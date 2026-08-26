@@ -10,6 +10,24 @@ seção `## <número>` com o que mudou. O resto acontece sozinho.
 
 ---
 
+## 1.4.1
+
+- Os "Recursos utilizados" voltaram a aparecer com o nome completo, igual
+  ao do formulário da SED: "Computadores/notebooks (pesquisa) no
+  laboratório" em vez de "Notebooks — pesquisa". Encurtar o texto tinha
+  escondido justamente o que distingue um recurso do outro na hora de
+  marcar — se é no laboratório ou se é o notebook levado para a sala.
+- Os nove recursos continuam todos visíveis sem precisar rolar a tela.
+- Com o programa aberto, ele passa a procurar versão nova uma vez por dia
+  — antes só procurava na abertura, e quem deixa o computador do
+  laboratório ligado a semana inteira nunca recebia correção nenhuma. Se
+  houver formulário preenchido esperando envio, a procura espera: aceitar
+  a atualização reabre o programa e jogaria o preenchimento fora.
+- O rodapé passa a mostrar a que horas a agenda foi lida pela última vez.
+  Ela é relida sozinha a cada 30 minutos (já era assim), mas isso
+  acontecia sem deixar rastro — e "será que ele já viu a aula que acabei
+  de agendar?" era motivo para fechar e abrir o programa à toa.
+
 ## 1.4.0
 
 - O navegador passa a preencher o formulário EM SEGUNDO PLANO. A janela

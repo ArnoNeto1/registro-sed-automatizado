@@ -246,28 +246,6 @@ PROFESSOR_FILTRO = _config("PROFESSOR_FILTRO") or None
 # Recursos utilizados por padrão em toda aula (a regra de ouro combinada:
 # só pergunta recurso diferente se você pedir explicitamente com
 # --perguntar-recursos).
-# Como cada recurso aparece NA TELA. O texto enviado à SED continua sendo o
-# nome completo (RECURSOS_DISPONIVEIS) — isto aqui é só para caber.
-#
-# O motivo é concreto: com os nomes por extenso, os oito recursos só cabiam
-# em duas colunas de quatro linhas, e essas quatro linhas empurravam a lista
-# para fora da parte visível numa tela de 1366x768. Foi o que fez um
-# professor relatar que "sumiram as opções de materiais". Encurtando o
-# rótulo, cabem três colunas de três linhas — e a lista inteira aparece sem
-# rolar.
-RECURSO_CURTO = {
-    "Computadores/notebooks (pesquisa) no laboratório": "Notebooks — pesquisa",
-    "Computadores/notebooks (software/programa) no laboratório": "Notebooks — software",
-    "Computadores/notebooks (edição de imagens/vídeos) no laboratório": "Notebooks — imagens/vídeos",
-    "Computadores/notebooks (sites educacionais) no laboratório": "Notebooks — sites educacionais",
-    "Notebooks (recurso móvel para sala de aula)": "Notebooks na sala de aula",
-}
-
-
-def rotulo_curto(recurso: str) -> str:
-    return RECURSO_CURTO.get(recurso, recurso)
-
-
 RECURSOS_PADRAO = [
     "Lousa Digital",
     "Computadores/notebooks (pesquisa) no laboratório",

@@ -94,7 +94,6 @@ from config import (  # noqa: E402
     curso_sugerido,
     etapa_para_turma,
     resolver_componente,
-    rotulo_curto,
     subetapa_sugerida,
     SENHAS_SALVAS,
     TODOS_TURNOS,
@@ -188,6 +187,15 @@ JANELA_AVISO_MIN = 5
 # De quanto em quanto tempo relê a agenda sozinho, para pegar aulas
 # agendadas depois que o programa foi aberto.
 INTERVALO_RECONSULTA_MS = 30 * 60 * 1000
+
+# De quanto em quanto tempo procura versão nova com o programa aberto.
+#
+# Ao abrir, ele já procura uma vez — e para quem fecha o programa todo dia
+# isso basta. Mas em laboratório é comum a máquina ficar dias ligada com o
+# programa aberto: sem este relógio, quem faz isso nunca receberia
+# correção nenhuma. Uma vez por dia é frequência de sobra para um programa
+# que muda algumas vezes por mês.
+INTERVALO_ATUALIZACAO_MS = 24 * 60 * 60 * 1000
 
 # Ritmo do verde piscando na linha "Sugerida agora". 700ms chama atenção
 # sem virar aquele pisca-pisca que cansa a vista em poucos minutos.
@@ -646,6 +654,7 @@ class Janela(tk.Tk):
         # relógio do aviso de início de aula + reconsulta periódica
         self.after(INTERVALO_CHECAGEM_MS, self._verificar_inicio_de_aula)
         self.after(INTERVALO_RECONSULTA_MS, self._recarregar_silencioso)
+        self.after(INTERVALO_ATUALIZACAO_MS, self._procurar_atualizacao_diaria)
 
     # -- construção da tela -------------------------------------------------
     def _montar(self) -> None:
@@ -876,14 +885,22 @@ class Janela(tk.Tk):
         # juntos na primeira coluna e a segunda não estoura a largura da
         # janela. Antes o texto da direita saía cortado ("...no laborató"),
         # e a barra de rolagem da área de cima ainda comia alguns pixels.
-        colunas_recursos = 3
+        # Nome COMPLETO na tela, igual ao do formulário da SED. Cheguei a
+        # encurtar ("Notebooks — software") para caber em três colunas, e
+        # o professor sentiu falta da informação: "no laboratório" e
+        # "recurso móvel para sala de aula" são justamente o que distingue
+        # um recurso do outro na hora de marcar.
+        #
+        # Cabe assim porque as colunas são preenchidas de cima para baixo:
+        # os quatro nomes longos de "Computadores/notebooks" ficam todos na
+        # primeira coluna, e a segunda fica com os curtos. Em ziguezague, a
+        # segunda coluna herdaria um nome longo e estouraria a largura.
+        colunas_recursos = 2
         por_coluna = -(-len(RECURSOS_DISPONIVEIS) // colunas_recursos)
         for i, recurso in enumerate(RECURSOS_DISPONIVEIS):
             var = tk.BooleanVar(value=recurso in RECURSOS_PADRAO)
             self.vars_recursos[recurso] = var
-            ttk.Checkbutton(
-                caixa_recursos, text=rotulo_curto(recurso), variable=var
-            ).grid(
+            ttk.Checkbutton(caixa_recursos, text=recurso, variable=var).grid(
                 row=i % por_coluna, column=i // por_coluna, sticky="w",
                 padx=(0, 18), pady=1
             )
@@ -959,6 +976,12 @@ class Janela(tk.Tk):
             text=f"versão {atualizador.versao_atual()}",
             style="Rodape.TLabel",
         ).pack(side="right")
+        # A releitura da agenda acontece de meia em meia hora, calada. Sem
+        # este carimbo não havia como saber se ela tinha acontecido — e
+        # "será que ele já viu a aula que acabei de agendar?" é justamente
+        # a dúvida que faz a pessoa fechar e abrir o programa à toa.
+        self.rotulo_agenda = ttk.Label(rodape, text="", style="Rodape.TLabel")
+        self.rotulo_agenda.pack(side="right", padx=(0, 16))
         ttk.Button(
             rodape, text="Procurar atualização", style="Rodape.TButton",
             command=self._procurar_atualizacao_agora,
@@ -1236,6 +1259,21 @@ class Janela(tk.Tk):
         self._definir_status("Conferindo a conta Google da escola...")
         self.comandos.put(("conta_google",))
 
+    def _procurar_atualizacao_diaria(self) -> None:
+        """
+        Procura versão nova uma vez por dia, com o programa aberto.
+
+        Adia se houver formulário preenchido esperando envio: aceitar a
+        atualização fecha e reabre o programa, e isso jogaria fora um
+        preenchimento pronto — bem na hora em que a pessoa está conferindo
+        para mandar. Nesse caso ele tenta de novo em meia hora.
+        """
+        ocupado = self.preenchido_para is not None
+        proximo = INTERVALO_RECONSULTA_MS if ocupado else INTERVALO_ATUALIZACAO_MS
+        if not ocupado:
+            threading.Thread(target=self._procurar_atualizacao, daemon=True).start()
+        self.after(proximo, self._procurar_atualizacao_diaria)
+
     def _procurar_atualizacao_agora(self) -> None:
         """Botão 'Procurar atualização' — a consulta vai para outra thread."""
         self._definir_status("Procurando versão nova...")
@@ -1491,6 +1529,15 @@ class Janela(tk.Tk):
         self._definir_status(
             f"Começou agora: {grupo.disciplina} · {grupo.turma} · {quando}"
         )
+
+    def _marcar_hora_da_agenda(self) -> None:
+        """Carimba no rodapé quando a agenda foi lida pela última vez."""
+        try:
+            self.rotulo_agenda.configure(
+                text=f"agenda lida às {agora_sc():%H:%M} · relê a cada 30 min"
+            )
+        except (AttributeError, tk.TclError):
+            pass
 
     def _recarregar_silencioso(self) -> None:
         """Relê a agenda de tempos em tempos, sem chamar atenção."""
@@ -1963,6 +2010,7 @@ class Janela(tk.Tk):
                     self.grupos = evento[1]
                     quieto = bool(evento[2]) if len(evento) > 2 else False
                     self.enviados = carregar_enviados()
+                    self._marcar_hora_da_agenda()
                     # Aulas que já começaram há mais tempo que a janela de
                     # aviso entram como "já avisadas": abrir o programa às
                     # 15h não deve piscar de uma vez pela manhã inteira.
