@@ -1,0 +1,88 @@
+name: Montar o programa (.exe)
+
+# Toda vez que um arquivo do programa muda aqui no GitHub, esta receita
+# roda sozinha num computador com Windows emprestado pelo GitHub, monta o
+# executável e publica em "Releases".
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  montar:
+    runs-on: windows-latest
+
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+
+      - name: Preparar o Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Instalar o que o programa precisa
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Descobrir a versão
+        id: versao
+        shell: bash
+        run: echo "numero=$(tr -d '[:space:]' < VERSAO.txt)" >> "$GITHUB_OUTPUT"
+
+      - name: Montar o executável
+        run: >
+          pyinstaller --noconfirm --onefile --windowed
+          --name Registro-SED
+          --add-data "VERSAO.txt;."
+          --add-data ".env.example;."
+          --collect-all playwright
+          app.py
+
+      - name: Conferir se o executável saiu inteiro
+        shell: bash
+        run: |
+          test -f "dist/Registro-SED.exe" || { echo "O executável não foi gerado."; exit 1; }
+          TAMANHO=$(stat -c%s "dist/Registro-SED.exe")
+          echo "Tamanho: $((TAMANHO / 1024 / 1024)) MB"
+          test "$TAMANHO" -gt 10000000 || { echo "Executável pequeno demais."; exit 1; }
+
+      - name: Publicar a versão
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="v${{ steps.versao.outputs.numero }}"
+          NOTAS=$(git log -1 --pretty=%s)
+          gh release delete "$TAG" --yes --cleanup-tag 2>/dev/null || true
+          gh release create "$TAG" "dist/Registro-SED.exe" \
+            --title "Registro SED $TAG" \
+            --notes "$NOTAS"
+
+      - name: Avisar os professores que saiu versão nova
+        shell: bash
+        run: |
+          TAG="v${{ steps.versao.outputs.numero }}"
+          NOTAS=$(git log -1 --pretty=%s | sed 's/\\/\\\\/g; s/"/\\"/g')
+          cat > versao.json <<JSON
+          {
+            "versao": "${{ steps.versao.outputs.numero }}",
+            "exe": "https://github.com/${{ github.repository }}/releases/download/$TAG/Registro-SED.exe",
+            "zip": "https://github.com/${{ github.repository }}/archive/refs/heads/main.zip",
+            "notas": "$NOTAS"
+          }
+          JSON
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add versao.json
+          git diff --cached --quiet || git commit -m "versão ${{ steps.versao.outputs.numero }} publicada [skip ci]"
+          git pull --rebase --autostash
+          git push
