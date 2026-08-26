@@ -1,6 +1,6 @@
 {
-  "versao": "1.4.1",
-  "exe": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v1.4.1/Registro-SED.exe",
+  "versao": "1.4.2",
+  "exe": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v1.4.2/Registro-SED.exe",
   "zip": "https://github.com/ArnoNeto1/registro-sed-automatizado/archive/refs/heads/main.zip",
-  "notas": "- Os \"Recursos utilizados\" voltaram a aparecer com o nome completo, igual\n  ao do formulário da SED: \"Computadores/notebooks (pesquisa) no\n  laboratório\" em vez de \"Notebooks — pesquisa\". Encurtar o texto tinha\n  escondido justamente o que distingue um recurso do outro na hora de\n  marcar — se é no laboratório ou se é o notebook levado para a sala.\n- Os nove recursos continuam todos visíveis sem precisar rolar a tela.\n- Com o programa aberto, ele passa a procurar versão nova uma vez por dia\n  — antes só procurava na abertura, e quem deixa o computador do\n  laboratório ligado a semana inteira nunca recebia correção nenhuma. Se\n  houver formulário preenchido esperando envio, a procura espera: aceitar\n  a atualização reabre o programa e jogaria o preenchimento fora.\n- O rodapé passa a mostrar a que horas a agenda foi lida pela última vez.\n  Ela é relida sozinha a cada 30 minutos (já era assim), mas isso\n  acontecia sem deixar rastro — e \"será que ele já viu a aula que acabei\n  de agendar?\" era motivo para fechar e abrir o programa à toa."
+  "notas": "- Corrigido o \"não consegui reabrir o programa sozinho\" que aparecia\n  depois de atualizar. A troca da versão dava certo — o erro era só na\n  hora de abrir a versão nova, e bastava abrir pelo atalho. Agora ele\n  reabre sozinho de verdade.\n- Se algum dia isso falhar de novo, a mensagem passa a dizer o motivo\n  técnico junto, em vez de só \"não consegui\"."
 }
