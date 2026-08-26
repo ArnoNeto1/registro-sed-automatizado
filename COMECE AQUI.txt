@@ -13,7 +13,7 @@ que ele faz.
 
 
 -----------------------------------------------------------------------
-INSTALAR (uns 5 minutos, uma vez só)
+INSTALAR (uns 3 minutos, uma vez só)
 -----------------------------------------------------------------------
 
 PASSO 1 — Baixar o programa
@@ -39,7 +39,7 @@ PASSO 2 — Guardar numa pasta própria
     tudo, você vai acabar apagando sem querer.
 
 
-PASSO 3 — Abrir uma primeira vez
+PASSO 3 — Abrir e preencher a tela de boas-vindas
 
     Dê dois cliques no Registro-SED.exe.
 
@@ -49,36 +49,32 @@ PASSO 3 — Abrir uma primeira vez
     >>> "Mais informações" e depois em "Executar assim mesmo".
     >>> Só na primeira vez.
 
-    O programa abre e diz que falta configurar. É esperado — ele acabou
-    de criar um arquivo chamado  .env  ali na pasta.
+    Vai abrir uma tela pedindo:
+
+        Escola ....... escolha na lista (é o nome exato que a SED usa)
+        Regional ..... já vem BLUMENAU
+        Seu nome ..... como deve aparecer no registro enviado à SED
+        Seu CPF ...... o mesmo login do site da agenda do NTE
+        Você é orientador de ..... Tecnologias Educacionais ou Maker
+        Você atende em ........... marque os seus turnos
+
+    Clique em Salvar. Pronto, está configurado.
 
 
-PASSO 4 — Preencher os seus dados
+PASSO 4 — Entrar
 
-    Feche o programa. Clique com o botão direito no arquivo  .env  >
-    Abrir com > Bloco de Notas.
+    O programa pede a sua senha do site da agenda. É a mesma senha de
+    sempre.
 
-    Preencha as linhas com os SEUS dados:
-
-        ORIENTADOR_NOME=Seu Nome Completo
-        ESCOLA=EEB NOME DA SUA ESCOLA
-        REGIONAL=BLUMENAU
-        AGENDA_CPF=seu CPF, só números
-        AGENDA_SENHA=sua senha do site da agenda
-
-    O nome da escola tem que ser IGUALZINHO ao que aparece na lista da
-    SED — confira no arquivo "ESCOLAS - CRE BLUMENAU.txt".
-
-    Salve e feche o Bloco de Notas.
-
-    Esse arquivo fica só no SEU computador. Ele não é enviado a lugar
-    nenhum, e não vai junto quando o programa se atualiza.
+    Essa senha NÃO fica guardada em lugar nenhum: ela é pedida toda vez
+    que você abre o programa. É o que garante que, num computador
+    dividido com outro professor, ninguém registre aula no seu nome.
 
 
 PASSO 5 — Entrar na conta Google da escola
 
-    Abra o programa de novo e clique em "Preencher formulário" numa aula
-    qualquer. Vai abrir uma janela do navegador pedindo login.
+    Escolha uma aula e clique em "Preencher formulário". Vai abrir uma
+    janela do navegador pedindo login.
 
     Entre com a conta Google DA ESCOLA (aquela do formulário da SED).
     Só na primeira vez — depois ele lembra.
@@ -87,11 +83,36 @@ Pronto. Daí em diante é só abrir o programa.
 
 
 -----------------------------------------------------------------------
+DOIS PROFESSORES NO MESMO COMPUTADOR
+-----------------------------------------------------------------------
+
+É o caso de quem divide o laboratório com um colega de outro turno.
+
+    - Na tela de entrada, clique em "Cadastrar outro professor" e
+      preencha os dados dele.
+    - A partir daí, cada um escolhe o próprio nome ao entrar e digita a
+      própria senha.
+    - Para passar a vez: botão "Sair da conta", lá embaixo. A senha de
+      quem estava usando some na hora.
+    - Como cada um marca os turnos que atende, o programa já abre com o
+      nome de quem está de plantão naquele horário.
+
+O histórico de registros é do computador, não da pessoa: os dois veem as
+mesmas aulas e sabem o que já foi enviado. É proposital — o laboratório é
+um só.
+
+
+-----------------------------------------------------------------------
 PERGUNTAS QUE TODO MUNDO FAZ
 -----------------------------------------------------------------------
 
 "Preciso instalar Python?"
     Não. Isso era na versão antiga.
+
+"Preciso editar aquele arquivo .env?"
+    Não, também é coisa da versão antiga. Agora é tudo pela tela. (Quem
+    já tinha o .env configurado continua funcionando do mesmo jeito, sem
+    precisar refazer nada.)
 
 "Ele mexe no meu Chrome?"
     Não. Ele abre uma janela separada, com um perfil próprio dentro da
@@ -108,13 +129,10 @@ PERGUNTAS QUE TODO MUNDO FAZ
 
 "Ele pode enviar registro errado sem eu ver?"
     Não. Ele para na última página e mostra tudo o que vai mandar. O
-    envio só acontece quando você clica em "Enviar para a SED" e confirma.
+    envio só acontece quando você clica em "Enviar para a SED" e
+    confirma.
 
-
------------------------------------------------------------------------
-E OS ARQUIVOS .bat QUE ESTÃO AQUI?
------------------------------------------------------------------------
-
-São do jeito antigo de rodar (com Python instalado). Continuam
-funcionando para quem já usava assim, e servem para quem quiser mexer no
-código. Para usar o programa no dia a dia, ignore-os: baixe o .exe.
+"Dei dois cliques e não aconteceu nada."
+    Olhe se apareceu um arquivo  erro.txt  na pasta do programa e mande
+    ele para quem cuida do programa. É exatamente para isso que ele
+    existe.

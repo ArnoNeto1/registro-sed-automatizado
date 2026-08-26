@@ -31,6 +31,8 @@ from __future__ import annotations
 import datetime as dt
 import json
 import os
+import subprocess
+import sys
 import queue
 import threading
 import tkinter as tk
@@ -92,8 +94,13 @@ from config import (  # noqa: E402
     curso_sugerido,
     etapa_para_turma,
     resolver_componente,
+    rotulo_curto,
     subetapa_sugerida,
+    SENHAS_SALVAS,
+    TODOS_TURNOS,
+    turno_do_horario,
 )
+import configuracao  # noqa: E402
 from main import (  # noqa: E402
     ESTADO_FILE,  # noqa: F401  (mantido pra deixar claro de onde vem o estado)
     PROFILE_DIR,
@@ -110,6 +117,10 @@ from sed_form_filler import (  # noqa: E402
     preencher_atividade_com_estudantes,
     preencher_dados_fixos,
 )
+
+# O iniciar.py olha esta marca para não repetir um aviso que a pessoa já viu.
+ERRO_JA_MOSTRADO = False
+
 
 def _texto_componente(comp) -> str:
     """
@@ -499,8 +510,14 @@ class NavegadorWorker(threading.Thread):
 # Janela
 # ---------------------------------------------------------------------------
 class Janela(tk.Tk):
-    def __init__(self):
+    def __init__(self, orientador=None, senha=""):
         super().__init__()
+        # quando a pessoa entrou pela tela de login, o professor já vem
+        # escolhido e com a senha na mão; sem ela (formato .env antigo), a
+        # escolha é feita aqui embaixo como sempre foi
+        self._orientador_da_entrada = orientador
+        self._senha_da_entrada = senha
+        self.sair_da_conta = False
         self.title("Registro de Atividades — SED-SC")
         # A janela se ajusta à tela em vez de ter um tamanho fixo. Num
         # monitor de 1366x768 (comum em escola), ou com o Windows em 125%
@@ -533,9 +550,11 @@ class Janela(tk.Tk):
         # noite. Então o turno atual decide primeiro; o último escolhido
         # entra como segunda opção (e vale sozinho quando os dois cobrem
         # o mesmo turno, ou quando há um professor só).
-        de_plantao = orientador_de_plantao(agora_sc())
-        if de_plantao is not None:
-            self.orientador = de_plantao
+        if self._orientador_da_entrada is not None:
+            self.orientador = dict(self._orientador_da_entrada)
+            self.orientador["senha"] = self._senha_da_entrada
+        elif orientador_de_plantao(agora_sc()) is not None:
+            self.orientador = orientador_de_plantao(agora_sc())
         else:
             lembrado = carregar_ultimo_professor()
             self.orientador = next(
@@ -584,6 +603,7 @@ class Janela(tk.Tk):
         estilo.configure(
             "Rodape.TLabel", background=COR_FUNDO, foreground="#9aa5b1", font=("Segoe UI", 8)
         )
+        estilo.configure("Rodape.TButton", font=("Segoe UI", 8), padding=(6, 2))
         estilo.configure(
             "SubAviso.TLabel",
             background=COR_FUNDO,
@@ -627,8 +647,14 @@ class Janela(tk.Tk):
         # Seletor de professor — só aparece quando a escola tem mais de um
         # orientador configurado. Com um professor só, um seletor de uma
         # opção é ruído puro.
+        # Com a configuração pela tela, quem troca de professor é a tela de
+        # entrada (que pede a senha) — um seletor aqui deixaria qualquer um
+        # registrar no nome do outro. Então: seletor no formato antigo,
+        # botão de sair no formato novo.
         self.combo_professor = None
-        if len(ORIENTADORES) > 1:
+        if not SENHAS_SALVAS:
+            pass          # a barra de conta fica no rodapé, junto da versão
+        elif len(ORIENTADORES) > 1:
             linha_prof = ttk.Frame(topo)
             linha_prof.pack(anchor="w", pady=(10, 0))
             ttk.Label(linha_prof, text="Quem está registrando:").pack(side="left")
@@ -761,7 +787,7 @@ class Janela(tk.Tk):
         ).grid(row=4, column=0, columnspan=4, sticky="w", pady=(12, 4))
         self.campo_conteudo = tk.Text(
             cartao_dados,
-            height=3,
+            height=2,
             wrap="word",
             font=("Segoe UI", 10),
             relief="solid",
@@ -788,13 +814,16 @@ class Janela(tk.Tk):
         # juntos na primeira coluna e a segunda não estoura a largura da
         # janela. Antes o texto da direita saía cortado ("...no laborató"),
         # e a barra de rolagem da área de cima ainda comia alguns pixels.
-        por_coluna = (len(RECURSOS_DISPONIVEIS) + 1) // 2
+        colunas_recursos = 3
+        por_coluna = -(-len(RECURSOS_DISPONIVEIS) // colunas_recursos)
         for i, recurso in enumerate(RECURSOS_DISPONIVEIS):
             var = tk.BooleanVar(value=recurso in RECURSOS_PADRAO)
             self.vars_recursos[recurso] = var
-            ttk.Checkbutton(caixa_recursos, text=recurso, variable=var).grid(
+            ttk.Checkbutton(
+                caixa_recursos, text=rotulo_curto(recurso), variable=var
+            ).grid(
                 row=i % por_coluna, column=i // por_coluna, sticky="w",
-                padx=(0, 10), pady=1
+                padx=(0, 18), pady=1
             )
 
         # --- ações ---
@@ -857,6 +886,25 @@ class Janela(tk.Tk):
             text=f"versão {atualizador.versao_atual()}",
             style="Rodape.TLabel",
         ).pack(side="right")
+
+        # Barra de conta no rodapé, e não no alto: ali ela não disputa
+        # altura com a lista de aulas e com os campos do registro, que é
+        # o que a pessoa precisa ver numa tela pequena. E fica ao lado da
+        # versão, que é o outro dado "sobre o programa", não sobre a aula.
+        if not SENHAS_SALVAS:
+            ttk.Label(
+                rodape,
+                text=f"registrando como {self.orientador['nome']}",
+                style="Rodape.TLabel",
+            ).pack(side="left")
+            ttk.Button(
+                rodape, text="Sair da conta", style="Rodape.TButton",
+                command=self._sair_da_conta,
+            ).pack(side="left", padx=(10, 0))
+            ttk.Button(
+                rodape, text="Meus dados", style="Rodape.TButton",
+                command=self._editar_cadastro,
+            ).pack(side="left", padx=(6, 0))
 
         # --- ordem de empacotamento (é ela que decide quem some) ---------
         # O Tk atende os widgets na ordem em que são empacotados. Os de
@@ -1520,6 +1568,44 @@ class Janela(tk.Tk):
             self._escrever("")
 
     # -- ações --------------------------------------------------------------
+    def _sair_da_conta(self) -> None:
+        """
+        Fecha a sessão deste professor e volta para a tela de entrada.
+
+        A senha vive só na memória; ao sair, ela some junto com a janela.
+        É assim que o professor do noturno assume a máquina sem herdar a
+        conta de quem usou de manhã.
+        """
+        if self.preenchido_para is not None:
+            if not messagebox.askyesno(
+                "Sair da conta",
+                "Tem um formulário preenchido esperando envio.\n\n"
+                "Sair agora descarta esse preenchimento. Continuar?",
+            ):
+                return
+        self.sair_da_conta = True
+        self._fechar()
+
+    def _editar_cadastro(self) -> None:
+        """Abre o cadastro deste professor (nome, CPF, turnos, escola)."""
+        atual = next(
+            (
+                p
+                for p in (configuracao.carregar().get("professores") or [])
+                if p.get("nome") == self.orientador["nome"]
+            ),
+            None,
+        )
+        tela = configuracao.TelaDeCadastro(mestre=self, professor=atual)
+        if tela.mostrar():
+            messagebox.showinfo(
+                "Dados salvos",
+                "Pronto. O programa vai fechar e abrir de novo para os dados "
+                "novos valerem.",
+            )
+            self._fechar()
+            _reabrir_e_sair()
+
     def _trocar_professor(self, _evento=None) -> None:
         """
         Troca o professor que está registrando.
@@ -1794,13 +1880,111 @@ class Janela(tk.Tk):
         self.after(100, self._ler_eventos)
 
 
+def _reabrir_e_sair() -> None:
+    """
+    Fecha e abre o programa de novo.
+
+    Necessário depois de mexer no cadastro: escola, regional e nome são
+    lidos UMA vez, quando o programa abre, e distribuídos para os módulos
+    que preenchem o formulário. Continuar rodando depois de mudá-los
+    daria o pior dos mundos — a tela mostrando o dado novo e o registro
+    saindo com o antigo.
+    """
+    try:
+        if empacotado():
+            atualizador.reiniciar()
+        else:
+            subprocess.Popen([sys.executable] + sys.argv, close_fds=True)
+    except Exception:
+        pass
+    raise SystemExit(0)
+
+
+def _professores_cadastrados() -> list:
+    """
+    Lê os professores direto do arquivo, e não da configuração carregada
+    na abertura: assim um cadastro feito agora aparece na tela de entrada
+    sem precisar reabrir nada.
+    """
+    dados = configuracao.carregar()
+    return [
+        {
+            "nome": p.get("nome", ""),
+            "cpf": p.get("cpf", ""),
+            "senha": "",
+            "tipo": p.get("tipo", "tecnologias"),
+            "turnos": p.get("turnos") or list(TODOS_TURNOS),
+        }
+        for p in (dados.get("professores") or [])
+        if (p.get("nome") or "").strip()
+    ]
+
+
+def _quem_provavelmente_esta_usando(professores: list) -> str:
+    """Palpite para já vir escolhido na tela de entrada: turno, depois hábito."""
+    turno = turno_do_horario(agora_sc())
+    candidatos = [p for p in professores if turno in (p.get("turnos") or [])]
+    if len(candidatos) == 1:
+        return candidatos[0]["nome"]
+    lembrado = carregar_ultimo_professor()
+    nomes = [p["nome"] for p in professores]
+    if lembrado in nomes:
+        return lembrado
+    return nomes[0] if nomes else ""
+
+
+def _entrar_no_programa():
+    """
+    Quem vai usar o programa agora — e com qual senha.
+
+    Devolve (professor, senha) para a janela, ou None quando a pessoa
+    desiste (fecha a tela de entrada).
+
+    No formato antigo (.env com a senha salva) não há o que perguntar: o
+    programa abre direto, como sempre abriu.
+    """
+    if SENHAS_SALVAS:
+        return (None, "")
+
+    professores = _professores_cadastrados()
+    if not professores:
+        # sem ninguém cadastrado não há como entrar: cadastra e reabre
+        if configuracao.pedir_configuracao_inicial() is None:
+            return None
+        _reabrir_e_sair()
+
+    resposta = configuracao.pedir_entrada(
+        professores, sugerido=_quem_provavelmente_esta_usando(professores)
+    )
+    if resposta is None:
+        return None
+    if resposta[0] == "CADASTRAR":
+        if configuracao.pedir_configuracao_inicial() is not None:
+            _reabrir_e_sair()
+        return _entrar_no_programa()
+    professor, senha = resposta
+    professor["senha"] = senha
+    return (professor, senha)
+
+
 def main() -> None:
     # Rede de segurança: aberta pelo atalho, a janela roda SEM terminal
     # atrás. Se algo estourar antes dela aparecer (ex: falta uma
     # dependência), sem isto o programa morreria em silêncio e daria a
     # impressão de que "não abre". Assim, o erro aparece numa caixinha.
+    global ERRO_JA_MOSTRADO
     try:
-        Janela().mainloop()
+        # Laço de conta: entra -> usa -> sai -> entra de novo. É ele que
+        # permite o revezamento numa máquina compartilhada sem fechar e
+        # abrir o programa a cada troca de turno.
+        while True:
+            entrada = _entrar_no_programa()
+            if entrada is None:
+                return
+            janela = Janela(*entrada)
+            janela.mainloop()
+            if not getattr(janela, "sair_da_conta", False):
+                return
     except Exception:
         detalhe = traceback.format_exc()
         try:
@@ -1808,6 +1992,9 @@ def main() -> None:
             raiz.withdraw()
             messagebox.showerror("Erro ao abrir o programa", detalhe)
             raiz.destroy()
+            # avisa o iniciar.py de que a pessoa JA viu a mensagem, para
+            # não aparecerem duas caixinhas dizendo a mesma coisa
+            ERRO_JA_MOSTRADO = True
         except Exception:
             print(detalhe)
         raise

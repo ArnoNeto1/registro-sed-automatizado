@@ -5,14 +5,42 @@ Ajuste os valores abaixo (ou use o .env — veja .env.example) conforme a
 realidade da sua escola / orientação.
 """
 
+import json
 import os
 import re
 import unicodedata
+
+from caminhos import caminho
 
 # ---------------------------------------------------------------------------
 # Dados do professor orientador (repetidos em todo preenchimento)
 # ---------------------------------------------------------------------------
 PLACEHOLDER = "!! PREENCHA"
+
+
+# ---------------------------------------------------------------------------
+# Configuração feita PELA TELA (configuracao.json)
+# ---------------------------------------------------------------------------
+# A partir da versão 1.3, quem instala o programa configura tudo numa tela
+# na primeira execução, e os dados ficam aqui. O .env continua sendo lido
+# para quem já o tinha: o arquivo novo apenas tem preferência quando
+# existe. Assim ninguém que já estava trabalhando precisa refazer nada.
+#
+# A SENHA NÃO ESTÁ NESTE ARQUIVO, de propósito — ela é digitada na hora de
+# entrar e vive só na memória. Ver configuracao.py.
+def _da_tela() -> dict:
+    try:
+        with open(caminho("configuracao.json"), encoding="utf-8") as f:
+            dados = json.load(f)
+        return dados if isinstance(dados, dict) else {}
+    except Exception:
+        return {}
+
+
+CONFIG_DA_TELA = _da_tela()
+_PROFESSORES_DA_TELA = [
+    p for p in (CONFIG_DA_TELA.get("professores") or []) if (p.get("nome") or "").strip()
+]
 
 
 def _config(nome: str, padrao: str = "") -> str:
@@ -30,13 +58,21 @@ def _config(nome: str, padrao: str = "") -> str:
     return (os.environ.get(nome) or "").strip() or padrao
 
 
-ORIENTADOR_NOME = _config("ORIENTADOR_NOME", PLACEHOLDER + " ORIENTADOR_NOME NO .env !!")
+ORIENTADOR_NOME = (
+    _PROFESSORES_DA_TELA[0]["nome"]
+    if _PROFESSORES_DA_TELA
+    else _config("ORIENTADOR_NOME", PLACEHOLDER + " ORIENTADOR_NOME NO .env !!")
+)
 
 # "tecnologias" ou "maker"
-ORIENTADOR_TIPO = _config("ORIENTADOR_TIPO", "tecnologias")
+ORIENTADOR_TIPO = (
+    _PROFESSORES_DA_TELA[0].get("tipo", "tecnologias")
+    if _PROFESSORES_DA_TELA
+    else _config("ORIENTADOR_TIPO", "tecnologias")
+)
 
-REGIONAL = _config("REGIONAL", "BLUMENAU")
-ESCOLA = _config("ESCOLA", PLACEHOLDER + " ESCOLA NO .env !!")
+REGIONAL = CONFIG_DA_TELA.get("regional") or _config("REGIONAL", "BLUMENAU")
+ESCOLA = CONFIG_DA_TELA.get("escola") or _config("ESCOLA", PLACEHOLDER + " ESCOLA NO .env !!")
 
 
 def _sem_acento(texto: str) -> str:
@@ -108,6 +144,19 @@ def _ler_orientadores() -> list:
     (ORIENTADOR_NOME + AGENDA_CPF + AGENDA_SENHA) — ele segue valendo,
     e é o que acontece quando nenhum ORIENTADOR_1_* é encontrado.
     """
+    # cadastrados pela tela: sem senha guardada (ela é pedida ao entrar)
+    if _PROFESSORES_DA_TELA:
+        return [
+            {
+                "nome": p.get("nome", ""),
+                "cpf": p.get("cpf", ""),
+                "senha": "",
+                "tipo": p.get("tipo", "tecnologias"),
+                "turnos": p.get("turnos") or list(TODOS_TURNOS),
+            }
+            for p in _PROFESSORES_DA_TELA
+        ]
+
     lista = []
     numero = 1
     while True:
@@ -160,6 +209,12 @@ def orientador_de_plantao(momento):
 
 ORIENTADORES = _ler_orientadores()
 
+# Há senha guardada em arquivo? Só no formato antigo (.env) existe. Quando
+# não há, o programa pede a senha na entrada — e é isso que permite dois
+# professores dividirem o mesmo computador sem um usar a conta do outro.
+SENHAS_SALVAS = any((o.get("senha") or "").strip() for o in ORIENTADORES)
+CONFIGURADO_PELA_TELA = bool(_PROFESSORES_DA_TELA)
+
 
 def configuracao_incompleta() -> list:
     """
@@ -191,6 +246,28 @@ PROFESSOR_FILTRO = _config("PROFESSOR_FILTRO") or None
 # Recursos utilizados por padrão em toda aula (a regra de ouro combinada:
 # só pergunta recurso diferente se você pedir explicitamente com
 # --perguntar-recursos).
+# Como cada recurso aparece NA TELA. O texto enviado à SED continua sendo o
+# nome completo (RECURSOS_DISPONIVEIS) — isto aqui é só para caber.
+#
+# O motivo é concreto: com os nomes por extenso, os oito recursos só cabiam
+# em duas colunas de quatro linhas, e essas quatro linhas empurravam a lista
+# para fora da parte visível numa tela de 1366x768. Foi o que fez um
+# professor relatar que "sumiram as opções de materiais". Encurtando o
+# rótulo, cabem três colunas de três linhas — e a lista inteira aparece sem
+# rolar.
+RECURSO_CURTO = {
+    "Computadores/notebooks (pesquisa) no laboratório": "Notebooks — pesquisa",
+    "Computadores/notebooks (software/programa) no laboratório": "Notebooks — software",
+    "Computadores/notebooks (edição de imagens/vídeos) no laboratório": "Notebooks — imagens/vídeos",
+    "Computadores/notebooks (sites educacionais) no laboratório": "Notebooks — sites educacionais",
+    "Notebooks (recurso móvel para sala de aula)": "Notebooks na sala de aula",
+}
+
+
+def rotulo_curto(recurso: str) -> str:
+    return RECURSO_CURTO.get(recurso, recurso)
+
+
 RECURSOS_PADRAO = [
     "Lousa Digital",
     "Computadores/notebooks (pesquisa) no laboratório",
