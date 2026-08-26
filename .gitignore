@@ -1,0 +1,24 @@
+# ---------------------------------------------------------------------
+# O que NUNCA pode subir para o GitHub
+# ---------------------------------------------------------------------
+# O repositório é público. Estes arquivos são pessoais de cada professor
+# e não têm nada que fazer aqui.
+
+.env                        # CPF e senha da agenda
+browser_profile/            # login da conta Google da escola
+registros_enviados.json     # histórico do que já foi enviado à SED
+aulas_nao_realizadas.json
+ultimo_professor.txt
+backup_versao_anterior/
+
+# ---------------------------------------------------------------------
+# Sobras de quem roda o programa
+# ---------------------------------------------------------------------
+__pycache__/
+*.pyc
+build/
+dist/
+*.spec
+*.antigo.exe
+*.novo.exe
+_atualizacao.zip

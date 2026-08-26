@@ -1,0 +1,2 @@
+playwright>=1.45
+python-dotenv>=1.0

@@ -1,0 +1,120 @@
+=======================================================================
+  REGISTRO SED AUTOMATIZADO — comece por aqui
+=======================================================================
+
+Este programa lê a agenda do laboratório, reconhece a aula que acabou de
+acontecer e preenche sozinho o formulário de registro de atividades da
+SED — parando antes de enviar, para você conferir.
+
+Ele NUNCA envia nada sem você clicar em "Enviar para a SED".
+
+Leia o PDF "Registro SED Automatizado.pdf" se quiser entender melhor o
+que ele faz.
+
+
+-----------------------------------------------------------------------
+INSTALAR (uns 5 minutos, uma vez só)
+-----------------------------------------------------------------------
+
+PASSO 1 — Baixar o programa
+
+    Abra:
+    https://github.com/ArnoNeto1/registro-sed-automatizado/releases
+
+    Clique no arquivo  Registro-SED.exe  da versão mais recente.
+
+    Não precisa instalar Python nem nada: é um arquivo só.
+
+
+PASSO 2 — Guardar numa pasta própria
+
+    Crie uma pasta na Área de Trabalho, por exemplo:
+
+        Registro SED
+
+    e coloque o Registro-SED.exe DENTRO dela.
+
+    Isso importa: o programa cria ao lado dele os arquivos de
+    configuração e de histórico. Solto na pasta Downloads, no meio de
+    tudo, você vai acabar apagando sem querer.
+
+
+PASSO 3 — Abrir uma primeira vez
+
+    Dê dois cliques no Registro-SED.exe.
+
+    >>> O Windows vai mostrar uma tela azul dizendo "O Windows protegeu
+    >>> o computador". Isso NÃO é vírus: acontece com todo programa
+    >>> novo que não é de uma empresa conhecida. Clique em
+    >>> "Mais informações" e depois em "Executar assim mesmo".
+    >>> Só na primeira vez.
+
+    O programa abre e diz que falta configurar. É esperado — ele acabou
+    de criar um arquivo chamado  .env  ali na pasta.
+
+
+PASSO 4 — Preencher os seus dados
+
+    Feche o programa. Clique com o botão direito no arquivo  .env  >
+    Abrir com > Bloco de Notas.
+
+    Preencha as linhas com os SEUS dados:
+
+        ORIENTADOR_NOME=Seu Nome Completo
+        ESCOLA=EEB NOME DA SUA ESCOLA
+        REGIONAL=BLUMENAU
+        AGENDA_CPF=seu CPF, só números
+        AGENDA_SENHA=sua senha do site da agenda
+
+    O nome da escola tem que ser IGUALZINHO ao que aparece na lista da
+    SED — confira no arquivo "ESCOLAS - CRE BLUMENAU.txt".
+
+    Salve e feche o Bloco de Notas.
+
+    Esse arquivo fica só no SEU computador. Ele não é enviado a lugar
+    nenhum, e não vai junto quando o programa se atualiza.
+
+
+PASSO 5 — Entrar na conta Google da escola
+
+    Abra o programa de novo e clique em "Preencher formulário" numa aula
+    qualquer. Vai abrir uma janela do navegador pedindo login.
+
+    Entre com a conta Google DA ESCOLA (aquela do formulário da SED).
+    Só na primeira vez — depois ele lembra.
+
+Pronto. Daí em diante é só abrir o programa.
+
+
+-----------------------------------------------------------------------
+PERGUNTAS QUE TODO MUNDO FAZ
+-----------------------------------------------------------------------
+
+"Preciso instalar Python?"
+    Não. Isso era na versão antiga.
+
+"Ele mexe no meu Chrome?"
+    Não. Ele abre uma janela separada, com um perfil próprio dentro da
+    pasta do programa. Suas abas, seu histórico e suas senhas não são
+    tocados.
+
+"E se eu não tiver Chrome?"
+    Ele usa o Microsoft Edge, que já vem no Windows.
+
+"Como recebo as correções?"
+    Sozinho. Quando abrir o programa e houver versão nova, ele avisa e
+    pergunta se pode atualizar. Você clica em sim, ele se troca e reabre.
+    Seus dados e seu histórico ficam intactos.
+
+"Ele pode enviar registro errado sem eu ver?"
+    Não. Ele para na última página e mostra tudo o que vai mandar. O
+    envio só acontece quando você clica em "Enviar para a SED" e confirma.
+
+
+-----------------------------------------------------------------------
+E OS ARQUIVOS .bat QUE ESTÃO AQUI?
+-----------------------------------------------------------------------
+
+São do jeito antigo de rodar (com Python instalado). Continuam
+funcionando para quem já usava assim, e servem para quem quiser mexer no
+código. Para usar o programa no dia a dia, ignore-os: baixe o .exe.

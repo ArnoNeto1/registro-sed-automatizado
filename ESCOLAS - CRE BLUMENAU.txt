@@ -1,0 +1,114 @@
+=======================================================================
+  COMO PREENCHER OS NOMES NO ARQUIVO .env
+=======================================================================
+
+Abra o arquivo  .env  com o Bloco de Notas. Escreva o valor logo depois
+do sinal de igual, SEM espaço, SEM aspas.
+
+Assim (exemplo):
+
+    ORIENTADOR_NOME=Maria Aparecida da Silva
+    REGIONAL=BLUMENAU
+    ESCOLA=EEB HERMANN HAMANN
+
+Errado:
+
+    ESCOLA = "EEB HERMANN HAMANN"      <-- tem espaço e aspas
+    ESCOLA=eeb hermann hamann          <-- minúsculas
+    ESCOLA=E.E.B. Hermann Hamann       <-- pontos a mais
+
+
+-----------------------------------------------------------------------
+ORIENTADOR_NOME
+-----------------------------------------------------------------------
+Seu nome como deve aparecer no formulário da SED. Este é livre: escreva
+normalmente, com maiúsculas e minúsculas e acentos.
+
+    ORIENTADOR_NOME=João Carlos de Souza
+
+
+-----------------------------------------------------------------------
+REGIONAL e ESCOLA — ATENÇÃO
+-----------------------------------------------------------------------
+Estes dois NÃO são livres. Eles precisam ser IDÊNTICOS ao que está
+escrito na lista do formulário da SED — mesma grafia, mesmas
+abreviações, tudo em MAIÚSCULAS.
+
+Se estiver diferente por uma letra que seja, o programa não encontra a
+opção na lista e para com a mensagem:
+
+    "Não consegui confirmar a seleção de ... no menu ..."
+
+Abaixo está a lista exata das escolas da regional BLUMENAU, tirada do
+próprio formulário. Copie e cole a sua, sem alterar nada.
+
+
+-----------------------------------------------------------------------
+ESCOLAS DA CRE BLUMENAU (46 opções, exatamente como no formulário)
+-----------------------------------------------------------------------
+COORDENADORIA
+CEDUP HERMANN HERING
+CEJA DE BLUMENAU + 6 UDs
+EEB ADOLPHO KONDER
+EEB ARNOLDO AGENOR ZIMMERMANN
+EEB BRUNO HOELTGEBAUM
+EEB CARLOS TECHENTIN
+EEB CEL PEDRO CHRISTIANO FEDDERSEN
+EEB CHRISTOPH AUGENSTEIN
+EEB DR MAX TAVARES D AMARAL
+EEB EMILIO BAUMGART
+EEB ERWIN RADTKE
+EEB FREI GODOFREDO
+EEB FREI POLICARPO
+EEB GOV CELSO RAMOS
+EEB GOV IRINEU BORNHAUSEN
+EEB HERCILIO DEEKE
+EEB HERMANN HAMANN
+EEB IVO D AQUINO
+EEB JOAO DURVAL MULLER
+EEB JOAO GAYA
+EEB JONAS R COELHO NEVES
+EEB JOSE BONIFACIO
+EEB JULIA LOPES DE ALMEIDA
+EEB LUIZ DELFINO
+EEB MARCOS KONDER
+EEB MARINA VIEIRA LEAL
+EEB PE JOSE MAURICIO
+EEB PEDRO II
+EEB PRES PRUDENTE DE MORAIS
+EEB PROF AUREA PERPETUA GOMES
+EEB PROF HERIBERTO JOSEPH MULLER
+EEB PROF HONORIO MIRANDA
+EEB PROF IZOLETE ELIZA GOUVEIA MULLER
+EEB PROF JOAO WIDEMANN
+EEB PROF LOTHAR KRIECK
+EEB PROF NILO BORGHESI
+EEB SANTOS DUMONT
+EEB TENENTE ANSELMO JOSE HESS
+EEB VALERIO GOMES
+EEB VICTOR HERING
+EEF JOSE VIEIRA CORTE
+EEM ERWIN CURT TEICHMANN
+EEM PROF ELZA HENRIQUETA T PACHECO
+EEM PROF WIGAND GELHARDT
+EEM SENADOR EVILASIO VIEIRA
+
+Repare que não há acentos nem pontos nessas escritas (é "JOSE", não
+"JOSÉ"; é "PROF", não "PROF."). Copie exatamente como está.
+
+
+-----------------------------------------------------------------------
+SE VOCÊ NÃO FOR DA REGIONAL BLUMENAU
+-----------------------------------------------------------------------
+Troque o REGIONAL pelo nome da sua (as opções são as mesmas que
+aparecem no formulário: ARARANGUÁ, BRAÇO DO NORTE, BRUSQUE, CAÇADOR,
+CAMPOS NOVOS, CANOINHAS, CHAPECÓ, CONCÓRDIA, CRICIÚMA, CURITIBANOS,
+DIONÍSIO CERQUEIRA, GRANDE FPOLIS, IBIRAMA, ITAJAÍ, ITAPIRANGA,
+ITUPORANGA, JARAGUÁ DO SUL, JOAÇABA, JOINVILLE, e outras).
+
+Para achar o nome exato da sua escola: abra o formulário da SED no
+navegador, escolha a sua regional, clique em Avançar e abra a lista
+"Selecione a sua Escola". Copie o nome de lá para o .env.
+
+Lembrando que, se o nome estiver errado, o próprio programa avisa —
+ele não envia nada com dado inventado.
