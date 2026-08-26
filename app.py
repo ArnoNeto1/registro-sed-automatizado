@@ -1319,11 +1319,18 @@ class Janela(tk.Tk):
             )
             try:
                 atualizador.reiniciar()
-            except Exception:
+            except Exception as erro:
+                # O motivo vai junto: sem ele, "não consegui reabrir" é
+                # indistinguível de qualquer outra falha, e foi preciso
+                # deduzir a causa por eliminação da primeira vez que isto
+                # aconteceu.
                 messagebox.showinfo(
-                    "Quase lá",
-                    "A atualização foi aplicada, mas não consegui reabrir o "
-                    "programa sozinho. Abra de novo pelo atalho.",
+                    "Atualizado — abra o programa de novo",
+                    f"A atualização foi aplicada: você já está na versão "
+                    f"{info['versao']}.\n\n"
+                    "Só não consegui reabrir o programa sozinho. Abra pelo "
+                    "atalho de sempre e estará tudo certo.\n\n"
+                    f"(motivo técnico: {erro})",
                 )
             self._fechar()
             return

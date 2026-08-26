@@ -10,6 +10,15 @@ seção `## <número>` com o que mudou. O resto acontece sozinho.
 
 ---
 
+## 1.4.2
+
+- Corrigido o "não consegui reabrir o programa sozinho" que aparecia
+  depois de atualizar. A troca da versão dava certo — o erro era só na
+  hora de abrir a versão nova, e bastava abrir pelo atalho. Agora ele
+  reabre sozinho de verdade.
+- Se algum dia isso falhar de novo, a mensagem passa a dizer o motivo
+  técnico junto, em vez de só "não consegui".
+
 ## 1.4.1
 
 - Os "Recursos utilizados" voltaram a aparecer com o nome completo, igual

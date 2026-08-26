@@ -200,11 +200,43 @@ def _aplicar_exe(info: dict) -> list:
                 pass
 
 
+# Sinalizadores do Windows para soltar o programa novo do que está saindo.
+# Números fixos porque subprocess.DETACHED_PROCESS só existe no Windows —
+# referenciá-lo direto quebraria o programa em qualquer outro sistema.
+_DESACOPLADO = 0x00000008      # DETACHED_PROCESS
+_NOVO_GRUPO = 0x00000200       # CREATE_NEW_PROCESS_GROUP
+
+
 def reiniciar() -> None:
-    """Abre a versão nova e sai — usado logo depois de trocar o .exe."""
+    """
+    Abre a versão nova e deixa esta sair.
+
+    OS TRÊS "DEVNULL" NÃO SÃO FRESCURA. Como .exe, o programa roda sem
+    janela de terminal — e, nesse modo, os canais de entrada e saída que
+    o Windows entrega ao processo não valem nada. Um subprocess.Popen que
+    tente herdá-los falha na hora, com "[WinError 6] identificador
+    inválido". Foi exatamente isso que aconteceu: o executável era
+    trocado com sucesso e, na hora de reabrir, o programa dizia que não
+    tinha conseguido. Apontando entrada e saída para o vazio, não há o
+    que herdar.
+
+    DETACHED_PROCESS solta o programa novo do que está fechando: sem
+    ele, o filho pode morrer junto com o pai que acabou de chamá-lo.
+    """
     if not empacotado():
         return
-    subprocess.Popen([sys.executable], close_fds=True)
+    extras = {}
+    if os.name == "nt":
+        extras["creationflags"] = _DESACOPLADO | _NOVO_GRUPO
+    subprocess.Popen(
+        [sys.executable],
+        cwd=str(pasta_do_programa()),
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        close_fds=True,
+        **extras,
+    )
 
 
 def _arquivos_do_pacote(caminho_zip: str) -> dict:
