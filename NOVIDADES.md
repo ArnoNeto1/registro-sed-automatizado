@@ -10,6 +10,16 @@ seção `## <número>` com o que mudou. O resto acontece sozinho.
 
 ---
 
+## 1.3.1
+
+- Corrigido o motivo de ninguém receber as atualizações: o endereço de
+  onde elas vêm dependia de uma linha escrita no arquivo .env, e quem
+  não tinha essa linha nunca era avisado de versão nova — sem erro, sem
+  aviso, sem nada. Agora o endereço já vem no programa.
+- Botão "Procurar atualização" no rodapé, para conferir na hora. Ele
+  sempre responde: ou oferece a versão nova, ou diz que você já está na
+  mais nova, ou avisa que não conseguiu consultar.
+
 ## 1.3.0
 
 - O aviso de versão nova passa a explicar o que mudou, em vez de só

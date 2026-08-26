@@ -277,14 +277,26 @@ RECURSOS_PADRAO = [
 # ---------------------------------------------------------------------------
 # Atualização automática
 #
-# Endereço onde ficam os arquivos da versão mais recente. Em branco =
-# atualização desligada (o programa funciona igual, só não se atualiza).
+# Endereço onde ficam os arquivos da versão mais recente.
 #
-# É configurável de propósito: hoje pode apontar para o GitHub e, se um
-# dia o NTE/SED hospedar os arquivos no servidor deles, basta trocar esta
-# linha no .env — sem reinstalar nada em escola nenhuma.
+# ISTO TEM UM PADRÃO DE PROPÓSITO. Antes o endereço só existia se a
+# pessoa tivesse escrito a linha URL_ATUALIZACAO no .env — e quem
+# instalasse sem essa linha (ou copiasse um .env antigo por cima)
+# simplesmente nunca era avisado de versão nova. O programa não dava erro
+# nenhum: ele calava. Uma correção publicada não chegava em ninguém, e o
+# jeito de descobrir era alguém reclamar de um defeito já resolvido.
+#
+# Continua configurável: escrever URL_ATUALIZACAO no .env manda por cima
+# deste padrão. É o caminho para o dia em que o NTE/SED hospedar os
+# arquivos no servidor deles — troca-se uma linha, sem reinstalar nada
+# em escola nenhuma. E deixar a linha escrita como "desligado" desliga a
+# atualização de vez.
 # ---------------------------------------------------------------------------
-URL_ATUALIZACAO = _config("URL_ATUALIZACAO")
+CASA_DO_PROGRAMA = "https://raw.githubusercontent.com/ArnoNeto1/registro-sed-automatizado/main"
+
+URL_ATUALIZACAO = _config("URL_ATUALIZACAO", CASA_DO_PROGRAMA)
+if URL_ATUALIZACAO.strip().lower() in ("desligado", "nao", "não", "off", "0"):
+    URL_ATUALIZACAO = ""
 
 # ---------------------------------------------------------------------------
 # URLs

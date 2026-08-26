@@ -886,6 +886,10 @@ class Janela(tk.Tk):
             text=f"versão {atualizador.versao_atual()}",
             style="Rodape.TLabel",
         ).pack(side="right")
+        ttk.Button(
+            rodape, text="Procurar atualização", style="Rodape.TButton",
+            command=self._procurar_atualizacao_agora,
+        ).pack(side="right", padx=(0, 10))
 
         # Barra de conta no rodapé, e não no alto: ali ela não disputa
         # altura com a lista de aulas e com os campos do registro, que é
@@ -1104,16 +1108,50 @@ class Janela(tk.Tk):
         except Exception:
             pass  # se o gerenciador de janelas não deixar, segue a vida
 
-    def _procurar_atualizacao(self) -> None:
-        """Consulta se há versão nova (roda fora da janela, em segundo plano)."""
+    def _procurar_atualizacao(self, manual: bool = False) -> None:
+        """
+        Consulta se há versão nova (roda fora da janela, em segundo plano).
+
+        Ao abrir o programa, o silêncio é proposital: sem internet ou com
+        o servidor fora do ar, não é hora de incomodar ninguém. Mas quando
+        a pessoa PEDE para procurar (manual=True), calar é o pior que
+        pode acontecer — ela fica sem saber se está atualizada, se a
+        internet falhou ou se o programa está quebrado. Então, no pedido
+        manual, toda saída tem resposta.
+        """
         if not URL_ATUALIZACAO:
+            if manual:
+                self.eventos.put((
+                    "aviso_atualizacao",
+                    "A atualização automática está desligada neste computador "
+                    "(a linha URL_ATUALIZACAO do arquivo .env está marcada "
+                    "como desligada).",
+                ))
             return
         try:
             info = atualizador.consultar(URL_ATUALIZACAO)
-        except Exception:
+        except Exception as erro:
+            if manual:
+                self.eventos.put((
+                    "aviso_atualizacao",
+                    "Não consegui consultar se há versão nova agora. "
+                    f"Tente de novo mais tarde.\n\n({erro})",
+                ))
             return  # sem internet, servidor fora do ar: hoje não deu, e tudo bem
         if info:
             self.eventos.put(("atualizacao", info))
+        elif manual:
+            self.eventos.put((
+                "aviso_atualizacao",
+                f"Você já está na versão mais nova ({atualizador.versao_atual()}).",
+            ))
+
+    def _procurar_atualizacao_agora(self) -> None:
+        """Botão 'Procurar atualização' — a consulta vai para outra thread."""
+        self._definir_status("Procurando versão nova...")
+        threading.Thread(
+            target=self._procurar_atualizacao, kwargs={"manual": True}, daemon=True
+        ).start()
 
     def _oferecer_atualizacao(self, info: dict) -> None:
         """Avisa que saiu versão nova e, se a pessoa quiser, atualiza."""
@@ -1879,6 +1917,8 @@ class Janela(tk.Tk):
                     self._preencher_tabela()
                 elif tipo == "atualizacao":
                     self._oferecer_atualizacao(evento[1])
+                elif tipo == "aviso_atualizacao":
+                    messagebox.showinfo("Atualização", evento[1])
                 elif tipo == "erro":
                     self.botao_preencher.configure(state="normal")
                     self._escrever("DEU ERRO\n\n" + evento[1])
