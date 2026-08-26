@@ -1117,7 +1117,14 @@ class Janela(tk.Tk):
 
     def _oferecer_atualizacao(self, info: dict) -> None:
         """Avisa que saiu versão nova e, se a pessoa quiser, atualiza."""
-        notas = f"\n\nO que mudou:\n{info['notas']}" if info.get("notas") else ""
+        # As notas vêm do NOVIDADES.md publicado junto com a versão. Um
+        # texto muito longo estouraria a caixinha do Windows e sairia
+        # cortado sem aviso, então ele é limitado aqui — o texto inteiro
+        # continua na página da versão, no GitHub.
+        texto_notas = (info.get("notas") or "").strip()
+        if len(texto_notas) > 1200:
+            texto_notas = texto_notas[:1200].rsplit("\n", 1)[0] + "\n(...)"
+        notas = f"\n\nO que mudou nesta versão:\n{texto_notas}" if texto_notas else ""
         if not messagebox.askyesno(
             "Nova versão disponível",
             f"Saiu a versão {info['versao']} do programa "

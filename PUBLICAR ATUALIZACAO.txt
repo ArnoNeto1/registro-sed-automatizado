@@ -7,67 +7,93 @@ professores que só usam.
 
 
 -----------------------------------------------------------------------
-A ROTINA, EM DUAS LINHAS
+A ROTINA INTEIRA, EM DOIS PASSOS
 -----------------------------------------------------------------------
 
     1. Suba os arquivos corrigidos aqui no GitHub.
-    2. Aumente o número dentro do VERSAO.txt.
 
-Só isso. O resto acontece sozinho.
+    2. No mesmo envio, mande também:
+         - VERSAO.txt    com o número aumentado
+         - NOVIDADES.md  com uma seção nova explicando o que mudou
+
+Só isso. Você não precisa apertar botão nenhum.
+
+
+-----------------------------------------------------------------------
+COMO ESCREVER AS NOVIDADES
+-----------------------------------------------------------------------
+
+O NOVIDADES.md é o que cada professor LÊ quando o programa avisa que
+saiu versão nova. O texto da seção da versão vai inteiro para dentro
+daquela caixinha.
+
+Formato (o número tem que ser igual ao do VERSAO.txt):
+
+    ## 1.3.1
+
+    - Corrigido o erro ao registrar aula de Educação Física.
+    - A lista de aulas agora mostra também as de sexta-feira.
+
+Escreva pensando em quem vai ler ali: o professor quer saber o que muda
+para ELE, não o nome do arquivo que você alterou.
+
+Se você esquecer de criar a seção, a nota vira o texto do commit — que
+costuma ser algo como "Add files via upload", e não ajuda ninguém.
 
 
 -----------------------------------------------------------------------
 O QUE ACONTECE SOZINHO
 -----------------------------------------------------------------------
 
-Assim que você sobe qualquer mudança, o GitHub:
+O GitHub confere o repositório assim que algo muda E, por garantia, de
+15 em 15 minutos. Quando o número do VERSAO.txt ainda não tem release,
+ele:
 
-  1. Empresta um computador com Windows;
+  1. empresta um computador com Windows;
   2. monta o Registro-SED.exe com o código novo;
-  3. confere se o executável saiu inteiro (se não saiu, ele para e NÃO
-     publica nada — ninguém recebe versão quebrada);
-  4. publica em "Releases", com o número da versão;
-  5. atualiza o arquivo versao.json, que é o que avisa os professores.
+  3. confere se o executável saiu inteiro (se não saiu, PARA e não
+     publica — ninguém recebe versão quebrada);
+  4. publica em "Releases" com as suas notas;
+  5. atualiza o versao.json, que é o que avisa os professores.
 
-Leva uns 5 minutos. Você acompanha na aba "Actions" lá em cima:
-bolinha amarela = montando, verde = publicado, vermelha = deu problema
-(clique nela para ver em que passo parou).
+Quando o número JÁ tem release, a execução termina em segundos sem
+fazer nada. É por isso que ela pode rodar de 15 em 15 minutos sem
+incomodar: publicar é aumentar o número do VERSAO.txt, e mais nada.
 
-Aí, quando cada professor abrir o programa, ele vê:
+Você acompanha na aba "Actions": bolinha amarela = montando, verde =
+publicado, vermelha = deu problema (clique nela para ver em que passo
+parou).
 
-    "Saiu a versão X. Atualizar agora?"
-
-Ele aceita, o programa se troca e reabre sozinho. Se ele disser não,
-continua usando a versão antiga e o programa pergunta de novo na próxima
-abertura — nunca troca nada sem o "sim" dele.
+Se um dia precisar republicar o MESMO número (por exemplo, o build
+falhou por causa da internet do GitHub), vá em Actions > Montar o
+programa > Run workflow e marque a caixinha "Publicar de novo mesmo que
+a versão já exista".
 
 
 -----------------------------------------------------------------------
 A REGRA DO NÚMERO DA VERSÃO
 -----------------------------------------------------------------------
 
-O VERSAO.txt é o que dispara tudo. Se você corrigir alguma coisa e
-esquecer de aumentar o número, o .exe até é montado, mas NINGUÉM recebe:
-o programa de cada professor compara justamente esse número.
-
-    1.2.0  ->  1.2.1     correção pequena
-    1.2.0  ->  1.3.0     recurso novo
-    1.2.0  ->  2.0.0     mudança grande
+    1.3.0  ->  1.3.1     correção pequena
+    1.3.0  ->  1.4.0     recurso novo
+    1.3.0  ->  2.0.0     mudança grande
 
 
 -----------------------------------------------------------------------
 O QUE A ATUALIZAÇÃO NUNCA TOCA
 -----------------------------------------------------------------------
 
-    .env                       (CPF e senha de cada professor)
+    .env                       (configuração antiga, de quem já tinha)
+    configuracao.json          (escola, professores e CPFs)
     browser_profile/           (login do Google da escola)
     registros_enviados.json    (o que já foi enviado à SED)
     aulas_nao_realizadas.json
     ultimo_professor.txt
 
-Quando o programa se troca, o executável antigo fica guardado ao lado
-como "Registro-SED.antigo.exe" até a abertura seguinte. Se uma versão
-sair com defeito, dá para apagar o novo e renomear esse de volta.
+Quando o programa se troca, o executável antigo fica ao lado como
+"Registro-SED.antigo.exe" até a abertura seguinte. Se uma versão sair
+com defeito, dá para apagar o novo e renomear esse de volta — e as
+versões antigas continuam em "Releases", para baixar de novo.
 
 E o mais importante: publique logo uma versão corrigida, com o número
 maior. Ela chega para todo mundo do mesmo jeito.
@@ -79,14 +105,14 @@ O QUE NUNCA SUBIR PARA CÁ
 
 Este repositório é PÚBLICO. Nunca envie:
 
-    .env                    (tem CPF e senha)
+    .env                    (pode ter CPF e senha)
+    configuracao.json       (tem os CPFs dos professores)
     browser_profile/        (tem o login do Google da escola)
     os arquivos .json de histórico
 
-O arquivo .gitignore já bloqueia isso para quem usa o Git pelo programa,
-MAS a tela de "Upload files" do site do GitHub não respeita o
-.gitignore: ali, o que você arrastar, sobe. Confira o que está
-selecionando.
+O .gitignore já bloqueia isso para quem usa o Git, MAS a tela de
+"Upload files" do site do GitHub não respeita o .gitignore: ali, o que
+você arrastar, sobe. Confira o que está selecionando.
 
 Se um dia subir sem querer, não basta apagar o arquivo depois — o
 histórico guarda. Nesse caso: troque a senha da agenda na hora e me

@@ -5,6 +5,7 @@
 # e não têm nada que fazer aqui.
 
 .env                        # CPF e senha da agenda
+configuracao.json           # escola, professores e CPFs
 browser_profile/            # login da conta Google da escola
 registros_enviados.json     # histórico do que já foi enviado à SED
 aulas_nao_realizadas.json
