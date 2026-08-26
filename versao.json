@@ -2,5 +2,5 @@
   "versao": "1.2.0",
   "exe": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v1.2.0/Registro-SED.exe",
   "zip": "https://github.com/ArnoNeto1/registro-sed-automatizado/archive/refs/heads/main.zip",
-  "notas": "Programa em arquivo unico (.exe), sem precisar instalar Python."
+  "notas": "Create montar-programa.yml"
 }
