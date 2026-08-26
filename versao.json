@@ -1,6 +1,6 @@
 {
-  "versao": "1.3.0",
-  "exe": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v1.3.0/Registro-SED.exe",
+  "versao": "1.3.1",
+  "exe": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v1.3.1/Registro-SED.exe",
   "zip": "https://github.com/ArnoNeto1/registro-sed-automatizado/archive/refs/heads/main.zip",
-  "notas": "versão 1.3.0 publicada [skip ci]"
+  "notas": "- Corrigido o motivo de ninguém receber as atualizações: o endereço de\n  onde elas vêm dependia de uma linha escrita no arquivo .env, e quem\n  não tinha essa linha nunca era avisado de versão nova — sem erro, sem\n  aviso, sem nada. Agora o endereço já vem no programa.\n- Botão \"Procurar atualização\" no rodapé, para conferir na hora. Ele\n  sempre responde: ou oferece a versão nova, ou diz que você já está na\n  mais nova, ou avisa que não conseguiu consultar."
 }
