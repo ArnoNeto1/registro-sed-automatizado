@@ -37,6 +37,34 @@ TIPO_LABEL = {
 }
 
 
+# ---------------------------------------------------------------------------
+# Conferência: o que a PÁGINA diz, e não o que o programa quis escrever
+# ---------------------------------------------------------------------------
+# Com o navegador rodando em segundo plano, ninguém mais vê o formulário
+# sendo preenchido. Se o resumo mostrasse só a intenção do programa
+# ("vou marcar História"), a pessoa estaria confirmando uma promessa: um
+# clique que não pegou passaria batido e o registro sairia errado sem
+# ninguém perceber — e clique que não pega já aconteceu aqui mais de uma
+# vez.
+#
+# Por isso cada valor abaixo é LIDO DE VOLTA da página depois de escrito.
+# O que aparece no resumo é o estado real do formulário.
+_CONFERENCIA: list = []
+
+
+def iniciar_conferencia() -> None:
+    _CONFERENCIA.clear()
+
+
+def pegar_conferencia() -> list:
+    return list(_CONFERENCIA)
+
+
+def _anotar(campo: str, valor: str) -> None:
+    if valor:
+        _CONFERENCIA.append((campo, valor))
+
+
 def _rotulo_atuacao(tipo: str) -> str:
     """
     Traduz o tipo do .env para o texto exato da opção no formulário.
@@ -124,6 +152,7 @@ def _click_radio(page, label: str) -> None:
     for _ in range(4):
         try:
             if alvo.is_checked():
+                _anotar("opção", label)
                 return
         except Exception:
             return  # sem como conferir: segue o baile, como era antes
@@ -233,6 +262,7 @@ def _click_checkbox(page, label: str) -> None:
     box.scroll_into_view_if_needed(timeout=3000)
     for _ in range(4):
         if box.is_checked():
+            _anotar("marcado", label)
             return
         box.click()
         page.wait_for_timeout(250)
@@ -303,6 +333,7 @@ def _select_google_dropdown(page, current_or_placeholder: str, option_text: str)
         # — .inner_text() dá erro de "strict mode" com mais de 1 elemento,
         # então juntamos o texto de todos em vez de usar só o primeiro.
         if selecionada.count() and option_text in " ".join(selecionada.all_inner_texts()):
+            _anotar(current_or_placeholder[:40], option_text)
             return
         # não selecionou (ou o menu ainda estava aberto/fechou sozinho) —
         # tenta de novo do zero.
@@ -326,6 +357,11 @@ def _fill_textbox_near(page, question_text: str, value: str) -> None:
     box = item.locator('input[type="text"], textarea').first
     box.click()
     box.fill(value)
+    try:
+        escrito = box.input_value()
+    except Exception:
+        escrito = ""
+    _anotar(question_text[:40], escrito)
 
 
 def _perguntas_obrigatorias_pendentes(page) -> list:
@@ -429,6 +465,54 @@ def _fechar_dialogo_rascunho(page) -> bool:
     botao.click()
     page.wait_for_timeout(500)
     return True
+
+
+def estado_da_conta_google(page) -> dict:
+    """
+    Onde a janela do navegador parou: no formulário ou na tela de login?
+
+    O programa depende de UMA sessão do Google, guardada na pasta
+    browser_profile — feito o login uma vez naquele computador, ele abre
+    sempre conectado. Quando a sessão expira (ou é a primeira vez), o
+    Google desvia para a tela de entrar, e o formulário simplesmente não
+    aparece. Sem esta verificação, o que a pessoa vê é o programa
+    "travando" num campo que não existe naquela página.
+
+    Devolve {"conectado": bool, "conta": e-mail visível na página ou ""}.
+    """
+    try:
+        url = page.url or ""
+    except Exception:
+        url = ""
+    if "accounts.google.com" in url or "signin" in url.lower():
+        return {"conectado": False, "conta": ""}
+
+    conta = ""
+    try:
+        achado = page.evaluate(
+            r"""
+            () => {
+              const texto = document.body ? document.body.innerText : '';
+              const m = texto.match(/[\w.+-]+@[\w-]+\.[\w.-]+/);
+              return m ? m[0] : '';
+            }
+            """
+        )
+        if isinstance(achado, str):
+            conta = achado
+    except Exception:
+        pass
+    return {"conectado": True, "conta": conta}
+
+
+def abrir_formulario(page) -> dict:
+    """Abre o formulário e diz em que estado a conta Google está."""
+    page.goto(SED_FORM_URL, wait_until="domcontentloaded", timeout=60000)
+    try:
+        page.wait_for_load_state("networkidle", timeout=30000)
+    except Exception:
+        pass
+    return estado_da_conta_google(page)
 
 
 def _garantir_pagina_1(page) -> None:
@@ -584,6 +668,19 @@ def preencher_dados_fixos(page, orientador_nome: str = "", orientador_tipo: str 
         page.wait_for_load_state("networkidle", timeout=60000)
     except Exception:
         pass
+    # Antes de procurar campo nenhum: a janela está no formulário ou na
+    # tela de login do Google? Perguntar isso aqui é a diferença entre uma
+    # frase que resolve e um travamento de cinco minutos num campo que
+    # ainda não existe.
+    if not estado_da_conta_google(page)["conectado"]:
+        raise RuntimeError(
+            "A conta Google da escola não está conectada neste computador.\n\n"
+            "Na janela do Chrome que abriu, entre com o e-mail institucional "
+            "da escola (o mesmo que responde o formulário da SED) e depois "
+            "clique em 'Preencher formulário' de novo.\n\n"
+            "Isso é pedido uma vez por computador: feito o login, ele fica "
+            "guardado e o programa passa a abrir já conectado."
+        )
     # O Google Forms às vezes mostra um diálogo "Progresso salvo" (rascunho
     # mais recente disponível) logo ao abrir — fecha se aparecer.
     _fechar_dialogo_rascunho(page)

@@ -113,13 +113,37 @@ from main import (  # noqa: E402
     monday_of,
 )
 from sed_form_filler import (  # noqa: E402
+    abrir_formulario,
     enviar,
+    iniciar_conferencia,
+    pegar_conferencia,
     preencher_atividade_com_estudantes,
     preencher_dados_fixos,
 )
 
 # O iniciar.py olha esta marca para não repetir um aviso que a pessoa já viu.
 ERRO_JA_MOSTRADO = False
+
+
+def _texto_conferencia(itens) -> str:
+    """
+    O que o formulário respondeu, lido de volta da própria página.
+
+    Com o navegador em segundo plano, esta é a evidência de que o
+    preenchimento aconteceu de verdade — e não a intenção do programa.
+    Cada linha aqui foi lida DEPOIS de escrita: caixa marcada conferida
+    com is_checked(), texto conferido com input_value(), item de lista
+    conferido pelo aria-selected.
+    """
+    if not itens:
+        return ""
+    linhas = ["", "CONFERIDO NA PÁGINA (lido de volta do formulário):"]
+    for campo, valor in itens:
+        valor = str(valor).strip().replace("\n", " ")
+        if len(valor) > 70:
+            valor = valor[:70] + "..."
+        linhas.append(f"  · {campo}: {valor}")
+    return "\n".join(linhas)
 
 
 def _texto_componente(comp) -> str:
@@ -319,33 +343,58 @@ class NavegadorWorker(threading.Thread):
         self.eventos = eventos
         self._page = None
         self._context = None
+        self._visivel = None
 
     # -- utilidades ---------------------------------------------------------
     def _status(self, texto: str) -> None:
         self.eventos.put(("status", texto))
 
-    def _garantir_navegador(self, p):
+    def _garantir_navegador(self, p, visivel: bool = False):
         """
-        Navegador VISÍVEL, usado só para preencher o formulário da SED.
+        O navegador que preenche o formulário da SED.
 
-        É visível de propósito: você acompanha o preenchimento acontecendo
-        e, na primeira vez, faz o login da conta Google nele. Ele usa um
-        perfil salvo em disco (PROFILE_DIR), que é o que guarda esse login
-        entre uma execução e outra.
+        Por padrão ele roda em SEGUNDO PLANO: preencher oito páginas de
+        formulário com a janela pulando na frente do professor era a parte
+        mais incômoda do programa — a cada registro o Chrome roubava o
+        foco e a pessoa ficava olhando o preenchimento acontecer sem poder
+        fazer mais nada. O que ela precisa conferir está no resumo, e esse
+        resumo é lido de volta da própria página (ver sed_form_filler).
+
+        Visível continua sendo possível, e é obrigatório em dois momentos:
+        para entrar na conta Google da escola e quando o professor pede
+        para acompanhar.
+
+        Usa sempre o mesmo perfil salvo em disco (PROFILE_DIR) — é ele que
+        guarda o login do Google entre uma execução e outra, nos dois
+        modos.
         """
-        if self._page is not None:
+        if self._page is not None and self._visivel == visivel:
             return self._page
-        self._status("Abrindo o navegador...")
+        if self._page is not None:
+            # trocar de modo exige reabrir: um navegador já aberto não
+            # muda de invisível para visível no meio do caminho
+            self._fechar_navegador()
+
+        self._status("Abrindo o navegador..." if visivel else "Preparando em segundo plano...")
+        extras = {"args": ["--start-maximized"], "no_viewport": True} if visivel else {}
         self._context, nome = abrir_contexto(
-            p,
-            PROFILE_DIR,
-            headless=False,
-            args=["--start-maximized"],
-            no_viewport=True,
+            p, PROFILE_DIR, headless=not visivel, **extras
         )
-        self._status(f"Navegador aberto ({nome}).")
+        self._visivel = visivel
+        self._status(f"Navegador pronto ({nome}).")
         self._page = self._context.pages[0] if self._context.pages else self._context.new_page()
         return self._page
+
+    def _fechar_navegador(self) -> None:
+        for alvo in (self._context,):
+            try:
+                if alvo is not None:
+                    alvo.close()
+            except Exception:
+                pass
+        self._context = None
+        self._page = None
+        self._visivel = None
 
     def _raspar_agenda(self, p, cpf: str, senha: str, invisivel: bool, quieto: bool = False):
         """
@@ -425,8 +474,9 @@ class NavegadorWorker(threading.Thread):
 
                     elif acao == "preencher":
                         (_, grupo, n_estudantes, recursos, etapa, conteudos,
-                         prof_nome, prof_tipo, subetapa, curso) = comando
-                        page = self._garantir_navegador(p)
+                         prof_nome, prof_tipo, subetapa, curso, mostrar) = comando
+                        page = self._garantir_navegador(p, visivel=bool(mostrar))
+                        iniciar_conferencia()
                         self._status("Abrindo o formulário e preenchendo...")
                         preencher_dados_fixos(page, prof_nome, prof_tipo)
                         resumo = (
@@ -467,14 +517,25 @@ class NavegadorWorker(threading.Thread):
                                     "estudantes": n_estudantes,
                                     "conteudos": conteudos,
                                     "recursos": recursos,
+                                    "conferencia": pegar_conferencia(),
                                 },
                             )
                         )
                         self._status("Formulário pronto — confira e clique em Enviar.")
 
+                    elif acao == "conta_google":
+                        # Abre o formulário SÓ para ver (e resolver) o estado
+                        # da conta Google da escola. Nada é preenchido aqui.
+                        # Sempre VISÍVEL: é impossível fazer login numa janela
+                        # que não aparece.
+                        page = self._garantir_navegador(p, visivel=True)
+                        self._status("Abrindo o formulário da SED...")
+                        estado = abrir_formulario(page)
+                        self.eventos.put(("conta_google", estado))
+
                     elif acao == "enviar":
                         _, grupo = comando
-                        page = self._garantir_navegador(p)
+                        page = self._garantir_navegador(p, visivel=self._visivel or False)
                         self._status("Enviando para a SED...")
                         enviar(page)
                         marcar_enviado(chave_grupo(grupo))
@@ -614,6 +675,7 @@ class Janela(tk.Tk):
         estilo.configure("TButton", font=("Segoe UI", 10), padding=8)
         estilo.configure("Principal.TButton", font=("Segoe UI", 11, "bold"), padding=10)
         estilo.configure("TCheckbutton", background=COR_CARTAO)
+        estilo.configure("Acoes.TCheckbutton", background=COR_FUNDO)
         estilo.map(
             "Treeview",
             background=[("selected", SELECAO_BG)],
@@ -850,6 +912,17 @@ class Janela(tk.Tk):
         )
         self.botao_nao_realizada.pack(side="right")
 
+        # O preenchimento acontece em segundo plano. Quem quiser assistir —
+        # para conferir com os próprios olhos, ou porque algo saiu errado e
+        # é preciso ver onde — marca aqui e o navegador aparece.
+        self.mostrar_navegador = tk.BooleanVar(value=False)
+        ttk.Checkbutton(
+            acoes,
+            text="Ver o formulário sendo preenchido",
+            variable=self.mostrar_navegador,
+            style="Acoes.TCheckbutton",
+        ).pack(side="right", padx=(0, 16))
+
         # --- status e resumo ---
         cartao_status = ttk.Frame(self, style="Cartao.TFrame", padding=14)
         self.rotulo_status = ttk.Label(
@@ -889,6 +962,10 @@ class Janela(tk.Tk):
         ttk.Button(
             rodape, text="Procurar atualização", style="Rodape.TButton",
             command=self._procurar_atualizacao_agora,
+        ).pack(side="right", padx=(0, 10))
+        ttk.Button(
+            rodape, text="Conta Google da escola", style="Rodape.TButton",
+            command=self._conferir_conta_google,
         ).pack(side="right", padx=(0, 10))
 
         # Barra de conta no rodapé, e não no alto: ali ela não disputa
@@ -1145,6 +1222,19 @@ class Janela(tk.Tk):
                 "aviso_atualizacao",
                 f"Você já está na versão mais nova ({atualizador.versao_atual()}).",
             ))
+
+    def _conferir_conta_google(self) -> None:
+        """
+        Abre o formulário para conferir (ou fazer) o login da conta da escola.
+
+        O login do Google acontece UMA vez por computador e fica guardado
+        na pasta do programa. O problema é que, sem este botão, a pessoa só
+        descobre que a sessão caiu no meio de um registro — com a aula já
+        acontecendo e o relógio correndo. Aqui ela resolve isso na hora que
+        quiser, de propósito.
+        """
+        self._definir_status("Conferindo a conta Google da escola...")
+        self.comandos.put(("conta_google",))
 
     def _procurar_atualizacao_agora(self) -> None:
         """Botão 'Procurar atualização' — a consulta vai para outra thread."""
@@ -1768,7 +1858,8 @@ class Janela(tk.Tk):
         self._definir_status("Preenchendo o formulário...")
         self.comandos.put(
             ("preencher", self.grupo_atual, int(bruto), recursos, etapa, conteudo,
-             self.orientador["nome"], self.orientador["tipo"], subetapa, curso)
+             self.orientador["nome"], self.orientador["tipo"], subetapa, curso,
+             bool(self.mostrar_navegador.get()))
         )
 
     def _enviar(self) -> None:
@@ -1902,6 +1993,7 @@ class Janela(tk.Tk):
                         f"  Estudantes ..... {resumo['estudantes']}\n"
                         f"  Conteúdos ...... {resumo['conteudos']}\n"
                         f"  Recursos ....... {', '.join(resumo['recursos'])}"
+                        + _texto_conferencia(resumo.get("conferencia"))
                     )
                     # o Chrome está na frente depois de preencher — traz o
                     # programa de volta, que é onde fica o botão de enviar
@@ -1919,6 +2011,32 @@ class Janela(tk.Tk):
                     self._oferecer_atualizacao(evento[1])
                 elif tipo == "aviso_atualizacao":
                     messagebox.showinfo("Atualização", evento[1])
+                elif tipo == "conta_google":
+                    estado = evento[1]
+                    if estado.get("conectado"):
+                        conta = estado.get("conta") or ""
+                        self._definir_status("Conta Google da escola conectada.")
+                        messagebox.showinfo(
+                            "Conta Google da escola",
+                            "Está tudo certo: o formulário abriu já conectado"
+                            + (f" ({conta})" if conta else "")
+                            + ".\n\nVocê não precisa entrar de novo neste "
+                            "computador — o programa guarda essa sessão e abre "
+                            "conectado a partir de agora.",
+                        )
+                    else:
+                        self._definir_status(
+                            "Entre com a conta da escola na janela do Chrome."
+                        )
+                        messagebox.showinfo(
+                            "Entrar na conta da escola",
+                            "Abri o formulário numa janela do Chrome e ele parou "
+                            "na tela de entrada do Google.\n\n"
+                            "Entre ali com o e-mail institucional da escola (o "
+                            "mesmo que responde o formulário da SED). Assim que "
+                            "aparecer o formulário, pode fechar esta mensagem: o "
+                            "programa passa a abrir conectado, sem pedir de novo.",
+                        )
                 elif tipo == "erro":
                     self.botao_preencher.configure(state="normal")
                     self._escrever("DEU ERRO\n\n" + evento[1])

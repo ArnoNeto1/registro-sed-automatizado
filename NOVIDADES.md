@@ -10,15 +10,28 @@ seção `## <número>` com o que mudou. O resto acontece sozinho.
 
 ---
 
-## 1.3.1
+## 1.4.0
 
+- O navegador passa a preencher o formulário EM SEGUNDO PLANO. A janela
+  do Chrome não aparece mais no meio do seu trabalho a cada registro.
+- Em troca, o resumo ficou mais forte: além do que o programa pretendia
+  escrever, ele agora mostra "CONFERIDO NA PÁGINA" — cada resposta lida
+  de volta do próprio formulário depois de escrita. É a prova de que o
+  preenchimento aconteceu, e não uma promessa.
+- Quem quiser assistir, marca "Ver o formulário sendo preenchido" ao lado
+  dos botões e o navegador aparece, como antes.
+- A conta Google da escola continua abrindo em janela visível, sempre —
+  não existe como entrar numa janela que não aparece.
+- Botão "Conta Google da escola" no rodapé: confere na hora se a conta
+  institucional está conectada e, se não estiver, abre a janela certa
+  para você entrar. O login continua sendo uma vez por computador.
+- Quando a sessão do Google cai, o programa diz isso com todas as letras
+  em vez de ficar parado esperando um campo que não existe na página.
 - Corrigido o motivo de ninguém receber as atualizações: o endereço de
-  onde elas vêm dependia de uma linha escrita no arquivo .env, e quem
-  não tinha essa linha nunca era avisado de versão nova — sem erro, sem
+  onde elas vêm dependia de uma linha escrita no arquivo .env, e quem não
+  tinha essa linha nunca era avisado de versão nova — sem erro, sem
   aviso, sem nada. Agora o endereço já vem no programa.
-- Botão "Procurar atualização" no rodapé, para conferir na hora. Ele
-  sempre responde: ou oferece a versão nova, ou diz que você já está na
-  mais nova, ou avisa que não conseguiu consultar.
+- Botão "Procurar atualização" no rodapé, para conferir na hora.
 
 ## 1.3.0
 
