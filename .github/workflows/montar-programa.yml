@@ -1,26 +1,57 @@
 name: Montar o programa (.exe)
 
-# Toda vez que um arquivo do programa muda aqui no GitHub, esta receita
-# roda sozinha num computador com Windows emprestado pelo GitHub, monta o
-# executável e publica em "Releases".
-
 on:
   push:
     branches: [main]
+  schedule:
+    - cron: "*/15 * * * *"
   workflow_dispatch:
+    inputs:
+      forcar:
+        description: "Publicar de novo mesmo que a versão já exista"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
 
 jobs:
+  decidir:
+    runs-on: ubuntu-latest
+    outputs:
+      numero: ${{ steps.v.outputs.numero }}
+      precisa: ${{ steps.v.outputs.precisa }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Já existe release para esta versão?
+        id: v
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          NUMERO=$(tr -d '[:space:]' < VERSAO.txt)
+          echo "numero=$NUMERO" >> "$GITHUB_OUTPUT"
+          if [ "${{ inputs.forcar }}" = "true" ]; then
+            echo "Forçado pelo botão."
+            echo "precisa=sim" >> "$GITHUB_OUTPUT"
+          elif gh release view "v$NUMERO" >/dev/null 2>&1; then
+            echo "A versão $NUMERO já está publicada. Nada a fazer."
+            echo "precisa=nao" >> "$GITHUB_OUTPUT"
+          else
+            echo "Versão $NUMERO ainda não publicada. Vamos montar."
+            echo "precisa=sim" >> "$GITHUB_OUTPUT"
+          fi
+
   montar:
+    needs: decidir
+    if: needs.decidir.outputs.precisa == 'sim'
     runs-on: windows-latest
 
     steps:
       - name: Baixar o código
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.ref_name }}
+          ref: ${{ github.event.repository.default_branch }}
 
       - name: Preparar o Python
         uses: actions/setup-python@v5
@@ -33,11 +64,6 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller
 
-      - name: Descobrir a versão
-        id: versao
-        shell: bash
-        run: echo "numero=$(tr -d '[:space:]' < VERSAO.txt)" >> "$GITHUB_OUTPUT"
-
       - name: Montar o executável
         run: >
           pyinstaller --noconfirm --onefile --windowed
@@ -45,7 +71,7 @@ jobs:
           --add-data "VERSAO.txt;."
           --add-data ".env.example;."
           --collect-all playwright
-          app.py
+          iniciar.py
 
       - name: Conferir se o executável saiu inteiro
         shell: bash
@@ -55,34 +81,65 @@ jobs:
           echo "Tamanho: $((TAMANHO / 1024 / 1024)) MB"
           test "$TAMANHO" -gt 10000000 || { echo "Executável pequeno demais."; exit 1; }
 
+      - name: Separar as notas desta versão
+        shell: bash
+        run: |
+          python - <<'PY'
+          import os, pathlib, re
+
+          numero = "${{ needs.decidir.outputs.numero }}"
+          texto = ""
+          arquivo = pathlib.Path("NOVIDADES.md")
+          if arquivo.exists():
+              dentro, linhas = False, []
+              for linha in arquivo.read_text(encoding="utf-8").splitlines():
+                  if re.match(r"^##\s", linha):
+                      dentro = linha.split(None, 1)[-1].strip() == numero
+                      continue
+                  if dentro:
+                      linhas.append(linha)
+              texto = "\n".join(linhas).strip()
+
+          if not texto:
+              texto = os.popen("git log -1 --pretty=%s").read().strip()
+
+          pathlib.Path("notas.txt").write_text(texto, encoding="utf-8")
+          print(texto)
+          PY
+
       - name: Publicar a versão
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="v${{ steps.versao.outputs.numero }}"
-          NOTAS=$(git log -1 --pretty=%s)
+          TAG="v${{ needs.decidir.outputs.numero }}"
           gh release delete "$TAG" --yes --cleanup-tag 2>/dev/null || true
           gh release create "$TAG" "dist/Registro-SED.exe" \
             --title "Registro SED $TAG" \
-            --notes "$NOTAS"
+            --notes-file notas.txt
 
-      - name: Avisar os professores que saiu versão nova
+      - name: Avisar os professores (versao.json)
         shell: bash
         run: |
-          TAG="v${{ steps.versao.outputs.numero }}"
-          NOTAS=$(git log -1 --pretty=%s | sed 's/\\/\\\\/g; s/"/\\"/g')
-          cat > versao.json <<JSON
-          {
-            "versao": "${{ steps.versao.outputs.numero }}",
-            "exe": "https://github.com/${{ github.repository }}/releases/download/$TAG/Registro-SED.exe",
-            "zip": "https://github.com/${{ github.repository }}/archive/refs/heads/main.zip",
-            "notas": "$NOTAS"
+          python - <<'PY'
+          import json, pathlib
+
+          numero = "${{ needs.decidir.outputs.numero }}"
+          repo = "${{ github.repository }}"
+          dados = {
+              "versao": numero,
+              "exe": f"https://github.com/{repo}/releases/download/v{numero}/Registro-SED.exe",
+              "zip": f"https://github.com/{repo}/archive/refs/heads/main.zip",
+              "notas": pathlib.Path("notas.txt").read_text(encoding="utf-8").strip(),
           }
-          JSON
+          pathlib.Path("versao.json").write_text(
+              json.dumps(dados, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+          )
+          PY
+          rm -f notas.txt
           git config user.name "github-actions"
           git config user.email "github-actions@users.noreply.github.com"
           git add versao.json
-          git diff --cached --quiet || git commit -m "versão ${{ steps.versao.outputs.numero }} publicada [skip ci]"
+          git diff --cached --quiet || git commit -m "versão ${{ needs.decidir.outputs.numero }} publicada [skip ci]"
           git pull --rebase --autostash
           git push
