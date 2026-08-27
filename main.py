@@ -94,9 +94,49 @@ def chave_grupo(g) -> str:
     return f"{g.data}|{g.inicio}|{g.fim}|{g.professor}|{g.disciplina}|{g.turma}"
 
 
+# Depois de quanto tempo uma chave (aula) some sozinha do histórico. Um mês
+# é folga de sobra: a SED não deixa registrar aula de mês passado, e
+# ninguém reabre a agenda tão velha assim — o único motivo de guardar a
+# chave é evitar duplicar um registro enquanto a aula ainda pode aparecer
+# de novo na tela.
+DIAS_PARA_ESQUECER = 30
+
+
+def _data_da_chave(chave: str):
+    """
+    A primeira parte de toda chave é a data (AAAA-MM-DD) — ver
+    `chave_grupo()`. Devolve None se não conseguir entender: uma chave
+    num formato inesperado é melhor guardar para sempre por engano do
+    que apagar por engano (o preço de guardar demais é um arquivo um
+    pouco maior; o de apagar demais é duplicar registro na SED).
+    """
+    try:
+        return dt.date.fromisoformat(chave.split("|", 1)[0])
+    except (ValueError, IndexError):
+        return None
+
+
+def purgar_antigas(chaves: set, dias: int = DIAS_PARA_ESQUECER) -> set:
+    """
+    Tira do conjunto as chaves de aulas com mais de `dias` dias.
+
+    Sem isto, `registros_enviados.json` (e `aulas_nao_realizadas.json`,
+    que usa o mesmo formato de chave — ver app.py) cresceriam para
+    sempre: nada nunca saía de lá.
+    """
+    hoje = agora_sc().date()
+    atuais = set()
+    for chave in chaves:
+        data = _data_da_chave(chave)
+        if data is None or (hoje - data).days <= dias:
+            atuais.add(chave)
+    return atuais
+
+
 def carregar_enviados() -> set:
     """
-    Lê o histórico do que já foi enviado à SED.
+    Lê o histórico do que já foi enviado à SED — e aproveita para
+    esquecer sozinho o que passou de `DIAS_PARA_ESQUECER`.
 
     Um .json corrompido (queda de luz, antivírus no meio de uma escrita)
     não pode derrubar o programa — mas também não pode ficar em silêncio
@@ -109,9 +149,15 @@ def carregar_enviados() -> set:
         return set()
     try:
         with open(ESTADO_FILE, "r", encoding="utf-8") as f:
-            return set(json.load(f))
+            enviados = set(json.load(f))
     except Exception:
         return set()
+    atuais = purgar_antigas(enviados)
+    if len(atuais) != len(enviados):
+        # a limpeza só é gravada quando tira algo de verdade — uma leitura
+        # comum não precisa reescrever o arquivo à toa
+        _escrever_estado(atuais)
+    return atuais
 
 
 def estado_corrompido() -> bool:

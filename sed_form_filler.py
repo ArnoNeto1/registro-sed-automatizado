@@ -937,11 +937,45 @@ def enviar(page) -> None:
     certo (só demorou a mostrar a tela), a segunda chamada não encontra
     mais o botão "Enviar" — encontra a confirmação já visível — e não há
     o que duplicar.
+
+    Dois tipos de falha são tratados separado, com mensagens diferentes,
+    porque contam histórias BEM diferentes pra quem vai ler:
+
+    - a janela do Chrome fechou (ou travou) ANTES do clique acontecer —
+      Playwright levanta TargetClosedError/erro parecido. Aqui dá pra
+      afirmar com certeza que nada foi enviado: o clique nem chegou a
+      acontecer.
+    - o clique aconteceu e a confirmação não apareceu depois — aí não dá
+      pra saber se chegou na SED ou não (ver o motivo acima, na mensagem
+      correspondente).
+
+    Sem essa distinção, as duas apareciam pra quem usa como o mesmo erro
+    técnico cru do Playwright ("TargetClosedError: Target page, context
+    or browser has been closed"), que não diz o que fazer a seguir.
     """
-    confirmacao = page.get_by_role("link", name="Enviar outra resposta")
-    if confirmacao.count():
+    try:
+        confirmacao = page.get_by_role("link", name="Enviar outra resposta")
+        ja_confirmado = confirmacao.count() > 0
+    except Exception as e:
+        raise RuntimeError(
+            "A janela do Chrome fechou (ou parou de responder) antes de eu "
+            "conseguir conferir o formulário. Nada foi enviado — o clique em "
+            "\"Enviar\" nem chegou a acontecer.\n\n"
+            "Clique em \"Preencher formulário\" de novo e tente outra vez.\n\n"
+            f"(detalhe técnico: {str(e).splitlines()[0][:200]})"
+        ) from None
+    if ja_confirmado:
         return
-    page.get_by_role("button", name="Enviar").click()
+    try:
+        page.get_by_role("button", name="Enviar").click()
+    except Exception as e:
+        raise RuntimeError(
+            "A janela do Chrome fechou (ou parou de responder) bem na hora "
+            "de clicar em \"Enviar\". Nada foi enviado — o clique nem chegou "
+            "a acontecer.\n\n"
+            "Clique em \"Preencher formulário\" de novo e tente outra vez.\n\n"
+            f"(detalhe técnico: {str(e).splitlines()[0][:200]})"
+        ) from None
     try:
         confirmacao.wait_for(state="visible", timeout=20000)
     except Exception:

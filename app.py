@@ -93,7 +93,6 @@ from config import (  # noqa: E402
     ORIENTADORES,
     opcoes_subetapa,
     orientador_de_plantao,
-    RECURSOS_PADRAO,
     SED_FORM_URL,
     configuracao_incompleta,
     curso_sugerido,
@@ -115,6 +114,7 @@ from main import (  # noqa: E402
     estado_corrompido,
     ja_comecou,
     marcar_enviado,
+    purgar_antigas,
     monday_of,
 )
 from sed_form_filler import (  # noqa: E402
@@ -258,14 +258,20 @@ def salvar_ultimo_professor(nome: str) -> None:
 
 
 def carregar_nao_realizadas() -> set:
-    if os.path.exists(NAO_REALIZADAS_FILE):
-        try:
-            with open(NAO_REALIZADAS_FILE, "r", encoding="utf-8") as f:
-                return set(json.load(f))
-        except Exception:
-            # arquivo corrompido não pode derrubar o programa inteiro
-            return set()
-    return set()
+    if not os.path.exists(NAO_REALIZADAS_FILE):
+        return set()
+    try:
+        with open(NAO_REALIZADAS_FILE, "r", encoding="utf-8") as f:
+            marcadas = set(json.load(f))
+    except Exception:
+        # arquivo corrompido não pode derrubar o programa inteiro
+        return set()
+    # Mesma limpeza de registros_enviados.json (main.purgar_antigas): sem
+    # isto, este arquivo também cresceria para sempre.
+    atuais = purgar_antigas(marcadas)
+    if len(atuais) != len(marcadas):
+        _salvar_nao_realizadas(atuais)
+    return atuais
 
 
 def _salvar_nao_realizadas(chaves: set) -> None:
@@ -385,9 +391,24 @@ class NavegadorWorker(threading.Thread):
         Usa sempre o mesmo perfil salvo em disco (PROFILE_DIR) — é ele que
         guarda o login do Google entre uma execução e outra, nos dois
         modos.
+
+        Antes de reaproveitar a página guardada, confere se ela ainda
+        está viva. Se a pessoa fechou a janela do Chrome na mão (ou ela
+        travou/foi fechada por fora), `self._page` continuava apontando
+        para uma página morta, e a AÇÃO SEGUINTE (preencher, enviar)
+        batia direto nela e explodia com um erro cru do Playwright
+        ("TargetClosedError: Target page, context or browser has been
+        closed") em vez de simplesmente abrir o navegador de novo.
         """
         if self._page is not None and self._visivel == visivel:
-            return self._page
+            try:
+                ainda_aberta = not self._page.is_closed()
+            except Exception:
+                ainda_aberta = False
+            if ainda_aberta:
+                return self._page
+            self._status("A janela do Chrome tinha fechado — abrindo de novo...")
+            self._fechar_navegador()
         if self._page is not None:
             # trocar de modo exige reabrir: um navegador já aberto não
             # muda de invisível para visível no meio do caminho
@@ -574,10 +595,20 @@ class NavegadorWorker(threading.Thread):
                         # "desfazer" nada: enquanto não se clica em Enviar,
                         # nada chegou na SED.
                         if self._page is not None:
-                            self._status("Cancelando e limpando o formulário...")
-                            self._page.goto(
-                                SED_FORM_URL, wait_until="domcontentloaded", timeout=60000
-                            )
+                            try:
+                                pagina_fechada = self._page.is_closed()
+                            except Exception:
+                                pagina_fechada = True
+                            if pagina_fechada:
+                                # a janela já não existe mais (fechada na
+                                # mão, ou travou) — não há o que "limpar",
+                                # só descarta a referência morta
+                                self._fechar_navegador()
+                            else:
+                                self._status("Cancelando e limpando o formulário...")
+                                self._page.goto(
+                                    SED_FORM_URL, wait_until="domcontentloaded", timeout=60000
+                                )
                         self._status("Cancelado — nada foi enviado.")
 
                 except Exception as exc:  # noqa: BLE001 - queremos mostrar qualquer erro na tela
@@ -812,10 +843,17 @@ class Janela(tk.Tk):
         # larguras somando pouco menos que a janela, senão a última coluna
         # ("Situação") fica cortada fora da tela.
         for col, titulo, largura, estica in (
-            ("quando", "Dia e horário", 140, False),
+            # "DD/MM  HH:MM-HH:MM" é sempre do mesmo tamanho — a coluna
+            # acompanha exatamente esse texto, sem sobra de espaço vazio.
+            ("quando", "Dia e horário", 125, False),
             ("professor", "Professor(a)", 200, True),
             ("disciplina", "Disciplina", 195, True),
-            ("turma", "Turma", 150, True),
+            # BEM mais larga: a agenda do NTE nomeia a turma de um jeito
+            # verboso e repetitivo ("Anos Iniciais - 3º ano - Anos
+            # Iniciais"), quase 40 caracteres — 230px ainda cortava no
+            # meio da palavra. Testado contra texto real (print de tela),
+            # não só estimado.
+            ("turma", "Turma", 360, True),
             # larga o bastante para "○ Ainda não ocorreu" caber inteiro —
             # antes esse texto aparecia cortado
             ("situacao", "Situação", 158, False),
@@ -922,7 +960,11 @@ class Janela(tk.Tk):
         colunas_recursos = 2
         por_coluna = -(-len(RECURSOS_DISPONIVEIS) // colunas_recursos)
         for i, recurso in enumerate(RECURSOS_DISPONIVEIS):
-            var = tk.BooleanVar(value=recurso in RECURSOS_PADRAO)
+            # Nenhum vem pré-marcado: quem registra escolhe cada vez, na
+            # mão, o que realmente foi usado naquela aula (RECURSOS_PADRAO
+            # é só o padrão do modo linha de comando, em main.py — a tela
+            # não usa mais isso pra pré-marcar nada).
+            var = tk.BooleanVar(value=False)
             self.vars_recursos[recurso] = var
             ttk.Checkbutton(caixa_recursos, text=recurso, variable=var).grid(
                 row=i % por_coluna, column=i // por_coluna, sticky="w",
@@ -944,6 +986,19 @@ class Janela(tk.Tk):
             state="disabled",
         )
         self.botao_enviar.pack(side="left", padx=(10, 0))
+        # Preencher acontece em segundo plano (headless) por padrão — sem
+        # isto não havia como conferir o formulário já preenchido com os
+        # próprios olhos antes de mandar. A tentação, sem este botão, é
+        # usar "Conta Google da escola" pra abrir uma janela — só que
+        # aquilo abre outra janela, DESCARTANDO o preenchimento em
+        # segundo plano sem avisar (ver aviso em _conferir_conta_google).
+        self.botao_ver_no_navegador = ttk.Button(
+            acoes,
+            text="Ver no navegador",
+            command=self._ver_no_navegador,
+            state="disabled",
+        )
+        self.botao_ver_no_navegador.pack(side="left", padx=(10, 0))
         self.botao_cancelar = ttk.Button(
             acoes, text="Cancelar e voltar ao início", command=self._cancelar
         )
@@ -1000,12 +1055,11 @@ class Janela(tk.Tk):
             text=f"versão {atualizador.versao_atual()}",
             style="Rodape.TLabel",
         ).pack(side="right")
-        # A releitura da agenda acontece de meia em meia hora, calada. Sem
-        # este carimbo não havia como saber se ela tinha acontecido — e
-        # "será que ele já viu a aula que acabei de agendar?" é justamente
-        # a dúvida que faz a pessoa fechar e abrir o programa à toa.
-        self.rotulo_agenda = ttk.Label(rodape, text="", style="Rodape.TLabel")
-        self.rotulo_agenda.pack(side="right", padx=(0, 16))
+        ttk.Label(
+            rodape,
+            text="Desenvolvido por ArnoNeto1",
+            style="Rodape.TLabel",
+        ).pack(side="right", padx=(0, 16))
         ttk.Button(
             rodape, text="Procurar atualização", style="Rodape.TButton",
             command=self._procurar_atualizacao_agora,
@@ -1279,7 +1333,32 @@ class Janela(tk.Tk):
         descobre que a sessão caiu no meio de um registro — com a aula já
         acontecendo e o relógio correndo. Aqui ela resolve isso na hora que
         quiser, de propósito.
+
+        Isto abre um navegador PRÓPRIO, separado do preenchimento em
+        segundo plano — e trocar de um pro outro fecha o que estava
+        aberto (ver `_garantir_navegador`). Clicar aqui com um
+        preenchimento pendente descartaria ele sem avisar — e a pessoa só
+        percebia ao tentar enviar depois, com um erro sem explicação.
+        Avisa e sugere o botão certo para conferir o preenchimento:
+        "Ver no navegador".
         """
+        if self.preenchido_para is not None:
+            if not messagebox.askyesno(
+                "Formulário preenchido esperando envio",
+                "Existe um formulário preenchido esperando envio.\n\n"
+                "Conferir a conta Google agora fecha essa janela e descarta "
+                "o preenchimento — vai ser preciso preencher de novo depois.\n\n"
+                'Se você quer só CONFERIR o que já foi preenchido, cancele e '
+                'use o botão "Ver no navegador" em vez deste.\n\n'
+                "Continuar mesmo assim?",
+            ):
+                return
+            # Confirmado o descarte: reflete na tela — senão "Enviar" e
+            # "Ver no navegador" continuariam habilitados apontando para
+            # um preenchimento que está prestes a deixar de existir.
+            self.preenchido_para = None
+            self.botao_enviar.configure(state="disabled")
+            self.botao_ver_no_navegador.configure(state="disabled")
         self._definir_status("Conferindo a conta Google da escola...")
         self.comandos.put(("conta_google",))
 
@@ -1593,15 +1672,6 @@ class Janela(tk.Tk):
             f"Começou agora: {grupo.disciplina} · {grupo.turma} · {quando}"
         )
 
-    def _marcar_hora_da_agenda(self) -> None:
-        """Carimba no rodapé quando a agenda foi lida pela última vez."""
-        try:
-            self.rotulo_agenda.configure(
-                text=f"agenda lida às {agora_sc():%H:%M} · relê a cada 30 min"
-            )
-        except (AttributeError, tk.TclError):
-            pass
-
     def _recarregar_silencioso(self) -> None:
         """Relê a agenda de tempos em tempos, sem chamar atenção."""
         self.comandos.put(("carregar", True, self.orientador["cpf"], self.orientador["senha"]))
@@ -1785,6 +1855,7 @@ class Janela(tk.Tk):
         self.grupo_atual = grupo
         self.preenchido_para = None
         self.botao_enviar.configure(state="disabled")
+        self.botao_ver_no_navegador.configure(state="disabled")
         dia = dt.date.fromisoformat(grupo.data).strftime("%d/%m/%Y")
         self.rotulo_aula.configure(
             text=(
@@ -1888,6 +1959,7 @@ class Janela(tk.Tk):
                 return
             self.preenchido_para = None
             self.botao_enviar.configure(state="disabled")
+            self.botao_ver_no_navegador.configure(state="disabled")
             self.comandos.put(("reiniciar",))
 
         self.orientador = novo
@@ -1994,11 +2066,57 @@ class Janela(tk.Tk):
                 return
         self.botao_preencher.configure(state="disabled")
         self.botao_enviar.configure(state="disabled")
+        self.botao_ver_no_navegador.configure(state="disabled")
         self._definir_status("Preenchendo o formulário...")
         self.comandos.put(
             ("preencher", self.grupo_atual, int(bruto), recursos, etapa, conteudo,
              self.orientador["nome"], self.orientador["tipo"], subetapa, curso,
              bool(self.mostrar_navegador.get()))
+        )
+
+    def _ver_no_navegador(self) -> None:
+        """
+        Reabre o formulário com a janela do Chrome VISÍVEL, com os mesmos
+        dados já preenchidos — para conferir pessoalmente antes de
+        enviar.
+
+        Não existe "mostrar a página que já foi preenchida escondida": um
+        Chrome headless não vira visível no meio do caminho, é outro
+        processo por dentro (ver `_garantir_navegador`, que fecha e
+        reabre quando o modo visível/invisível muda). A saída é preencher
+        de novo, do zero, mas desta vez com a janela aparecendo — como
+        cada campo já foi lido de volta e conferido na primeira vez (é o
+        "CONFIRA ANTES DE ENVIAR" do resumo), reescrever os mesmos dados
+        não muda nada nem arrisca nada.
+
+        Existe por causa de um erro real: sem esse botão, a saída era
+        clicar em "Conta Google da escola" para ver alguma janela do
+        Chrome — só que aquele botão abre OUTRO navegador, e trocar de
+        modo (headless -> visível) DESCARTA o preenchimento em segundo
+        plano sem avisar ninguém. A pessoa fechava aquela janela sem achar
+        o formulário preenchido, clicava em Enviar, e o programa quebrava
+        tentando usar uma página que já não existia mais.
+        """
+        if self.preenchido_para is None:
+            return
+        grupo = self.preenchido_para
+        bruto = self.campo_estudantes.get().strip()
+        if not bruto.isdigit() or int(bruto) <= 0:
+            return  # não deveria acontecer: já foi validado ao preencher
+        etapa = self.combo_etapa.get().strip()
+        subetapa = self.combo_extra.get().strip() if opcoes_subetapa(etapa) else ""
+        curso = self.campo_curso.get().strip() if etapa == ETAPA_PROFISSIONAL else ""
+        recursos = [r for r, v in self.vars_recursos.items() if v.get()]
+        conteudo = self.campo_conteudo.get("1.0", "end").strip()
+
+        self.botao_preencher.configure(state="disabled")
+        self.botao_enviar.configure(state="disabled")
+        self.botao_ver_no_navegador.configure(state="disabled")
+        self._definir_status("Abrindo o formulário no Chrome para você conferir...")
+        self.comandos.put(
+            ("preencher", grupo, int(bruto), recursos, etapa, conteudo,
+             self.orientador["nome"], self.orientador["tipo"], subetapa, curso,
+             True)  # sempre visível — é o propósito deste botão
         )
 
     def _enviar(self) -> None:
@@ -2014,6 +2132,7 @@ class Janela(tk.Tk):
         ):
             return
         self.botao_enviar.configure(state="disabled")
+        self.botao_ver_no_navegador.configure(state="disabled")
         self._definir_status("Enviando...")
         self._envio_em_andamento = True
         self.comandos.put(("enviar", grupo))
@@ -2064,6 +2183,7 @@ class Janela(tk.Tk):
             if self.preenchido_para is grupo:
                 self.preenchido_para = None
                 self.botao_enviar.configure(state="disabled")
+                self.botao_ver_no_navegador.configure(state="disabled")
                 self.comandos.put(("reiniciar",))
 
         self.nao_realizadas = carregar_nao_realizadas()
@@ -2077,10 +2197,11 @@ class Janela(tk.Tk):
     def _cancelar(self) -> None:
         self.preenchido_para = None
         self.botao_enviar.configure(state="disabled")
+        self.botao_ver_no_navegador.configure(state="disabled")
         self.botao_preencher.configure(state="normal")
         self.campo_estudantes.delete(0, "end")
-        for recurso, var in self.vars_recursos.items():
-            var.set(recurso in RECURSOS_PADRAO)
+        for var in self.vars_recursos.values():
+            var.set(False)
         self.campo_conteudo.delete("1.0", "end")
         self._escrever("")
         self._definir_status("Cancelado — nada foi enviado. Escolha uma aula.")
@@ -2167,7 +2288,6 @@ class Janela(tk.Tk):
             self.grupos = evento[1]
             quieto = bool(evento[2]) if len(evento) > 2 else False
             self.enviados = carregar_enviados()
-            self._marcar_hora_da_agenda()
             # Aulas que já começaram há mais tempo que a janela de
             # aviso entram como "já avisadas": abrir o programa às
             # 15h não deve piscar de uma vez pela manhã inteira.
@@ -2185,6 +2305,7 @@ class Janela(tk.Tk):
             self.preenchido_para = grupo
             self.botao_preencher.configure(state="normal")
             self.botao_enviar.configure(state="normal")
+            self.botao_ver_no_navegador.configure(state="normal")
             linha_sub = ""
             if resumo.get("subetapa"):
                 linha_sub = f"  Qual etapa? .... {resumo['subetapa']}\n"
@@ -2209,6 +2330,7 @@ class Janela(tk.Tk):
             self.enviados = carregar_enviados()
             self.preenchido_para = None
             self.botao_enviar.configure(state="disabled")
+            self.botao_ver_no_navegador.configure(state="disabled")
             self.botao_preencher.configure(state="normal")
             self.campo_estudantes.delete(0, "end")
             self._escrever("Registro enviado para a SED.")
@@ -2251,6 +2373,7 @@ class Janela(tk.Tk):
             # causa de, por exemplo, uma internet lenta.
             if len(evento) > 2 and evento[2] == "enviar":
                 self.botao_enviar.configure(state="normal")
+                self.botao_ver_no_navegador.configure(state="normal")
                 self._envio_em_andamento = False
             self._escrever("DEU ERRO\n\n" + evento[1])
 

@@ -19,6 +19,7 @@ __pycache__/
 *.pyc
 build/
 dist/
+dist_instalador/
 *.spec
 *.antigo.exe
 *.novo.exe

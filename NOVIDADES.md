@@ -12,6 +12,35 @@ seção `## <número>` com o que mudou. O resto acontece sozinho.
 
 ## 1.5.0
 
+- Nenhum "Recurso utilizado" vem mais pré-marcado — antes 3 vinham
+  marcados por padrão, e a ideia é cada professor escolher, toda vez, o
+  que realmente foi usado naquela aula.
+- **O histórico de envios não acumula mais para sempre.** Aulas com mais
+  de 1 mês somem sozinhas do `registros_enviados.json` e do
+  `aulas_nao_realizadas.json` — o programa esquece na hora de abrir,
+  sem precisar fazer nada. Continua funcionando exatamente igual: o
+  motivo desses arquivos existirem é só evitar duplicar registro
+  enquanto a aula ainda pode aparecer na tela, e depois de um mês isso
+  já não é mais um risco de verdade.
+- Coluna "Turma" bem mais larga na lista de aulas — nomes vindos da
+  agenda do NTE são longos ("Anos Iniciais - 3º ano - Anos Iniciais") e
+  ficavam cortados.
+- Rodapé: tirado o aviso "agenda lida às HH:MM · relê a cada 30 min" (a
+  releitura automática continua acontecendo do mesmo jeito, só não
+  aparece mais escrita) e colocado "Desenvolvido por ArnoNeto1".
+- **Novo botão "Ver no navegador"**, ao lado de "Enviar para a SED": abre
+  o formulário já preenchido numa janela de verdade do Chrome, para
+  conferir pessoalmente antes de enviar. Aparece assim que o
+  preenchimento termina.
+- **Corrigido o erro "Target page, context or browser has been closed"**
+  que podia aparecer depois de preencher: se a janela do Chrome fosse
+  fechada na mão (ou travasse) enquanto o programa ainda achava que ela
+  estava aberta, a ação seguinte (enviar, cancelar) quebrava com um erro
+  técnico sem explicação. Agora o programa percebe e se recupera sozinho,
+  ou avisa com clareza que nada foi enviado. Isso também podia acontecer
+  ao clicar em "Conta Google da escola" com um formulário preenchido
+  esperando envio — esse botão agora avisa antes de descartar o
+  preenchimento (e sugere o "Ver no navegador" no lugar).
 - **Corrigido o erro depois de uma atualização automática.** Às vezes,
   logo depois do programa se atualizar e reabrir sozinho, aparecia um erro
   e era preciso fechar e abrir de novo na mão para funcionar. Isso
