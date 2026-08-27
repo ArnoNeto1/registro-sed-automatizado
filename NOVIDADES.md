@@ -10,6 +10,21 @@ seção `## <número>` com o que mudou. O resto acontece sozinho.
 
 ---
 
+## 1.4.3
+
+- Passou a existir um instalador (`Registro-SED-Instalador.exe`), além do
+  `.exe` de sempre: baixa, executa uma vez (pede a senha de administrador
+  do computador) e o programa já fica instalado em "Arquivos de
+  Programas", com ícone próprio, atalho na área de trabalho e no Menu
+  Iniciar — sem precisar copiar arquivo nenhum manualmente.
+- O programa ganhou um ícone próprio (o logo do NTE Blumenau) em vez do
+  ícone genérico, tanto na barra de tarefas quanto nos atalhos do Windows.
+- Desinstalar também ficou normal: aparece em "Adicionar ou remover
+  programas" do Windows, e remove junto a configuração, o login salvo e o
+  histórico de envios.
+- Quem já usa o .exe portátil de antes não precisa trocar nada: ele
+  continua existindo e se atualizando sozinho, do jeito que já era.
+  
 ## 1.4.2
 
 - Corrigido o "não consegui reabrir o programa sozinho" que aparecia
