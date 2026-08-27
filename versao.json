@@ -3,5 +3,5 @@
   "exe": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v1.4.3/Registro-SED.exe",
   "instalador": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v1.4.3/Registro-SED-Instalador.exe",
   "zip": "https://github.com/ArnoNeto1/registro-sed-automatizado/archive/refs/heads/main.zip",
-  "notas": "Update VERSAO.txt"
+  "notas": "- Passou a existir um instalador (`Registro-SED-Instalador.exe`), além do\n  `.exe` de sempre: baixa, executa uma vez (pede a senha de administrador\n  do computador) e o programa já fica instalado em \"Arquivos de\n  Programas\", com ícone próprio, atalho na área de trabalho e no Menu\n  Iniciar — sem precisar copiar arquivo nenhum manualmente.\n- O programa ganhou um ícone próprio (o logo do NTE Blumenau) em vez do\n  ícone genérico, tanto na barra de tarefas quanto nos atalhos do Windows.\n- Desinstalar também ficou normal: aparece em \"Adicionar ou remover\n  programas\" do Windows, e remove junto a configuração, o login salvo e o\n  histórico de envios.\n- Quem já usa o .exe portátil de antes não precisa trocar nada: ele\n  continua existindo e se atualizando sozinho, do jeito que já era."
 }
