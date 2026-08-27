@@ -10,7 +10,7 @@ import os
 import re
 import unicodedata
 
-from caminhos import caminho
+from caminhos import caminho_de_dados
 
 # ---------------------------------------------------------------------------
 # Dados do professor orientador (repetidos em todo preenchimento)
@@ -30,7 +30,7 @@ PLACEHOLDER = "!! PREENCHA"
 # entrar e vive só na memória. Ver configuracao.py.
 def _da_tela() -> dict:
     try:
-        with open(caminho("configuracao.json"), encoding="utf-8") as f:
+        with open(caminho_de_dados("configuracao.json"), encoding="utf-8") as f:
             dados = json.load(f)
         return dados if isinstance(dados, dict) else {}
     except Exception:

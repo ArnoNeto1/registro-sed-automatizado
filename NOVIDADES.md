@@ -10,6 +10,41 @@ seção `## <número>` com o que mudou. O resto acontece sozinho.
 
 ---
 
+## 1.5.0
+
+- **Corrigido o erro depois de uma atualização automática.** Às vezes,
+  logo depois do programa se atualizar e reabrir sozinho, aparecia um erro
+  e era preciso fechar e abrir de novo na mão para funcionar. Isso
+  acontecia porque a versão nova podia tentar abrir o navegador antes da
+  versão antiga ter fechado o dela de verdade. Agora o programa espera o
+  navegador antigo fechar direito antes de abrir a versão nova — e, se
+  mesmo assim o navegador não abrir de primeira por qualquer outro motivo
+  passageiro (por exemplo, um antivírus examinando o programa recém
+  atualizado), ele tenta de novo sozinho antes de desistir.
+- **Reforçada a proteção contra duplicar um registro na SED**: se a
+  internet travar bem no instante de clicar "Enviar", o programa agora
+  confere de verdade se a SED recebeu o registro antes de marcá-lo como
+  enviado — antes, essa checagem não existia. Se não conseguir confirmar,
+  ele avisa e NÃO marca como enviado, em vez de arriscar.
+- Fechar o programa enquanto um envio está em andamento agora pede
+  confirmação, avisando do risco.
+- Se o arquivo do histórico de envios estiver corrompido (queda de luz,
+  antivírus), o programa agora avisa na tela — antes, ficava em silêncio e
+  tratava tudo como se nada tivesse sido enviado.
+- Corrigida uma tela que podia parar de atualizar status e botões pelo
+  resto da sessão, sem avisar, se algo raro desse errado ao processar um
+  evento interno.
+- Trocar de professor (computador dividido entre dois orientadores) agora
+  limpa a aula selecionada na hora — evita o risco raro de clicar
+  "Preencher formulário" bem no meio da troca e misturar o nome do
+  professor novo com dados de aula do professor anterior.
+- Instalado pelo instalador (não pelo `.exe` portátil): os dados do
+  professor (login, senha, histórico) passaram a ficar numa pasta própria
+  do Windows em vez de dentro de "Arquivos de Programas". Quem já tinha
+  instalado antes não perde nada — a migração acontece sozinha, na
+  próxima vez que abrir.
+- Adicionada uma licença (MIT) ao repositório no GitHub.
+
 ## 1.4.3
 
 - Passou a existir um instalador (`Registro-SED-Instalador.exe`), além do

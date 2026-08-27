@@ -47,9 +47,9 @@ from dotenv import load_dotenv
 # load_dotenv() vier depois (como estava, lá dentro do main()), o arquivo
 # .env é ignorado para nome, escola e regional — e o script usa os valores
 # padrão do config sem avisar ninguém.
-from caminhos import abrir_contexto, caminho, pasta_do_programa  # noqa: E402
+from caminhos import abrir_contexto, caminho_de_dados, pasta_de_dados  # noqa: E402
 
-load_dotenv(pasta_do_programa() / ".env")
+load_dotenv(pasta_de_dados() / ".env")
 from playwright.sync_api import sync_playwright
 
 from agenda_scraper import TURNOS, filtrar_e_agrupar, login, scrape_week  # noqa: E402
@@ -86,8 +86,8 @@ RECURSOS_DISPONIVEIS = [
     "Outros recursos",
 ]
 
-PROFILE_DIR = caminho("browser_profile")
-ESTADO_FILE = caminho("registros_enviados.json")
+PROFILE_DIR = caminho_de_dados("browser_profile")
+ESTADO_FILE = caminho_de_dados("registros_enviados.json")
 
 
 def chave_grupo(g) -> str:
@@ -95,17 +95,58 @@ def chave_grupo(g) -> str:
 
 
 def carregar_enviados() -> set:
-    if os.path.exists(ESTADO_FILE):
+    """
+    Lê o histórico do que já foi enviado à SED.
+
+    Um .json corrompido (queda de luz, antivírus no meio de uma escrita)
+    não pode derrubar o programa — mas também não pode ficar em silêncio
+    absoluto aqui: é este arquivo que impede reenviar pra SED uma aula já
+    registrada. Por isso quem chama (main() / app.py) avisa a pessoa
+    quando `estado_corrompido` vem True, em vez de só seguir como se o
+    histórico estivesse vazio de verdade.
+    """
+    if not os.path.exists(ESTADO_FILE):
+        return set()
+    try:
         with open(ESTADO_FILE, "r", encoding="utf-8") as f:
             return set(json.load(f))
-    return set()
+    except Exception:
+        return set()
+
+
+def estado_corrompido() -> bool:
+    """O ESTADO_FILE existe, mas não é um .json válido?"""
+    if not os.path.exists(ESTADO_FILE):
+        return False
+    try:
+        with open(ESTADO_FILE, "r", encoding="utf-8") as f:
+            json.load(f)
+        return False
+    except Exception:
+        return True
+
+
+def _escrever_estado(enviados: set) -> None:
+    """
+    Grava o histórico de forma atômica: escreve num arquivo temporário ao
+    lado e só troca de nome no final (`os.replace` é atômico no Windows
+    dentro da mesma pasta). Uma queda de luz ou fechamento forçado no
+    meio de uma escrita comum (abrir em "w", que já zera o arquivo antes
+    de escrever) deixaria o .json pela metade — corrompido — e o próximo
+    carregamento esqueceria tudo que já foi enviado, arriscando duplicar
+    registro na SED. Com o arquivo temporário, ou a troca acontece
+    inteira, ou o arquivo antigo (íntegro) continua valendo.
+    """
+    tmp = ESTADO_FILE + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(sorted(enviados), f, ensure_ascii=False, indent=2)
+    os.replace(tmp, ESTADO_FILE)
 
 
 def marcar_enviado(chave: str) -> None:
     enviados = carregar_enviados()
     enviados.add(chave)
-    with open(ESTADO_FILE, "w", encoding="utf-8") as f:
-        json.dump(sorted(enviados), f, ensure_ascii=False, indent=2)
+    _escrever_estado(enviados)
 
 
 def agora_sc() -> dt.datetime:

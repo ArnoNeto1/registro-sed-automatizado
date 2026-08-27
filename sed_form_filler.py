@@ -908,6 +908,49 @@ def _depois_da_etapa(
 
 
 def enviar(page) -> None:
-    """Clica em 'Enviar'. Só chame isso depois de confirmação explícita."""
+    """
+    Clica em 'Enviar' e confere que o Forms REALMENTE recebeu o envio
+    antes de devolver.
+
+    Todo outro clique deste arquivo é lido de volta da página antes de
+    seguir em frente (ver o comentário no topo do arquivo) — inclusive o
+    de "Avançar", que tenta de novo se o primeiro clique só passou o
+    mouse sem navegar. Este aqui, até agora, era o único que não
+    conferia nada: quem chama `enviar()` marca a aula como enviada logo
+    em seguida, sem checar mais nada.
+
+    NÃO clicamos "Enviar" de novo se a confirmação não aparecer, ao
+    contrário do padrão usado no resto do arquivo: um segundo clique
+    aqui pode ser um segundo envio de verdade para o Google Forms, se o
+    primeiro só estava demorando a responder. É melhor levantar um erro
+    claro e deixar a pessoa olhar a janela do Chrome do que arriscar
+    duplicar o registro tentando "corrigir" sozinho.
+
+    Devolve normalmente só quando a tela de confirmação do Forms
+    ("Enviar outra resposta") aparece — a mesma que `_garantir_pagina_1`
+    já reconhece como prova de que uma resposta anterior foi recebida.
+
+    Se a página JÁ estiver nessa tela de confirmação ao entrar aqui, não
+    clica em nada — devolve na hora. É o que permite mandar chamar
+    `enviar()` de novo com segurança depois de um erro "não vi a
+    confirmação a tempo": se o primeiro envio, na verdade, tinha dado
+    certo (só demorou a mostrar a tela), a segunda chamada não encontra
+    mais o botão "Enviar" — encontra a confirmação já visível — e não há
+    o que duplicar.
+    """
+    confirmacao = page.get_by_role("link", name="Enviar outra resposta")
+    if confirmacao.count():
+        return
     page.get_by_role("button", name="Enviar").click()
-    page.wait_for_load_state("networkidle")
+    try:
+        confirmacao.wait_for(state="visible", timeout=20000)
+    except Exception:
+        raise RuntimeError(
+            "Cliquei em 'Enviar', mas não vi a confirmação do Google Forms "
+            "('Enviar outra resposta') depois de esperar — não dá para "
+            "saber se o registro chegou na SED ou não. NÃO marquei esta "
+            "aula como enviada. Olhe a janela do Chrome: se ela já mostra "
+            "a confirmação, é só clicar em \"Enviar para a SED\" de novo "
+            "aqui (não vai duplicar); se ainda mostra o formulário, espere "
+            "a internet normalizar e tente de novo."
+        ) from None

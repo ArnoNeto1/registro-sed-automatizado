@@ -1,105 +1,128 @@
-# Preenchimento automático do formulário da SED a partir da agenda do NTE Blumenau
+# Registro SED Automatizado
 
-Este script lê os agendamentos do laboratório (nteblumenau.com.br) e
-preenche automaticamente o Google Forms "REGISTRO DE ATIVIDADES DOS
-PROFESSORES ORIENTADORES DE TECNOLOGIAS EDUCACIONAIS OU MAKER" da SED-SC.
+Programa para professores orientadores de tecnologia (Blumenau/SC) que lê a
+agenda de reservas do laboratório do NTE Blumenau e preenche sozinho o
+formulário da SED-SC de "Registro de Atividades dos Professores Orientadores
+de Tecnologias Educacionais ou Maker" — parando sempre antes de enviar, para
+você conferir.
+
+**Ele nunca envia nada sem você clicar em "Enviar para a SED".**
+
+## Para professores — baixar e instalar
+
+Não precisa instalar Python nem nada: baixe pela página de
+[**Releases**](https://github.com/ArnoNeto1/registro-sed-automatizado/releases/latest).
+Duas opções, faça o que for mais fácil para você:
+
+- **`Registro-SED.exe`** (portátil) — baixe, coloque numa pasta própria (ex.:
+  `Área de Trabalho\Registro SED`) e dê dois cliques. Ele mesmo cria, ao
+  lado, o que precisa na primeira vez.
+- **`Registro-SED-Instalador.exe`** — instala de verdade, com atalho no Menu
+  Iniciar e na Área de Trabalho, e aparece em "Adicionar ou remover
+  programas" do Windows. Pede senha de administrador uma vez, na instalação.
+
+As duas formas se atualizam sozinhas quando sai versão nova, e leem/escrevem
+a mesma coisa (login salvo, histórico de envios) — pode trocar de uma para a
+outra sem perder nada.
+
+Depois de instalado, o arquivo **`COMECE AQUI.txt`** (vem junto) explica o
+passo a passo — cadastro na primeira tela, como dividir o computador com
+outro professor do laboratório, perguntas frequentes.
 
 ## Como funciona (resumo)
 
-1. Loga no site de agendamento com seu CPF e senha.
-2. Lê a semana pedida (Matutino/Vespertino/Noturno) e agrupa aulas emendadas
-   da mesma turma/disciplina em uma única atividade, contando quantas
-   "aulas de 45min" foram usadas.
-3. Para cada atividade, pergunta no terminal:
-   - **número de estudantes atendidos** — não existe no site de agendamento
-     hoje, por isso é sempre perguntado;
-   - **quais recursos do laboratório foram usados** — idem.
-4. Preenche o formulário da SED no navegador, página por página.
-5. **Nunca envia sozinho**: mostra um resumo e só clica em "Enviar" depois
-   que você digitar `s` no terminal (a menos que use `--auto-submit`).
+1. Loga no site de agendamento (nteblumenau.com.br) com CPF e senha.
+2. Lê a semana atual e agrupa aulas emendadas da mesma turma/disciplina numa
+   única atividade, contando quantas "aulas de 45min" foram usadas.
+3. Identifica pelo horário qual aula está acontecendo agora (ou acabou de
+   acontecer) e já deixa ela sugerida — só falta dizer quantos estudantes
+   foram atendidos, a única informação que não existe na agenda.
+4. Preenche o formulário da SED em segundo plano, página por página, e
+   **confere cada resposta lida de volta da própria página** — não é uma
+   promessa do que o programa pretendia escrever, é o que está lá de fato.
+5. Mostra o resumo e para. Só envia depois que você clicar em "Enviar para a
+   SED" e confirmar.
 
-## Instalação
+O histórico do que já foi enviado é do **computador** (ou da instalação),
+não da pessoa — de propósito: dois professores que dividem o mesmo
+laboratório, em turnos diferentes, precisam ver a mesma agenda e o mesmo
+histórico, senão um acabaria reenviando o que o outro já registrou.
 
-```bash
-cd sed_autofill
-python3 -m venv venv
-source venv/bin/activate          # Windows: venv\Scripts\activate
-pip install -r requirements.txt
-python -m playwright install chromium
-
-cp .env.example .env
-# edite o .env com seu CPF, senha e dados do orientador
-```
-
-## Uso
-
-```bash
-# só olhar o que seria enviado, sem preencher nada (recomendado na primeira vez)
-python main.py --dry-run
-
-# ler a semana atual e preencher o formulário (pede confirmação antes de enviar
-# cada aula, e antes disso pergunta se a aula realmente aconteceu)
-python main.py
-```
-
-Sem `--semana`, o script já usa a semana de hoje. **Só aulas que já
-começaram são processadas** — uma aula agendada para mais tarde no mesmo dia
-nunca é mostrada para envio (regra de ouro: nunca adiantar aula futura). Use
-`--incluir-futuras` só para conferir a agenda inteira com `--dry-run`.
-
-O script também guarda em `registros_enviados.json` (nesta mesma pasta)
-quais aulas já foram enviadas, então rodar o script de novo no mesmo dia não
-oferece a mesma aula duas vezes.
-
-Na primeira vez que o script abrir o formulário da SED, uma janela do
-Chrome vai pedir o login da conta Google (a mesma que você usou para
-acessar o formulário no navegador). Faça login manualmente uma vez — a
-sessão fica salva em `browser_profile/` e não será pedida de novo enquanto
-essa pasta não for apagada.
-
-### Outras opções
-
-- `--semana 2026-08-17` — processa uma semana específica em vez da atual
-  (qualquer data dessa semana serve). Útil para conferir uma semana passada
-  com `--dry-run`; nunca envia aula futura mesmo assim.
-- `--turnos Matutino,Vespertino` — processa só os turnos informados.
-- `--professor "Nome Completo"` — processa só os agendamentos desse
-  professor (por padrão usa `PROFESSOR_FILTRO` do `.env`; deixe em branco
-  para processar a aula de qualquer professor que usou o laboratório).
-- `--perguntar-recursos` — pergunta no terminal quais recursos foram usados
-  em cada aula, em vez de usar automaticamente os 3 recursos padrão
-  definidos em `config.RECURSOS_PADRAO`.
-- `--incluir-futuras` — só para conferência com `--dry-run`: mostra também
-  aulas que ainda vão acontecer. Nunca processa nem envia essas aulas.
-- `--auto-submit` — pula a confirmação manual e envia direto. Só recomendado
-  depois de validar bastante o fluxo manualmente.
-
-## O que ainda precisa de melhorias
+## Limitações conhecidas
 
 - **Só cobre o fluxo "Atividade/Aula com estudantes".** Os outros tipos de
   registro do formulário (Suporte a outros espaços, Manutenção de
-  equipamentos, Formação/Reunião) ainda não foram mapeados — hoje o script
+  equipamentos, Formação/Reunião) ainda não foram mapeados — o programa
   ignora automaticamente os agendamentos de "Organização interna na Sala de
-  Tecnologias\Formação".
+  Tecnologias/Formação".
 - **Número de estudantes** continua manual porque o site de agendamento não
-  guarda essa informação — o script sempre pergunta no terminal, depois de
-  confirmar que a aula realmente aconteceu.
-- **Layout do site do NTE pode mudar.** Os seletores usados
-  (`.weekly-cell.reserved`, `.reserva-professor` etc.) foram tirados do HTML
-  real em 20/08/2026. Se o site for atualizado, os seletores em
-  `agenda_scraper.py` podem precisar de ajuste.
+  guarda essa informação.
+- **Layout do site do NTE pode mudar.** Os seletores usados em
+  `agenda_scraper.py` foram tirados do HTML real em 20/08/2026.
 - **Layout do formulário da SED também pode mudar** (novas perguntas, novos
-  componentes curriculares). O mapeamento em `config.DISCIPLINA_PARA_COMPONENTE`
-  foi conferido em 24/08/2026 direto na estrutura interna do formulário —
-  inclusive o detalhe de que "Educação Digital" aparece **sem** "(ETI)" nos
-  Anos Iniciais e **com** "(ETI)" nos Anos Finais (por isso esse item usa
-  `ETAPA_DEPENDENTE` em vez de uma lista fixa).
+  componentes curriculares). O mapeamento em
+  `config.DISCIPLINA_PARA_COMPONENTE` foi conferido em 24/08/2026 direto na
+  estrutura interna do formulário.
 
-## Estrutura dos arquivos
+## Para quem for mexer no código
 
-- `config.py` — todos os dados fixos e mapeamentos (edite aqui para ajustar
-  regras, sem mexer no resto do código).
-- `agenda_scraper.py` — login e leitura do site de agendamento.
-- `sed_form_filler.py` — preenchimento do formulário da SED, página por
-  página.
-- `main.py` — script principal (linha de comando).
+### Rodando a partir do código-fonte
+
+```bash
+git clone https://github.com/ArnoNeto1/registro-sed-automatizado.git
+cd registro-sed-automatizado
+python -m venv venv
+source venv/bin/activate          # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+python -m playwright install chromium   # só usado se não achar Chrome/Edge na máquina
+
+cp .env.example .env
+# ou: python app.py e cadastre pela tela (recomendado — .env é o formato antigo)
+```
+
+- **`python app.py`** — a interface gráfica (janela), o jeito normal de usar.
+- **`python main.py --dry-run`** — linha de comando, só para conferir o que
+  seria enviado sem preencher nada. Veja `python main.py --help` para as
+  opções (`--semana`, `--turnos`, `--professor`, `--auto-submit` etc.).
+
+### Estrutura dos arquivos
+
+| Arquivo | O que é |
+|---|---|
+| `app.py` | Interface gráfica (Tkinter) — o programa do dia a dia. |
+| `main.py` | Script de linha de comando (mesma automação, sem janela). |
+| `iniciar.py` | Porta de entrada do `.exe` — rede de segurança contra falha antes da tela existir (gera `erro.txt`). |
+| `agenda_scraper.py` | Login e leitura do site de agendamento do NTE. |
+| `sed_form_filler.py` | Preenchimento do formulário da SED, página por página, com conferência de cada resposta. |
+| `config.py` | Dados fixos e mapeamentos (disciplina → componente curricular etc.). |
+| `configuracao.py` | Tela de cadastro (nome, escola, CPF, turnos) — substitui a edição manual do `.env`. |
+| `caminhos.py` | Onde ficam os arquivos do programa (`.py` vs `.exe`, portátil vs instalado) e qual navegador usar. |
+| `atualizador.py` | Autoatualização: consulta `versao.json`, baixa e troca os arquivos/o `.exe`. |
+| `escolas.py` | Lista de escolas da CRE Blumenau, como aparecem no formulário da SED. |
+| `installer/setup.iss` | Script do instalador Windows (Inno Setup). |
+| `.github/workflows/montar-programa.yml` | Gera o `.exe` portátil e o instalador e publica a release, automaticamente. |
+
+### Onde ficam os dados do professor
+
+`.env` (ou a configuração feita pela tela), o login salvo do navegador
+(`browser_profile/`) e o histórico de envios ficam:
+
+- **ao lado do executável**, rodando pelos `.py` ou pelo `.exe` portátil;
+- em **`%ProgramData%\RegistroSED`**, quando instalado dentro de "Arquivos
+  de Programas" (o instalador) — pasta compartilhada por todos os usuários
+  do Windows na máquina, não por usuário, para não quebrar o
+  compartilhamento entre professores descrito acima. Ver
+  `caminhos.pasta_de_dados()`.
+
+### Publicando uma versão nova
+
+Aumente o número em `VERSAO.txt`, descreva o que mudou numa seção nova em
+`NOVIDADES.md` e dê push na `main` — o GitHub Actions
+(`.github/workflows/montar-programa.yml`) monta o `.exe` portátil e o
+instalador, publica os dois numa Release e atualiza `versao.json`, que é o
+que os programas já instalados consultam para saber que existe versão nova.
+Veja `PUBLICAR ATUALIZACAO.txt` para o passo a passo completo.
+
+## Licença
+
+[MIT](LICENSE).

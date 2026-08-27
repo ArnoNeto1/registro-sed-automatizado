@@ -66,13 +66,23 @@ Source: "..\ESCOLAS - CRE BLUMENAU.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\VERSAO.txt"; DestDir: "{app}"; Flags: ignoreversion
 
 [Dirs]
-; O programa guarda o .env (CPF/senha), o login salvo do navegador
-; (browser_profile\) e o histórico de envios do LADO do próprio
-; executável. Como a pasta de instalação fica dentro de "Arquivos de
-; Programas" — protegida por padrão contra escrita por usuários comuns
-; — liberamos aqui a permissão de escrita para o grupo "Usuários"
-; nesta pasta específica. Sem isso, o programa abriria e falharia ao
-; tentar criar o .env na primeira execução.
+; Desde a versão 1.5, o .env (CPF/senha), o login salvo do navegador
+; (browser_profile\) e o histórico de envios NÃO ficam mais aqui — foram
+; para %ProgramData%\RegistroSED, pasta compartilhada por TODOS os
+; usuários do Windows na máquina (ver caminhos.pasta_de_dados() no
+; código — tem que ser por MÁQUINA, não por usuário do Windows: dois
+; professores que dividem o laboratório precisam ver o mesmo histórico
+; de envios, senão um reenviaria o que o outro já registrou). Criada
+; aqui, já com permissão de escrita, para não depender de o programa
+; conseguir criá-la sozinho na primeira execução.
+Name: "{commonappdata}\RegistroSED"; Permissions: users-modify
+
+; Mesmo com os dados do professor fora daqui, a autoatualização
+; (atualizador.py) ainda troca o próprio Registro-SED.exe e reescreve o
+; VERSAO.txt NESTA pasta, dentro de "Arquivos de Programas" — protegida
+; por padrão contra escrita por usuários comuns. Por isso a permissão
+; continua liberada: sem ela, um professor sem privilégio de
+; administrador não conseguiria se autoatualizar.
 Name: "{app}"; Permissions: users-modify
 
 [Icons]
@@ -85,7 +95,15 @@ Filename: "{app}\{#MyAppExeName}"; Description: "Abrir o {#MyAppName} agora"; Fl
 
 [UninstallDelete]
 ; Ao desinstalar, remove também os arquivos que o programa criou depois
-; (histórico, config, login salvo) — sem isso ficariam órfãos na pasta.
+; (histórico, config, login salvo, .env com CPF/senha) — sem isso
+; ficariam órfãos na máquina.
+;
+; Desde a 1.5 esses dados moram em %ProgramData%\RegistroSED (fora de
+; "{app}"); os itens abaixo em "{app}" continuam aqui só para limpar uma
+; instalação de versão anterior à 1.5 que seja desinstalada antes de
+; nunca ter sido aberta com o instalador novo (ou seja, antes de rodar a
+; migração automática) — não fazem mal nenhum ficar mesmo quando não há
+; nada ali para apagar.
 Type: filesandordirs; Name: "{app}\browser_profile"
 Type: files; Name: "{app}\.env"
 Type: files; Name: "{app}\registros_enviados.json"
@@ -93,3 +111,4 @@ Type: files; Name: "{app}\configuracao.json"
 Type: files; Name: "{app}\aulas_nao_realizadas.json"
 Type: files; Name: "{app}\ultimo_professor.txt"
 Type: files; Name: "{app}\erro.txt"
+Type: filesandordirs; Name: "{commonappdata}\RegistroSED"

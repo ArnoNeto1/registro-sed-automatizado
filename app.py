@@ -64,18 +64,23 @@ from dotenv import load_dotenv
 from caminhos import (  # noqa: E402
     abrir_contexto,
     abrir_navegador,
-    caminho,
+    caminho_de_dados,
     empacotado,
     garantir_env,
     limpar_sobras,
-    pasta_do_programa,
+    migrar_dados_antigos,
+    pasta_de_dados,
 )
 
-# Quem baixa o .exe baixa um arquivo só: o modelo de configuração precisa
-# aparecer ao lado dele na primeira execução, senão não há o que preencher.
+# Quem já usava uma versão anterior à 1.5 tinha .env, login do navegador e
+# histórico do lado do .exe; migra tudo para a pasta de dados antes de
+# qualquer leitura abaixo. Depois, quem baixa o .exe baixa um arquivo só:
+# o modelo de configuração precisa aparecer na primeira execução, senão
+# não há o que preencher.
+migrar_dados_antigos()
 garantir_env()
 
-load_dotenv(pasta_do_programa() / ".env")
+load_dotenv(pasta_de_dados() / ".env")
 
 from agenda_scraper import TURNOS, filtrar_e_agrupar, login, scrape_week  # noqa: E402
 import atualizador  # noqa: E402
@@ -107,6 +112,7 @@ from main import (  # noqa: E402
     agora_sc,
     carregar_enviados,
     chave_grupo,
+    estado_corrompido,
     ja_comecou,
     marcar_enviado,
     monday_of,
@@ -227,12 +233,12 @@ COR_DESTAQUE = "#2f6f4e"
 # coisa é "já registrei", outra bem diferente é "não houve aula". Misturar
 # as duas faria parecer que foram enviadas à SED.
 # ---------------------------------------------------------------------------
-NAO_REALIZADAS_FILE = caminho("aulas_nao_realizadas.json")
+NAO_REALIZADAS_FILE = caminho_de_dados("aulas_nao_realizadas.json")
 
 # Guarda qual professor foi escolhido da última vez. Em escola com dois
 # orientadores dividindo o computador, ninguém quer reescolher o próprio
 # nome toda vez que abre o programa.
-ULTIMO_PROF_FILE = caminho("ultimo_professor.txt")
+ULTIMO_PROF_FILE = caminho_de_dados("ultimo_professor.txt")
 
 
 def carregar_ultimo_professor() -> str:
@@ -263,8 +269,12 @@ def carregar_nao_realizadas() -> set:
 
 
 def _salvar_nao_realizadas(chaves: set) -> None:
-    with open(NAO_REALIZADAS_FILE, "w", encoding="utf-8") as f:
+    # Atômico pelo mesmo motivo de _escrever_estado() em main.py: uma
+    # escrita comum interrompida no meio deixaria o .json pela metade.
+    tmp = NAO_REALIZADAS_FILE + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
         json.dump(sorted(chaves), f, ensure_ascii=False, indent=2)
+    os.replace(tmp, NAO_REALIZADAS_FILE)
 
 
 def marcar_nao_realizada(chave: str) -> None:
@@ -342,7 +352,7 @@ class NavegadorWorker(threading.Thread):
         ("aulas", lista_de_grupos)
         ("preenchido", grupo, resumo_dict)
         ("enviado", grupo)
-        ("erro", mensagem)
+        ("erro", mensagem, acao_que_falhou)
     """
 
     def __init__(self, comandos: queue.Queue, eventos: queue.Queue):
@@ -468,6 +478,15 @@ class NavegadorWorker(threading.Thread):
                 comando = self.comandos.get()
                 acao = comando[0]
                 if acao == "sair":
+                    # Fecha explicitamente aqui, em vez de confiar só na
+                    # saída do "with sync_playwright()": esta é uma thread
+                    # daemon — se o processo principal encerrar antes dela
+                    # terminar de rodar, ela é interrompida na hora, sem
+                    # garantia de que o Chrome da sessão persistente
+                    # (browser_profile) chegou a fechar de verdade. Ver
+                    # Janela._encerrar_worker(), que ESPERA esta thread
+                    # terminar antes de deixar o processo ir embora.
+                    self._fechar_navegador()
                     break
                 try:
                     if acao == "carregar":
@@ -565,7 +584,7 @@ class NavegadorWorker(threading.Thread):
                     detalhe = "".join(
                         traceback.format_exception_only(type(exc), exc)
                     ).strip()
-                    self.eventos.put(("erro", detalhe))
+                    self.eventos.put(("erro", detalhe, acao))
                     self._status("Deu erro — veja a mensagem abaixo.")
 
         if self._context is not None:
@@ -610,6 +629,11 @@ class Janela(tk.Tk):
         self.nao_realizadas: set = carregar_nao_realizadas()
         self.grupo_atual = None
         self.preenchido_para = None
+        # True do instante em que "enviar" é mandado pra fila até o evento
+        # "enviado"/"erro" voltar. Ver `_fechar()`: fechar o programa no
+        # meio disso pode deixar um envio que DEU CERTO do lado da SED sem
+        # marcar a aula como enviada aqui — risco de duplicar depois.
+        self._envio_em_andamento = False
         self._ja_avisadas: set = set()
 
         # Professor ativo. Numa escola com dois orientadores dividindo o
@@ -1317,6 +1341,14 @@ class Janela(tk.Tk):
                 f"Pronto — agora na versão {info['versao']}.\n\n"
                 "O programa vai fechar e abrir de novo sozinho.",
             )
+            # NESTA ORDEM: fecha (e espera) o Chrome da sessão persistente
+            # ANTES de abrir a versão nova — não depois. Abrir a versão
+            # nova primeiro e só fechar o Chrome antigo em seguida dava
+            # tempo de sobra para as duas coisas se atravessarem: a versão
+            # nova podia tentar abrir o MESMO browser_profile antes do
+            # Chrome antigo ter soltado a trava dele, e falhava com um
+            # erro que só ia embora fechando e abrindo de novo na mão.
+            self._encerrar_worker()
             try:
                 atualizador.reiniciar()
             except Exception as erro:
@@ -1332,7 +1364,11 @@ class Janela(tk.Tk):
                     "atalho de sempre e estará tudo certo.\n\n"
                     f"(motivo técnico: {erro})",
                 )
-            self._fechar()
+            # Não usa _fechar() aqui: já fechamos o navegador acima, à
+            # mão, na ordem certa (antes de abrir a versão nova) — chamar
+            # de novo só mandaria um "sair" redundante para uma thread que
+            # já terminou.
+            self.destroy()
             return
 
         messagebox.showinfo(
@@ -1346,16 +1382,36 @@ class Janela(tk.Tk):
         )
 
     def _checar_configuracao(self) -> None:
-        """Avisa, logo ao abrir, se faltou preencher o arquivo .env."""
+        """Avisa, logo ao abrir, se faltou preencher o arquivo .env — ou se
+        o histórico de envios não pôde ser lido."""
+        if estado_corrompido():
+            self._escrever(
+                "NÃO CONSEGUI LER O HISTÓRICO DE ENVIOS\n\n"
+                f"O arquivo {os.path.basename(ESTADO_FILE)} existe, mas está "
+                "corrompido — o programa está tratando como se nada tivesse "
+                "sido enviado ainda.\n\n"
+                "IMPORTANTE: confira com cuidado, antes de reenviar, se "
+                "cada aula já não foi registrada de verdade na SED — pode "
+                "estar em duplicidade."
+            )
+            messagebox.showwarning(
+                "Histórico de envios corrompido",
+                f"O arquivo {os.path.basename(ESTADO_FILE)} (o que já foi "
+                "enviado à SED) existe, mas não pôde ser lido — o programa "
+                "vai tratar tudo como pendente.\n\n"
+                "Antes de reenviar qualquer aula, confira na própria SED se "
+                "ela já não foi registrada — para não duplicar.",
+            )
         faltando = configuracao_incompleta()
         if not faltando:
             return
         lista = "\n".join(f"   • {item}" for item in faltando)
+        pasta_env = str(pasta_de_dados())
         self._escrever(
             "FALTA CONFIGURAR O ARQUIVO .env\n\n"
             "Estes dados ainda não foram preenchidos:\n"
             f"{lista}\n\n"
-            "Abra o arquivo .env (na pasta do programa) com o Bloco de "
+            f"Abra o arquivo .env (em {pasta_env}) com o Bloco de "
             "Notas, preencha os campos, salve e abra o programa de novo."
         )
         self._definir_status("Falta configurar o arquivo .env — veja abaixo.")
@@ -1364,7 +1420,7 @@ class Janela(tk.Tk):
             "O programa ainda não sabe quem você é.\n\n"
             "Estes dados não foram preenchidos:\n\n"
             f"{lista}\n\n"
-            "Abra o arquivo .env na pasta do programa com o Bloco de Notas, "
+            f"Abra o arquivo .env (em {pasta_env}) com o Bloco de Notas, "
             "preencha esses campos, salve e abra o programa de novo.\n\n"
             "Sem isso, o registro iria para a SED com os dados errados.",
         )
@@ -1654,8 +1710,18 @@ class Janela(tk.Tk):
         # campos, e a reconsulta automática (de 30 em 30 min) apagaria o
         # trabalho em andamento bem na hora de clicar em Enviar.
         if self.preenchido_para is not None:
+            # Por CHAVE, não por identidade (`is`): toda recarga da agenda
+            # — inclusive a silenciosa, de 30 em 30 min — cria objetos
+            # novos a partir de um scrape novo. Comparar por identidade
+            # nunca reencontra a aula depois disso, e a linha ficava sem
+            # seleção visual (cosmético — o envio usa self.preenchido_para
+            # direto, não esta busca — mas confuso: parecia que a aula
+            # tinha sumido no meio do preenchimento).
+            chave_pendente = chave_grupo(self.preenchido_para)
             try:
-                indice = next(i for i, x in enumerate(self.grupos) if x is self.preenchido_para)
+                indice = next(
+                    i for i, x in enumerate(self.grupos) if chave_grupo(x) == chave_pendente
+                )
                 self.tabela.selection_set(str(indice))
                 self.grupo_atual = self.preenchido_para
             except StopIteration:
@@ -1827,6 +1893,18 @@ class Janela(tk.Tk):
         self.orientador = novo
         salvar_ultimo_professor(novo["nome"])
         self._ja_avisadas.clear()  # os avisos valem para a agenda do novo login
+
+        # A aula selecionada na tabela é da agenda do professor ANTERIOR —
+        # ela só é substituída quando o evento "aulas" do novo login
+        # voltar (é assíncrono, a leitura da agenda leva um tempo). Sem
+        # isto, clicar "Preencher formulário" nesse intervalo registraria
+        # a aula de um professor com o nome do outro: dado errado na SED,
+        # sem nenhum aviso. `_preencher()` recusa a agir sem uma aula
+        # selecionada — não precisa desabilitar o botão pra isso, e
+        # desabilitar aqui deixaria ele travado até o próximo preenchimento
+        # de verdade, já que nada mais o reabilita.
+        self.grupo_atual = None
+
         self._definir_status(f"Professor: {novo['nome']} — relendo a agenda...")
         self.comandos.put(("carregar", False, novo["cpf"], novo["senha"]))
 
@@ -1836,6 +1914,13 @@ class Janela(tk.Tk):
         self.comandos.put(("carregar", False, self.orientador["cpf"], self.orientador["senha"]))
 
     def _preencher(self) -> None:
+        if str(self.botao_preencher.cget("state")) == "disabled":
+            # O botão já reflete "preenchimento em andamento" — mas o
+            # atalho <Return> no campo de estudantes chama esta função
+            # direto, sem passar pelo botão. Sem esta checagem, um Enter
+            # a mais (ou Enter logo depois de um clique) enfileira um
+            # segundo "preencher" pro mesmo formulário.
+            return
         if self.grupo_atual is None:
             messagebox.showinfo("Escolha uma aula", "Selecione uma aula na lista primeiro.")
             return
@@ -1930,6 +2015,7 @@ class Janela(tk.Tk):
             return
         self.botao_enviar.configure(state="disabled")
         self._definir_status("Enviando...")
+        self._envio_em_andamento = True
         self.comandos.put(("enviar", grupo))
 
     def _alternar_nao_realizada(self) -> None:
@@ -2002,102 +2088,171 @@ class Janela(tk.Tk):
         self._preencher_tabela()
 
     def _fechar(self) -> None:
-        self.comandos.put(("sair",))
+        # Fechar no meio de um envio é o pior momento possível: se o
+        # clique em "Enviar" já tiver dado certo do lado da SED e o
+        # programa for embora antes do evento "enviado" voltar, a aula
+        # nunca é marcada como enviada aqui — e reaparece como pendente,
+        # arriscando um registro duplicado na próxima vez que abrir.
+        if self._envio_em_andamento and not messagebox.askyesno(
+            "Envio em andamento",
+            "Ainda estou enviando este registro para a SED — feche só depois "
+            'de ver a mensagem "Registro enviado para a SED".\n\n'
+            "Se fechar agora, o envio pode terminar do lado da SED sem que o "
+            "programa saiba disso aqui, e a aula voltaria a aparecer como "
+            "pendente (risco de duplicar o registro).\n\n"
+            "Fechar mesmo assim?",
+        ):
+            return
+        self._encerrar_worker()
         self.destroy()
+
+    def _encerrar_worker(self) -> None:
+        """
+        Manda a thread do navegador sair e ESPERA (até 8s) ela terminar
+        antes de continuar.
+
+        Sem esperar, o processo pode ir embora (ou, na atualização
+        automática, a versão NOVA pode abrir) antes do Chrome da sessão
+        persistente (browser_profile) ter soltado o perfil de verdade — a
+        thread do navegador é "daemon" e é interrompida na hora se o
+        processo principal encerrar primeiro, sem chance de fechar o
+        Chrome direito. Um Chrome que não fechou por completo deixa uma
+        trava (SingletonLock) na pasta do perfil, e a próxima tentativa de
+        abrir esse MESMO perfil esbarra nela e falha — foi exatamente
+        esse o "erro que precisa fechar e abrir de novo" visto depois de
+        uma atualização automática (ver `_oferecer_atualizacao`, que
+        chama isto ANTES de abrir a versão nova, não depois).
+
+        O timeout é rede de segurança, não o caminho esperado: se o
+        Chrome estiver mesmo travado, é melhor o programa fechar do jeito
+        antigo (arriscando a trava) do que travar para sempre esperando.
+        """
+        self.comandos.put(("sair",))
+        self.worker.join(timeout=8)
 
     # -- eventos vindos da thread do navegador ------------------------------
     def _ler_eventos(self) -> None:
+        """
+        Lê os eventos que a thread do navegador colocou na fila e atualiza
+        a tela.
+
+        Reagendada em `finally`, não no fim do corpo: um erro inesperado
+        ao processar UM evento (um KeyError num campo que faltou, um
+        TclError num widget) não pode fazer esta função nunca mais ser
+        chamada — foi exatamente isso que já aconteceu aqui, e o efeito é
+        silencioso e grave: a tela para de reagir a QUALQUER coisa (status,
+        botões, "enviado com sucesso") pelo resto da sessão, sem avisar.
+        Cada evento é processado no seu próprio try/except por causa
+        disso: um evento com problema não pode impedir os próximos, já
+        enfileirados, de serem lidos.
+        """
         try:
             while True:
-                evento = self.eventos.get_nowait()
-                tipo = evento[0]
-                if tipo == "status":
-                    self._definir_status(evento[1])
-                elif tipo == "aulas":
-                    self.grupos = evento[1]
-                    quieto = bool(evento[2]) if len(evento) > 2 else False
-                    self.enviados = carregar_enviados()
-                    self._marcar_hora_da_agenda()
-                    # Aulas que já começaram há mais tempo que a janela de
-                    # aviso entram como "já avisadas": abrir o programa às
-                    # 15h não deve piscar de uma vez pela manhã inteira.
-                    agora = agora_sc()
-                    for g in self.grupos:
-                        if (agora - self._momento_inicio(g, agora)).total_seconds() > JANELA_AVISO_MIN * 60:
-                            self._ja_avisadas.add(chave_grupo(g))
-                    self._preencher_tabela()
-                    if self.grupo_atual is None and not self.grupos:
-                        self._escrever("Nenhuma aula encontrada nesta semana.")
-                    if not quieto:
-                        self._trazer_para_frente()
-                elif tipo == "preenchido":
-                    _, grupo, resumo = evento
-                    self.preenchido_para = grupo
-                    self.botao_preencher.configure(state="normal")
-                    self.botao_enviar.configure(state="normal")
-                    linha_sub = ""
-                    if resumo.get("subetapa"):
-                        linha_sub = f"  Qual etapa? .... {resumo['subetapa']}\n"
-                    self._escrever(
-                        "CONFIRA ANTES DE ENVIAR\n"
-                        f"  Etapa .......... {resumo['etapa']}\n"
-                        + linha_sub
-                        + f"  Componente ..... {_texto_componente(resumo['componente'])}\n"
-                        f"  Resumo ......... {resumo['resumo']}\n"
-                        f"  Nº de aulas .... {resumo['aulas']}\n"
-                        f"  Estudantes ..... {resumo['estudantes']}\n"
-                        f"  Conteúdos ...... {resumo['conteudos']}\n"
-                        f"  Recursos ....... {', '.join(resumo['recursos'])}"
-                        + _texto_conferencia(resumo.get("conferencia"))
-                    )
-                    # o Chrome está na frente depois de preencher — traz o
-                    # programa de volta, que é onde fica o botão de enviar
-                    self._trazer_para_frente()
-                elif tipo == "enviado":
-                    _, grupo = evento
-                    self.enviados = carregar_enviados()
-                    self.preenchido_para = None
-                    self.botao_enviar.configure(state="disabled")
-                    self.botao_preencher.configure(state="normal")
-                    self.campo_estudantes.delete(0, "end")
-                    self._escrever("Registro enviado para a SED.")
-                    self._preencher_tabela()
-                elif tipo == "atualizacao":
-                    self._oferecer_atualizacao(evento[1])
-                elif tipo == "aviso_atualizacao":
-                    messagebox.showinfo("Atualização", evento[1])
-                elif tipo == "conta_google":
-                    estado = evento[1]
-                    if estado.get("conectado"):
-                        conta = estado.get("conta") or ""
-                        self._definir_status("Conta Google da escola conectada.")
-                        messagebox.showinfo(
-                            "Conta Google da escola",
-                            "Está tudo certo: o formulário abriu já conectado"
-                            + (f" ({conta})" if conta else "")
-                            + ".\n\nVocê não precisa entrar de novo neste "
-                            "computador — o programa guarda essa sessão e abre "
-                            "conectado a partir de agora.",
-                        )
-                    else:
-                        self._definir_status(
-                            "Entre com a conta da escola na janela do Chrome."
-                        )
-                        messagebox.showinfo(
-                            "Entrar na conta da escola",
-                            "Abri o formulário numa janela do Chrome e ele parou "
-                            "na tela de entrada do Google.\n\n"
-                            "Entre ali com o e-mail institucional da escola (o "
-                            "mesmo que responde o formulário da SED). Assim que "
-                            "aparecer o formulário, pode fechar esta mensagem: o "
-                            "programa passa a abrir conectado, sem pedir de novo.",
-                        )
-                elif tipo == "erro":
-                    self.botao_preencher.configure(state="normal")
-                    self._escrever("DEU ERRO\n\n" + evento[1])
-        except queue.Empty:
-            pass
-        self.after(100, self._ler_eventos)
+                try:
+                    evento = self.eventos.get_nowait()
+                except queue.Empty:
+                    break
+                try:
+                    self._processar_evento(evento)
+                except Exception:
+                    traceback.print_exc()
+        finally:
+            self.after(100, self._ler_eventos)
+
+    def _processar_evento(self, evento) -> None:
+        tipo = evento[0]
+        if tipo == "status":
+            self._definir_status(evento[1])
+        elif tipo == "aulas":
+            self.grupos = evento[1]
+            quieto = bool(evento[2]) if len(evento) > 2 else False
+            self.enviados = carregar_enviados()
+            self._marcar_hora_da_agenda()
+            # Aulas que já começaram há mais tempo que a janela de
+            # aviso entram como "já avisadas": abrir o programa às
+            # 15h não deve piscar de uma vez pela manhã inteira.
+            agora = agora_sc()
+            for g in self.grupos:
+                if (agora - self._momento_inicio(g, agora)).total_seconds() > JANELA_AVISO_MIN * 60:
+                    self._ja_avisadas.add(chave_grupo(g))
+            self._preencher_tabela()
+            if self.grupo_atual is None and not self.grupos:
+                self._escrever("Nenhuma aula encontrada nesta semana.")
+            if not quieto:
+                self._trazer_para_frente()
+        elif tipo == "preenchido":
+            _, grupo, resumo = evento
+            self.preenchido_para = grupo
+            self.botao_preencher.configure(state="normal")
+            self.botao_enviar.configure(state="normal")
+            linha_sub = ""
+            if resumo.get("subetapa"):
+                linha_sub = f"  Qual etapa? .... {resumo['subetapa']}\n"
+            self._escrever(
+                "CONFIRA ANTES DE ENVIAR\n"
+                f"  Etapa .......... {resumo['etapa']}\n"
+                + linha_sub
+                + f"  Componente ..... {_texto_componente(resumo['componente'])}\n"
+                f"  Resumo ......... {resumo['resumo']}\n"
+                f"  Nº de aulas .... {resumo['aulas']}\n"
+                f"  Estudantes ..... {resumo['estudantes']}\n"
+                f"  Conteúdos ...... {resumo['conteudos']}\n"
+                f"  Recursos ....... {', '.join(resumo['recursos'])}"
+                + _texto_conferencia(resumo.get("conferencia"))
+            )
+            # o Chrome está na frente depois de preencher — traz o
+            # programa de volta, que é onde fica o botão de enviar
+            self._trazer_para_frente()
+        elif tipo == "enviado":
+            _, grupo = evento
+            self._envio_em_andamento = False
+            self.enviados = carregar_enviados()
+            self.preenchido_para = None
+            self.botao_enviar.configure(state="disabled")
+            self.botao_preencher.configure(state="normal")
+            self.campo_estudantes.delete(0, "end")
+            self._escrever("Registro enviado para a SED.")
+            self._preencher_tabela()
+        elif tipo == "atualizacao":
+            self._oferecer_atualizacao(evento[1])
+        elif tipo == "aviso_atualizacao":
+            messagebox.showinfo("Atualização", evento[1])
+        elif tipo == "conta_google":
+            estado = evento[1]
+            if estado.get("conectado"):
+                conta = estado.get("conta") or ""
+                self._definir_status("Conta Google da escola conectada.")
+                messagebox.showinfo(
+                    "Conta Google da escola",
+                    "Está tudo certo: o formulário abriu já conectado"
+                    + (f" ({conta})" if conta else "")
+                    + ".\n\nVocê não precisa entrar de novo neste "
+                    "computador — o programa guarda essa sessão e abre "
+                    "conectado a partir de agora.",
+                )
+            else:
+                self._definir_status(
+                    "Entre com a conta da escola na janela do Chrome."
+                )
+                messagebox.showinfo(
+                    "Entrar na conta da escola",
+                    "Abri o formulário numa janela do Chrome e ele parou "
+                    "na tela de entrada do Google.\n\n"
+                    "Entre ali com o e-mail institucional da escola (o "
+                    "mesmo que responde o formulário da SED). Assim que "
+                    "aparecer o formulário, pode fechar esta mensagem: o "
+                    "programa passa a abrir conectado, sem pedir de novo.",
+                )
+        elif tipo == "erro":
+            self.botao_preencher.configure(state="normal")
+            # Erro ao ENVIAR: o formulário preenchido continua lá na
+            # janela do Chrome, então reabilita "Enviar" também —
+            # senão a única saída seria preencher tudo de novo por
+            # causa de, por exemplo, uma internet lenta.
+            if len(evento) > 2 and evento[2] == "enviar":
+                self.botao_enviar.configure(state="normal")
+                self._envio_em_andamento = False
+            self._escrever("DEU ERRO\n\n" + evento[1])
 
 
 def _reabrir_e_sair() -> None:

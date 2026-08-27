@@ -40,7 +40,7 @@ import re
 import tkinter as tk
 from tkinter import messagebox, ttk
 
-from caminhos import caminho
+from caminhos import caminho_de_dados
 
 ARQUIVO = "configuracao.json"
 
@@ -75,7 +75,7 @@ def escolas_conhecidas() -> list:
 def carregar() -> dict:
     """Lê o configuracao.json. Devolve {} quando ainda não existe."""
     try:
-        with open(caminho(ARQUIVO), encoding="utf-8") as f:
+        with open(caminho_de_dados(ARQUIVO), encoding="utf-8") as f:
             dados = json.load(f)
         return dados if isinstance(dados, dict) else {}
     except Exception:
@@ -83,7 +83,7 @@ def carregar() -> dict:
 
 
 def salvar(dados: dict) -> None:
-    with open(caminho(ARQUIVO), "w", encoding="utf-8") as f:
+    with open(caminho_de_dados(ARQUIVO), "w", encoding="utf-8") as f:
         json.dump(dados, f, ensure_ascii=False, indent=2)
 
 
