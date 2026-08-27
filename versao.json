@@ -1,6 +1,7 @@
 {
-  "versao": "1.4.2",
-  "exe": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v1.4.2/Registro-SED.exe",
+  "versao": "1.4.3",
+  "exe": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v1.4.3/Registro-SED.exe",
+  "instalador": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v1.4.3/Registro-SED-Instalador.exe",
   "zip": "https://github.com/ArnoNeto1/registro-sed-automatizado/archive/refs/heads/main.zip",
-  "notas": "- Corrigido o \"não consegui reabrir o programa sozinho\" que aparecia\n  depois de atualizar. A troca da versão dava certo — o erro era só na\n  hora de abrir a versão nova, e bastava abrir pelo atalho. Agora ele\n  reabre sozinho de verdade.\n- Se algum dia isso falhar de novo, a mensagem passa a dizer o motivo\n  técnico junto, em vez de só \"não consegui\"."
+  "notas": "Update VERSAO.txt"
 }
