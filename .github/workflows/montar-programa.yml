@@ -68,6 +68,7 @@ jobs:
         run: >
           pyinstaller --noconfirm --onefile --windowed
           --name Registro-SED
+          --icon assets\icone.ico
           --add-data "VERSAO.txt;."
           --add-data ".env.example;."
           --collect-all playwright
@@ -80,6 +81,24 @@ jobs:
           TAMANHO=$(stat -c%s "dist/Registro-SED.exe")
           echo "Tamanho: $((TAMANHO / 1024 / 1024)) MB"
           test "$TAMANHO" -gt 10000000 || { echo "Executável pequeno demais."; exit 1; }
+
+      - name: Instalar o Inno Setup
+        run: choco install innosetup --no-progress -y
+
+      - name: Montar o instalador (.exe com ícone, atalho e instalação em Arquivos de Programas)
+        shell: cmd
+        run: >
+          "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          /DMyAppVersion=${{ needs.decidir.outputs.numero }}
+          installer\setup.iss
+
+      - name: Conferir se o instalador saiu inteiro
+        shell: bash
+        run: |
+          test -f "dist_instalador/Registro-SED-Instalador.exe" || { echo "O instalador não foi gerado."; exit 1; }
+          TAMANHO=$(stat -c%s "dist_instalador/Registro-SED-Instalador.exe")
+          echo "Tamanho: $((TAMANHO / 1024 / 1024)) MB"
+          test "$TAMANHO" -gt 10000000 || { echo "Instalador pequeno demais."; exit 1; }
 
       - name: Separar as notas desta versão
         shell: bash
@@ -114,7 +133,9 @@ jobs:
         run: |
           TAG="v${{ needs.decidir.outputs.numero }}"
           gh release delete "$TAG" --yes --cleanup-tag 2>/dev/null || true
-          gh release create "$TAG" "dist/Registro-SED.exe" \
+          gh release create "$TAG" \
+            "dist/Registro-SED.exe" \
+            "dist_instalador/Registro-SED-Instalador.exe" \
             --title "Registro SED $TAG" \
             --notes-file notas.txt
 
@@ -129,6 +150,7 @@ jobs:
           dados = {
               "versao": numero,
               "exe": f"https://github.com/{repo}/releases/download/v{numero}/Registro-SED.exe",
+              "instalador": f"https://github.com/{repo}/releases/download/v{numero}/Registro-SED-Instalador.exe",
               "zip": f"https://github.com/{repo}/archive/refs/heads/main.zip",
               "notas": pathlib.Path("notas.txt").read_text(encoding="utf-8").strip(),
           }
