@@ -1,7 +1,7 @@
 {
-  "versao": "1.6.2",
-  "exe": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v1.6.2/Registro-SED.exe",
-  "instalador": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v1.6.2/Registro-SED-Instalador.exe",
+  "versao": "1.7.0",
+  "exe": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v1.7.0/Registro-SED.exe",
+  "instalador": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v1.7.0/Registro-SED-Instalador.exe",
   "zip": "https://github.com/ArnoNeto1/registro-sed-automatizado/archive/refs/heads/main.zip",
-  "notas": "- Faxina interna: removidos arquivos que só serviam pra uma forma bem\n  antiga de configurar o programa (editando um arquivo `.env` na mão,\n  sem instalador nenhum) — ninguém mais usa esse caminho. Não muda nada\n  pra quem já usa o instalador ou o `.exe` normalmente; o instalador\n  inclusive fica um pouco menor, por empacotar menos arquivo à toa."
+  "notas": "- **O programa agora preenche os 4 tipos de registro do formulário da\n  SED, não só \"Atividade/Aula com estudantes\".** Numa aula de Projetor\n  ou Tablets/Celular, o programa pergunta se foi mesmo uma aula com\n  estudantes ou se foi só instalar/dar suporte a um equipamento — os\n  campos mudam na hora, conforme a resposta. E apareceram duas abas\n  novas, sempre disponíveis do lado direito da tela: **Manutenção** (pra\n  quando você conserta ou organiza algo do laboratório) e **Formação/\n  Reunião** (pra quando você participa de uma formação ou reunião) —\n  essas duas nem precisam de aula marcada na agenda, é só abrir a aba e\n  preencher.\n- Pequeno ajuste visual: as opções de múltipla escolha (os círculos e\n  quadrados de marcar) ficaram com o mesmo fundo do resto da tela — antes\n  aparecia um retângulo cinza atrás do texto de cada opção."
 }
