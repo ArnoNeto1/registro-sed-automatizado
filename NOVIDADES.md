@@ -10,6 +10,25 @@ seção `## <número>` com o que mudou. O resto acontece sozinho.
 
 ---
 
+## 1.6.1
+
+- **O programa passa a ler também Projetor e Tablets/Celular, não só o
+  laboratório.** Ao carregar a agenda, ele descobre sozinho quais outros
+  recursos a sua escola tem reserváveis no NTE (cada escola tem os
+  seus) e só considera os que são de Tecnologias Educacionais de
+  verdade — Projetor, Tablet, Celular, Notebook móvel. Uma reserva de
+  Auditório ou Biblioteca, por exemplo, é ignorada: não é trabalho do
+  orientador. Quando isso encontra aula em mais de uma categoria na
+  semana, aparecem abas — **Laboratório | Projetores | Tablets/Celular**
+  — ao lado de "Aulas da semana". Quem só usa o laboratório (a grande
+  maioria) nem percebe: a tela continua exatamente igual, sem aba
+  nenhuma aparecendo à toa.
+- O aviso de "aula começando agora" (a piscada na barra de tarefas e a
+  linha verde "Sugerida agora") passa a funcionar por aba: se acontecer
+  aula no laboratório e em Tablets ao mesmo tempo, as duas avisam — e a
+  aba que não está sendo olhada no momento fica marcada em laranja, pra
+  não passar despercebida.
+
 ## 1.6.0
 
 - **Suporte a professor que dá aula em mais de uma escola, no mesmo

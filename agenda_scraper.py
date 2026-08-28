@@ -50,6 +50,11 @@ class Agendamento:
     # não erramos em escola com horário fora do comum. É o que permite dar
     # a cada orientador só as aulas do turno dele.
     turno: str = ""
+    # Qual agenda do NTE esta reserva veio: "Lab. Tecs" (o laboratório,
+    # sempre lida) ou o nome de outro recurso reservável da escola
+    # (Projetor 1, Tablets...) — ver _descobrir_outros_recursos. Cada
+    # escola tem seus próprios recursos, com nomes e números diferentes.
+    recurso: str = "Lab. Tecs"
 
 
 @dataclass
@@ -64,6 +69,7 @@ class AtividadeAgrupada:
     conteudo: str
     numero_aulas: int
     turno: str = ""
+    recurso: str = "Lab. Tecs"
     slots: list = field(default_factory=list)
 
 
@@ -288,10 +294,23 @@ def _diagnostico_falha_agenda(page) -> str:
     return "\n".join(partes)
 
 
-def scrape_week(page, monday: dt.date, turnos: list[str] | None = None) -> list[Agendamento]:
-    """Coleta todos os agendamentos da semana que começa em `monday`."""
+def scrape_week(
+    page,
+    monday: dt.date,
+    turnos: list[str] | None = None,
+    agenda_id: str | None = None,
+    nome_recurso: str = "Lab. Tecs",
+) -> list[Agendamento]:
+    """
+    Coleta todos os agendamentos da semana que começa em `monday`, de UMA
+    agenda (`agenda_id`, ou a padrão — o laboratório — se não informado).
+
+    Cada resultado vem marcado com `nome_recurso` — ver scrape_semana_completa,
+    que chama isto uma vez por recurso da escola (laboratório, projetor...).
+    """
     turnos = turnos or TURNOS
-    page.goto(AGENDA_URL, wait_until="domcontentloaded", timeout=60000)
+    url = AGENDA_URL if not agenda_id else f"{AGENDA_URL}?agenda={agenda_id}"
+    page.goto(url, wait_until="domcontentloaded", timeout=60000)
     try:
         page.wait_for_load_state("networkidle", timeout=60000)
     except Exception:
@@ -312,8 +331,95 @@ def scrape_week(page, monday: dt.date, turnos: list[str] | None = None) -> list[
     for turno in turnos:
         page.get_by_role("button", name=turno, exact=True).click()
         page.wait_for_timeout(300)
-        todos.extend(_scrape_current_view(page, turno))
+        for agendamento in _scrape_current_view(page, turno):
+            agendamento.recurso = nome_recurso
+            todos.append(agendamento)
 
+    return todos
+
+
+# Recursos de Tecnologias Educacionais que a escola pode ter, ALÉM do
+# laboratório — reconhecidos pela PALAVRA no nome do recurso, não por uma
+# lista fixa de números: cada escola tem os seus, com nomes e IDs
+# diferentes (confirmado ao vivo — a mesma etiqueta "Projetor 1" tem um
+# número numa escola e outro noutra, e nem toda escola tem os mesmos
+# recursos: uma tinha Projetor/Tablets, outra tinha Auditório/Biblioteca
+# no lugar). Só entram aqui palavras que também existem na lista de
+# "Recursos utilizados" do formulário da SED — uma sala qualquer
+# (Auditório, Biblioteca) não é trabalho do orientador de Tec. Educ./Maker,
+# e puxar essas reservas juntaria aula de gente que nada tem a ver com o
+# laboratório.
+_CATEGORIAS_RECURSO_RELEVANTE = {
+    "projetor": "Projetores",
+    "tablet": "Tablets/Celular",
+    "celular": "Tablets/Celular",
+    "notebook": "Tablets/Celular",
+    "chromebook": "Tablets/Celular",
+}
+
+
+def categoria_do_recurso(nome: str) -> str | None:
+    """A aba ("Projetores"/"Tablets/Celular") deste recurso, ou None se
+    não for um recurso de Tecnologias Educacionais reconhecido."""
+    chave = chave_comparacao(nome)
+    for palavra, categoria in _CATEGORIAS_RECURSO_RELEVANTE.items():
+        if palavra in chave:
+            return categoria
+    return None
+
+
+def descobrir_outros_recursos(page) -> list[tuple[str, str, str]]:
+    """
+    Lê o menu "Agenda: ..." da página atual e devolve os recursos
+    reserváveis desta escola que valem a pena ler além do laboratório —
+    já filtrados pelo nome (ver categoria_do_recurso). O Lab. Tecs em si
+    nunca aparece aqui: não bate com nenhuma palavra da lista, porque já
+    é lido à parte por quem chama esta função.
+
+    Devolve lista de (nome, id_da_agenda, categoria) — vazia se a escola
+    não tiver nenhum recurso reconhecido (o caso mais comum).
+    """
+    encontrados = []
+    try:
+        links = page.locator('a[href*="agenda="]')
+        for i in range(links.count()):
+            a = links.nth(i)
+            texto = (a.inner_text() or "").strip()
+            href = a.get_attribute("href") or ""
+            if not texto:
+                continue
+            m = re.search(r"agenda=(\d+)", href)
+            if not m:
+                continue
+            categoria = categoria_do_recurso(texto)
+            if categoria:
+                encontrados.append((texto, m.group(1), categoria))
+    except Exception:
+        pass
+    return encontrados
+
+
+def scrape_semana_completa(page, monday: dt.date, turnos: list[str] | None = None) -> list[Agendamento]:
+    """
+    Lê a semana inteira: o laboratório (sempre) e qualquer outro recurso
+    de Tecnologias Educacionais que a escola tenha (Projetor, Tablets,
+    Celulares, notebook móvel) — descobertos sozinho no menu da própria
+    página, já que cada escola tem os seus (às vezes nenhum extra).
+    """
+    todos = scrape_week(page, monday, turnos, nome_recurso="Lab. Tecs")
+    try:
+        extras = descobrir_outros_recursos(page)
+    except Exception:
+        extras = []
+    for nome, agenda_id, _categoria in extras:
+        try:
+            todos.extend(scrape_week(page, monday, turnos, agenda_id=agenda_id, nome_recurso=nome))
+        except Exception:
+            # Um recurso extra falhando (site fora do ar bem naquela hora,
+            # nome mudou) não pode derrubar a leitura do laboratório, que
+            # já funcionava antes disto existir — só essa parte some
+            # silenciosamente desta vez.
+            continue
     return todos
 
 
@@ -349,8 +455,13 @@ def filtrar_e_agrupar(
         and (professor_filtro is None or a.professor.strip().lower() == professor_filtro.strip().lower())
     ]
 
-    # ordena por dia, professor, disciplina, turma, horário de início
-    relevantes.sort(key=lambda a: (a.data, a.turno, a.professor, a.disciplina, a.turma, a.inicio))
+    # ordena por dia, professor, disciplina, turma, horário de início — o
+    # recurso entra na ordenação (não só na comparação abaixo) para que
+    # duas aulas emendadas de recursos DIFERENTES nunca fiquem vizinhas
+    # na lista por coincidência de horário.
+    relevantes.sort(
+        key=lambda a: (a.data, a.turno, a.professor, a.disciplina, a.turma, a.recurso, a.inicio)
+    )
 
     grupos: list[AtividadeAgrupada] = []
     atual: AtividadeAgrupada | None = None
@@ -363,6 +474,9 @@ def filtrar_e_agrupar(
             and atual.disciplina == a.disciplina
             and atual.turma == a.turma
             and atual.turno == a.turno
+            # recurso diferente (ex: laboratório e projetor) nunca emenda,
+            # mesmo com horário contíguo — são reservas de coisas distintas
+            and atual.recurso == a.recurso
             # emenda exata, OU só um intervalo de recreio no meio
             and 0 <= (_minutos(a.inicio) - _minutos(atual.fim)) <= TOLERANCIA_RECREIO_MIN
         ):
@@ -384,6 +498,7 @@ def filtrar_e_agrupar(
                 conteudo=a.conteudo,
                 numero_aulas=1,
                 turno=a.turno,
+                recurso=a.recurso,
                 slots=[a],
             )
     if atual is not None:

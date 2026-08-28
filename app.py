@@ -83,7 +83,13 @@ garantir_env()
 
 load_dotenv(pasta_de_dados() / ".env")
 
-from agenda_scraper import TURNOS, filtrar_e_agrupar, login, scrape_week  # noqa: E402
+from agenda_scraper import (  # noqa: E402
+    TURNOS,
+    categoria_do_recurso,
+    filtrar_e_agrupar,
+    login,
+    scrape_semana_completa,
+)
 import atualizador  # noqa: E402
 from config import (  # noqa: E402
     ESCOLA,
@@ -130,6 +136,19 @@ from sed_form_filler import (  # noqa: E402
 
 # O iniciar.py olha esta marca para não repetir um aviso que a pessoa já viu.
 ERRO_JA_MOSTRADO = False
+
+
+def _categoria_da_atividade(g) -> str:
+    """
+    Em qual aba esta aula aparece na tabela: "Laboratório" (o padrão —
+    Lab. Tecs, ou qualquer recurso que `categoria_do_recurso` não
+    reconheça) ou uma das categorias extras (Projetores, Tablets/Celular)
+    que a escola tiver.
+    """
+    return categoria_do_recurso(g.recurso) or "Laboratório"
+
+
+CATEGORIAS_RECURSO_EM_ORDEM = ("Laboratório", "Projetores", "Tablets/Celular")
 
 
 def _texto_conferencia(itens) -> str:
@@ -489,7 +508,7 @@ class NavegadorWorker(threading.Thread):
             login(pagina, cpf, senha, escola or ESCOLA)
             if not quieto:
                 self._status("Lendo os agendamentos da semana...")
-            agendamentos = scrape_week(pagina, monday_of(dt.date.today()), list(TURNOS))
+            agendamentos = scrape_semana_completa(pagina, monday_of(dt.date.today()), list(TURNOS))
             return filtrar_e_agrupar(agendamentos, None)
         finally:
             navegador.close()
@@ -850,6 +869,15 @@ class Janela(tk.Tk):
         estilo.configure("Secao.TLabel", background=COR_CARTAO, font=("Segoe UI", 11, "bold"))
         estilo.configure("TButton", font=("Segoe UI", 10), padding=8)
         estilo.configure("Principal.TButton", font=("Segoe UI", 11, "bold"), padding=10)
+        # Aba de recurso (Laboratório/Projetores/Tablets-Celular) que TEM
+        # aula acontecendo agora mas não é a aba aberta na tela — mesma cor
+        # de aviso usada em "SubAviso.TLabel". Sem isto, duas aulas
+        # simultâneas em recursos diferentes só mostrariam a mais recente:
+        # trocar para a aba dela escondia a outra sem nenhum sinal de que
+        # também precisava de atenção.
+        estilo.configure(
+            "AvisoAba.TButton", font=("Segoe UI", 10, "bold"), foreground="#a1663a", padding=8
+        )
         estilo.configure("TCheckbutton", background=COR_CARTAO)
         estilo.configure("Acoes.TCheckbutton", background=COR_FUNDO)
         estilo.map(
@@ -945,6 +973,22 @@ class Janela(tk.Tk):
         cabecalho.pack(fill="x")
         ttk.Label(cabecalho, text="Aulas da semana", style="Secao.TLabel").pack(side="left")
         ttk.Button(cabecalho, text="Atualizar agenda", command=self._recarregar).pack(side="right")
+
+        # Abas por recurso (Laboratório / Projetores / Tablets-Celular) —
+        # só a maioria das escolas tem só o laboratório mesmo, então essa
+        # linha começa ESCONDIDA e só aparece se a agenda de verdade trouxer
+        # aula de mais de uma categoria (ver _atualizar_abas_recurso). Os 3
+        # botões já nascem aqui, prontos, só entrando/saindo da tela com
+        # pack/pack_forget — não recriados a cada atualização de agenda.
+        self._linha_abas_recurso = ttk.Frame(cartao_lista, style="Cartao.TFrame")
+        self._linha_abas_recurso.pack(fill="x", pady=(8, 0))
+        self.categoria_atual = "Laboratório"
+        self.botoes_categoria = {}
+        for cat in CATEGORIAS_RECURSO_EM_ORDEM:
+            botao = ttk.Button(
+                self._linha_abas_recurso, text=cat, command=lambda c=cat: self._selecionar_categoria(c)
+            )
+            self.botoes_categoria[cat] = botao
 
         corpo_lista = ttk.Frame(cartao_lista, style="Cartao.TFrame")
         corpo_lista.pack(fill="both", expand=True, pady=(10, 0))
@@ -1725,17 +1769,22 @@ class Janela(tk.Tk):
             # continua escrita como "Ainda não ocorreu" — foi exatamente
             # isso que aconteceu: o alerta piscou na barra, mas a linha
             # não virou "Sugerida agora" nem começou a piscar em verde.
-            # Se a aula sugerida mudou, a lista está velha: redesenha.
-            sugerida = escolher_aula_automatica(
-                self.grupos, self.enviados | self.nao_realizadas, agora,
-                self.orientador.get("turnos"),
-            )
+            # Se a sugestão de QUALQUER aba mudou, a lista está velha:
+            # redesenha (a aba aberta agora — sem trocar sozinho de aba
+            # aqui; só o aviso de "começou agora", logo abaixo, faz isso).
+            sugeridas_novas = self._sugerida_por_categoria()
             if (
-                sugerida is not getattr(self, "_grupo_sugerido", None)
+                sugeridas_novas != getattr(self, "_sugeridas_por_categoria_anterior", None)
                 and self.preenchido_para is None
             ):
                 self._preencher_tabela()
+            self._sugeridas_por_categoria_anterior = sugeridas_novas
 
+            # Sem "break": se duas aulas começaram juntas em recursos
+            # diferentes (um laboratório, outro Tablets ao mesmo tempo),
+            # as DUAS precisam do aviso — cada uma pisca a barra de
+            # tarefas na hora certa, e a aba de quem não ficou selecionada
+            # por último continua marcada (ver _atualizar_abas_recurso).
             for g in self.grupos:
                 chave = chave_grupo(g)
                 if chave in self._ja_avisadas:
@@ -1748,7 +1797,6 @@ class Janela(tk.Tk):
                 if 0 <= atraso <= JANELA_AVISO_MIN * 60:
                     self._ja_avisadas.add(chave)
                     self._avisar_aula_comecou(g)
-                    break
         except Exception:
             pass  # nunca deixar o relógio morrer por causa de um erro pontual
         finally:
@@ -1757,6 +1805,16 @@ class Janela(tk.Tk):
     def _avisar_aula_comecou(self, grupo) -> None:
         self._piscar_na_barra()
         quando = f"{grupo.inicio}-{grupo.fim}"
+
+        # Se a aula que acabou de começar é de outra aba (ex: Tablets, com
+        # o Laboratório aberto na tela), troca pra aba certa sozinho — senão
+        # a linha "Sugerida agora" fica escrita e piscando numa aba que
+        # ninguém está olhando, e a seleção automática logo abaixo nem acha
+        # a linha (ela não existe na tabela enquanto a aba errada estiver
+        # selecionada).
+        categoria_da_aula = _categoria_da_atividade(grupo)
+        if self.categoria_atual != categoria_da_aula:
+            self.categoria_atual = categoria_da_aula
 
         # Garante que a linha desta aula já esteja escrita como "Sugerida
         # agora" (e piscando) no momento em que o aviso aparece.
@@ -1846,12 +1904,69 @@ class Janela(tk.Tk):
             self._barra_resumo.pack_forget()
             self._barra_resumo_visivel = False
 
+    def _selecionar_categoria(self, categoria: str) -> None:
+        self.categoria_atual = categoria
+        self._preencher_tabela()
+
+    def _sugerida_por_categoria(self) -> dict:
+        """
+        A "sugerida agora" de CADA aba, calculada separadamente — não uma
+        só pra tudo. Necessário porque, com mais de um recurso, pode
+        acontecer aula em duas abas ao mesmo tempo (um laboratório, outro
+        Tablets): uma sugestão global esconderia uma das duas ao trocar de
+        aba pra mostrar a outra.
+        """
+        agora = agora_sc()
+        ignorar = self.enviados | self.nao_realizadas
+        turnos = self.orientador.get("turnos")
+        resultado = {}
+        for cat in CATEGORIAS_RECURSO_EM_ORDEM:
+            grupos_da_aba = [g for g in self.grupos if _categoria_da_atividade(g) == cat]
+            resultado[cat] = escolher_aula_automatica(grupos_da_aba, ignorar, agora, turnos)
+        return resultado
+
+    def _atualizar_abas_recurso(self) -> None:
+        """
+        Mostra as abas de recurso (Laboratório/Projetores/Tablets-Celular)
+        só quando a agenda de verdade tiver aula de mais de uma categoria —
+        a grande maioria das escolas só tem o laboratório, e 3 abas para
+        escolher entre uma coisa só seria só confusão.
+
+        Uma aba que não é a selecionada, mas tem uma "sugerida agora" dela
+        mesma, ganha destaque de aviso (cor de "SubAviso") — é o sinal de
+        que tem aula acontecendo ali que a pessoa ainda não olhou.
+        """
+        presentes = {"Laboratório"} | {_categoria_da_atividade(g) for g in self.grupos}
+        sugeridas = self._sugerida_por_categoria()
+        if len(presentes) > 1:
+            for cat in CATEGORIAS_RECURSO_EM_ORDEM:
+                if cat not in presentes:
+                    self.botoes_categoria[cat].pack_forget()
+                    continue
+                if cat == self.categoria_atual:
+                    estilo = "Principal.TButton"
+                elif sugeridas.get(cat) is not None:
+                    estilo = "AvisoAba.TButton"
+                else:
+                    estilo = "TButton"
+                self.botoes_categoria[cat].configure(style=estilo)
+                self.botoes_categoria[cat].pack(side="left", padx=(0, 6))
+        else:
+            for botao in self.botoes_categoria.values():
+                botao.pack_forget()
+        if self.categoria_atual not in presentes:
+            self.categoria_atual = "Laboratório"
+
     def _preencher_tabela(self) -> None:
+        self._atualizar_abas_recurso()
         self.tabela.delete(*self.tabela.get_children())
         agora = agora_sc()
         self.nao_realizadas = carregar_nao_realizadas()
+        # Sugestão só dentro da aba aberta agora — não da agenda inteira —
+        # pelo mesmo motivo do aviso acima: cada aba mostra a aula dela.
+        grupos_da_aba = [g for g in self.grupos if _categoria_da_atividade(g) == self.categoria_atual]
         sugerida = escolher_aula_automatica(
-            self.grupos, self.enviados | self.nao_realizadas, agora,
+            grupos_da_aba, self.enviados | self.nao_realizadas, agora,
             self.orientador.get("turnos"),
         )
         self.grupo_atual = None
@@ -1860,6 +1975,12 @@ class Janela(tk.Tk):
         # corresponde à realidade (ver _verificar_inicio_de_aula)
         self._grupo_sugerido = sugerida
         for indice, g in enumerate(self.grupos):
+            # Só desenha a linha se ela for da aba (categoria de recurso)
+            # selecionada agora — o índice usado no iid continua sendo a
+            # posição REAL em self.grupos (não recalculado), porque é por
+            # ele que _ao_selecionar acha o grupo certo ao clicar na linha.
+            if _categoria_da_atividade(g) != self.categoria_atual:
+                continue
             # A bolinha antes do texto ajuda a bater o olho e achar a linha
             # pela cor, sem precisar ler a coluna inteira.
             if chave_grupo(g) in self.enviados:

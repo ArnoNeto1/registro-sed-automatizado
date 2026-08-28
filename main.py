@@ -54,7 +54,7 @@ from caminhos import abrir_contexto, caminho_de_dados, pasta_de_dados  # noqa: E
 load_dotenv(pasta_de_dados() / ".env")
 from playwright.sync_api import sync_playwright
 
-from agenda_scraper import TURNOS, filtrar_e_agrupar, login, scrape_week  # noqa: E402
+from agenda_scraper import TURNOS, filtrar_e_agrupar, login, scrape_semana_completa  # noqa: E402
 from config import (  # noqa: E402
     ESCOLA,
     PROFESSOR_FILTRO,
@@ -354,7 +354,7 @@ def main() -> None:
 
         print(f"Lendo agenda da semana de {data_semana.isoformat()} ({', '.join(turnos)})...")
         login(page, cpf or "", senha or "", ESCOLA)
-        agendamentos = scrape_week(page, data_semana, turnos)
+        agendamentos = scrape_semana_completa(page, data_semana, turnos)
         grupos_todos = filtrar_e_agrupar(agendamentos, args.professor)
 
         agora = agora_sc()
