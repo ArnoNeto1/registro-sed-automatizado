@@ -16,8 +16,8 @@ terminal. O que ela faz sozinha ao abrir:
 Regra de ouro mantida: o envio nunca acontece sozinho, e uma confirmação
 não vale para o próximo registro.
 
-Como abrir: dê dois cliques em "Registro SED.bat" (na Área de Trabalho),
-ou rode `python app.py` na pasta do projeto.
+Como abrir: baixe o `.exe`/instalador da página de Releases do GitHub, ou
+rode `python app.py` na pasta do projeto (quem for mexer no código).
 
 DETALHE TÉCNICO IMPORTANTE (pra quem for mexer): o Playwright roda numa
 thread separada da janela. Isso é obrigatório — se ele rodasse na mesma
@@ -67,7 +67,6 @@ from caminhos import (  # noqa: E402
     abrir_navegador,
     caminho_de_dados,
     empacotado,
-    garantir_env,
     limpar_sobras,
     migrar_dados_antigos,
     pasta_de_dados,
@@ -75,11 +74,8 @@ from caminhos import (  # noqa: E402
 
 # Quem já usava uma versão anterior à 1.5 tinha .env, login do navegador e
 # histórico do lado do .exe; migra tudo para a pasta de dados antes de
-# qualquer leitura abaixo. Depois, quem baixa o .exe baixa um arquivo só:
-# o modelo de configuração precisa aparecer na primeira execução, senão
-# não há o que preencher.
+# qualquer leitura abaixo.
 migrar_dados_antigos()
-garantir_env()
 
 load_dotenv(pasta_de_dados() / ".env")
 

@@ -27,8 +27,8 @@ pedindo login da conta Google da SED — faça o login manualmente uma vez; a
 sessão fica salva em ./browser_profile e não será pedida de novo enquanto
 essa pasta existir.
 
-Veja README.md para instruções completas e .env.example para configurar
-suas credenciais.
+Veja README.md para instruções completas — as credenciais podem ser
+definidas num arquivo .env na pasta do projeto (AGENDA_CPF, AGENDA_SENHA).
 """
 
 from __future__ import annotations
@@ -338,8 +338,8 @@ def main() -> None:
     senha = os.environ.get("AGENDA_SENHA")
     if not args.dry_run and (not cpf or not senha):
         sys.exit(
-            "Defina AGENDA_CPF e AGENDA_SENHA no arquivo .env (veja .env.example) "
-            "antes de rodar sem --dry-run."
+            "Defina AGENDA_CPF e AGENDA_SENHA (num arquivo .env na pasta do "
+            "projeto, ou como variável de ambiente) antes de rodar sem --dry-run."
         )
 
     with sync_playwright() as p:

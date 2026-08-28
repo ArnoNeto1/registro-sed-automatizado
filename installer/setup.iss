@@ -61,8 +61,6 @@ Name: "desktopicon"; Description: "Criar um atalho na área de trabalho"; GroupD
 
 [Files]
 Source: "..\dist\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\.env.example"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\ESCOLAS - CRE BLUMENAU.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\VERSAO.txt"; DestDir: "{app}"; Flags: ignoreversion
 
 [Dirs]

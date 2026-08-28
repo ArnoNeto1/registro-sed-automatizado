@@ -190,37 +190,6 @@ def recurso(nome: str) -> Path:
     return pasta_do_programa() / nome
 
 
-def garantir_env() -> bool:
-    """
-    Cria o .env do professor na primeira execução, a partir do modelo.
-
-    Quem baixa um .exe baixa um arquivo só — não vem pasta, não vem
-    modelo de configuração, não vem nada para editar. Sem isto, o
-    programa abriria dizendo "configuração pendente" e a pessoa não teria
-    onde preencher. Agora o arquivo aparece ao lado do programa na
-    primeira vez que ele roda.
-
-    Só vale para o .exe: quem roda pelos arquivos .py recebeu a pasta
-    inteira, com o modelo dentro dela e o instalador para copiar. Criar
-    um .env sozinho ali seria mexer numa pasta que não é só do programa.
-
-    Nunca sobrescreve um .env existente. Devolve True se criou agora.
-    """
-    if not empacotado():
-        return False
-    destino = pasta_de_dados() / ".env"
-    if destino.exists():
-        return False
-    modelo = recurso(".env.example")
-    try:
-        if modelo.exists():
-            destino.write_text(modelo.read_text(encoding="utf-8"), encoding="utf-8")
-            return True
-    except Exception:
-        pass
-    return False
-
-
 def _erro_sem_navegador(motivos: list) -> RuntimeError:
     detalhe = "; ".join(motivos[-2:]) if motivos else ""
     return RuntimeError(

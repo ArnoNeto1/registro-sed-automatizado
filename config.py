@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Configuração fixa do preenchimento automático.
-Ajuste os valores abaixo (ou use o .env — veja .env.example) conforme a
+Ajuste os valores abaixo (ou use um .env na pasta do projeto) conforme a
 realidade da sua escola / orientação.
 """
 

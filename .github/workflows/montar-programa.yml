@@ -70,7 +70,6 @@ jobs:
           --name Registro-SED
           --icon assets\icone.ico
           --add-data "VERSAO.txt;."
-          --add-data ".env.example;."
           --collect-all playwright
           iniciar.py
 

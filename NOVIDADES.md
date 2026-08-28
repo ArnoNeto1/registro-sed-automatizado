@@ -10,6 +10,14 @@ seção `## <número>` com o que mudou. O resto acontece sozinho.
 
 ---
 
+## 1.6.2
+
+- Faxina interna: removidos arquivos que só serviam pra uma forma bem
+  antiga de configurar o programa (editando um arquivo `.env` na mão,
+  sem instalador nenhum) — ninguém mais usa esse caminho. Não muda nada
+  pra quem já usa o instalador ou o `.exe` normalmente; o instalador
+  inclusive fica um pouco menor, por empacotar menos arquivo à toa.
+
 ## 1.6.1
 
 - **O programa passa a ler também Projetor e Tablets/Celular, não só o
