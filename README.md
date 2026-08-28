@@ -1,5 +1,12 @@
 # Registro SED Automatizado
 
+[![Versão mais recente](https://img.shields.io/github/v/release/ArnoNeto1/registro-sed-automatizado?label=vers%C3%A3o&color=2f6f4f)](https://github.com/ArnoNeto1/registro-sed-automatizado/releases/latest)
+[![Baixar o instalador](https://img.shields.io/badge/⬇%20Baixar-Instalador%20(.exe)-2f6f4f?style=for-the-badge)](https://github.com/ArnoNeto1/registro-sed-automatizado/releases/latest/download/Registro-SED-Instalador.exe)
+[![Baixar a versão portátil](https://img.shields.io/badge/⬇%20Baixar-Vers%C3%A3o%20port%C3%A1til-6b7684?style=for-the-badge)](https://github.com/ArnoNeto1/registro-sed-automatizado/releases/latest/download/Registro-SED.exe)
+
+> Os dois botões acima baixam sempre a versão mais nova, sem precisar
+> procurar nada. Na dúvida, escolha o **Instalador**.
+
 ## Para que serve
 
 Programa para professores orientadores de tecnologia (Blumenau/SC). Ele lê
@@ -11,6 +18,15 @@ copiar os dados da agenda para o formulário, aula por aula.
 **Ele nunca envia nada sozinho.** Sempre para antes do envio, mostra um
 resumo de tudo que vai para a SED, e só manda depois que você clicar em
 "Enviar para a SED" e confirmar.
+
+## Veja funcionando
+
+![Demonstração: baixar, cadastrar, entrar, ler a agenda e preencher o formulário](docs/demonstracao.gif)
+
+Do download até o formulário pronto para conferir — o programa para aí e
+espera você clicar em "Enviar para a SED". Nesta demonstração, os nomes dos
+professores da agenda, o e-mail da escola e o campo de senha aparecem
+tarjados por privacidade; no seu computador eles aparecem normalmente.
 
 ## Como instalar e usar
 
