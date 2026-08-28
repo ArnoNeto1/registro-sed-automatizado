@@ -10,6 +10,99 @@ seção `## <número>` com o que mudou. O resto acontece sozinho.
 
 ---
 
+## 1.6.0
+
+- **Suporte a professor que dá aula em mais de uma escola, no mesmo
+  computador** (ver "Cadastro passa a aceitar até 3 escolas", mais
+  abaixo). Ao abrir o programa (ou trocar de conta), se você tem mais
+  de uma escola cadastrada, ele pergunta em qual delas você está hoje —
+  a pergunta não fica salva, é feita de novo toda vez, igual a senha.
+  Essa escolha vale tanto para a agenda lida quanto para o formulário
+  enviado à SED. Quem tem uma escola só nem percebe essa pergunta — o
+  programa nem chega a mostrar.
+- Junto disso, corrigido o login para quem o site do NTE pede para
+  escolher a escola (professores associados a mais de uma no cadastro
+  do NTE) — o programa escolhe sozinho a que vale no momento, em vez de
+  travar a leitura da agenda.
+- **O login salvo do Google agora é por escola, não um só para o
+  computador inteiro.** Quem dá aula em duas escolas tinha o login do
+  Google preso na conta da PRIMEIRA escola usada — trocar de escola não
+  trocava a conta, e o formulário preenchido ia para a SED com a conta
+  Google errada. Agora cada escola guarda o próprio login, e trocar de
+  escola pede a conta certa na hora.
+- Corrigido um "não foi possível navegar até a semana desejada" que
+  aparecia para quem tem mais de uma escola: a tela de escolha de
+  escola do NTE tem um botão "Confirmar" separado da lista — o programa
+  escolhia a escola certa mas nunca clicava em "Confirmar", então a
+  tela nunca fechava de verdade.
+- Corrigido um problema em que cadastrar (ou editar) um professor podia
+  silenciosamente trocar a escola de OUTRO professor que ainda não tinha
+  escola própria salva — cadastros antigos, de antes de existir a opção
+  de mais de uma escola, "herdavam" a escola de quem tivesse sido salvo
+  por último. Junto disso, corrigido "Meus dados" de quem estava nessa
+  situação: o campo Escola vinha pré-preenchido com essa mesma escola
+  errada, então confirmar e salvar não resolvia — agora vem em branco,
+  pedindo a escolha de verdade.
+- **"Sair da conta" agora também desloga a conta Google da escola.** Sair
+  do programa é sinal de que o uso terminou, e o próximo a mexer no
+  computador pode ser um professor de outra escola — não faz sentido a
+  conta institucional continuar logada esperando por ele. Acontece em
+  segundo plano, sem abrir janela, e nunca impede o programa de fechar
+  (sem internet, por exemplo, o login só continua guardado até a
+  próxima vez).
+- Como toda sessão agora começa deslogada do Google (item acima), o
+  programa passou a conferir a conta Google da escola sozinho, uma vez,
+  assim que a agenda termina de carregar — em vez de esperar a pessoa
+  lembrar de clicar em "Conta Google da escola" e só descobrir no meio
+  de um preenchimento que precisava logar de novo.
+- Depois de entrar na conta Google da escola (ou quando ela já estava
+  conectada), a janela do Chrome fecha sozinha e o programa volta para
+  a frente — antes ficava aberta, esperando ser fechada na mão.
+- Corrigido "Cadastrar outro professor" (na tela de login, quando é a
+  primeira coisa que abre) deixando uma segunda tela de cadastro em
+  branco aberta e "presa" no fundo, sem responder — bug antigo, achado
+  agora ao cadastrar um professor novo pela tela de login.
+- Corrigido um "não consegui abrir o programa" que podia aparecer bem
+  depois de cadastrar/editar um professor (o programa fecha e abre
+  sozinho nesse momento) — a causa é a mesma já conhecida do reabrir
+  depois de atualizar: algo passageiro (um antivírus examinando os
+  arquivos recém-criados, por exemplo) podia atrapalhar bem na hora de
+  a janela abrir. Agora, se isso acontecer, o programa tenta de novo
+  sozinho (até 6 vezes, esperando mais a cada uma) antes de desistir e
+  mostrar erro.
+- Erro de **falha de internet/conexão** (site fora do ar, wifi caiu na
+  hora) agora aparece numa frase clara ("Não consegui acessar o site —
+  parece internet, não o programa") em vez do texto técnico cru do
+  Chrome — que continua ali, só que como detalhe menor, não a mensagem
+  principal.
+- **Duas aulas separadas só pelo recreio agora contam como uma
+  atividade só**, em vez de aparecerem soltas na lista — mesma
+  professora, turma, disciplina e turno, com um intervalo curto (até
+  20 min) no meio. Antes só emendava quando o horário batia direto,
+  sem nenhum intervalo, e o recreio quebrava o que era uma aula
+  contínua em duas.
+- Novo botão **"Remover professor"** na tela de login: tira alguém da
+  lista de quem usa o programa neste computador (não mexe em nada na
+  SED nem no NTE — só o cadastro salvo aqui), pra quem testou/cadastrou
+  errado ou trocou de professor no laboratório.
+- **Turno passa a ser por escola, não um só para o professor inteiro.**
+  Quem atende de manhã numa escola e só à noite noutra agora marca isso
+  no cadastro, escola por escola — antes era um turno só, valendo pra
+  todas. É esse turno que decide o que aparece em destaque na agenda
+  daquela escola (e o que aparece em cinza, "de outro turno").
+- **Cadastro passa a aceitar até 3 escolas** (o estado permite dar aula
+  em até 3), com 3 campos "Escola" já visíveis na tela — antes existia
+  só uma segunda escola, escondida atrás de um checkbox que podia não
+  abrir corretamente. Agora é só deixar em branco quem tem menos de 3.
+- Corrigido "marquei só 1 recurso e foram 4 no formulário": as 4
+  opções "Computadores/notebooks (...) no laboratório" estão amarradas
+  entre si dentro do próprio formulário da SED — marcar qualquer uma
+  pode marcar as outras 3 junto (defeito de lá, não daqui). Desmarcar,
+  ao contrário, é independente. O programa agora usa isso: marca a
+  escolhida e, se alguma das outras 3 vier marcada de brinde, desmarca
+  de volta sozinho — o checkbox certo (e só ele) fica marcado, sem usar
+  nada fora do lugar certo do formulário.
+
 ## 1.5.0
 
 - Nenhum "Recurso utilizado" vem mais pré-marcado — antes 3 vinham

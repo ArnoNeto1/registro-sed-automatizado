@@ -37,7 +37,9 @@ import argparse
 import datetime as dt
 import json
 import os
+import re
 import sys
+import unicodedata
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -54,6 +56,7 @@ from playwright.sync_api import sync_playwright
 
 from agenda_scraper import TURNOS, filtrar_e_agrupar, login, scrape_week  # noqa: E402
 from config import (  # noqa: E402
+    ESCOLA,
     PROFESSOR_FILTRO,
     RECURSOS_PADRAO,
     disciplina_tem_mapeamento,
@@ -86,7 +89,37 @@ RECURSOS_DISPONIVEIS = [
     "Outros recursos",
 ]
 
-PROFILE_DIR = caminho_de_dados("browser_profile")
+def _slug_escola(escola: str) -> str:
+    """Nome de pasta seguro a partir do nome da escola: sem acento, sem
+    espaço, sem nada que o Windows recuse num nome de pasta."""
+    t = unicodedata.normalize("NFD", escola)
+    t = "".join(c for c in t if unicodedata.category(c) != "Mn")
+    t = re.sub(r"[^A-Za-z0-9]+", "_", t).strip("_")
+    return t or "padrao"
+
+
+def pasta_do_perfil(escola: str = "") -> str:
+    """
+    Onde fica o login do Google salvo — uma pasta POR ESCOLA, não uma só
+    para a instalação inteira.
+
+    Cada escola responde o formulário da SED com sua própria conta
+    Google. Quem dá aula em duas escolas no mesmo computador (ver
+    configuracao.pedir_escola) precisaria, com uma pasta só, ficar
+    trocando de conta Google toda vez que trocasse de escola — e o
+    programa nem avisava disso: simplesmente usava a conta de QUALQUER
+    escola que estivesse logada por último, errada mais da metade das
+    vezes.
+
+    Sem escola nenhuma informada (main.py de quem roda por fora da tela,
+    sem cadastro), cai na pasta de sempre — comportamento antigo,
+    inalterado.
+    """
+    if not escola:
+        return caminho_de_dados("browser_profile")
+    return caminho_de_dados("browser_profile", _slug_escola(escola))
+
+
 ESTADO_FILE = caminho_de_dados("registros_enviados.json")
 
 
@@ -312,7 +345,7 @@ def main() -> None:
     with sync_playwright() as p:
         context, _nome = abrir_contexto(
             p,
-            PROFILE_DIR,
+            pasta_do_perfil(ESCOLA),
             headless=False,
             args=["--start-maximized"],
             no_viewport=True,
@@ -320,7 +353,7 @@ def main() -> None:
         page = context.pages[0] if context.pages else context.new_page()
 
         print(f"Lendo agenda da semana de {data_semana.isoformat()} ({', '.join(turnos)})...")
-        login(page, cpf or "", senha or "")
+        login(page, cpf or "", senha or "", ESCOLA)
         agendamentos = scrape_week(page, data_semana, turnos)
         grupos_todos = filtrar_e_agrupar(agendamentos, args.professor)
 

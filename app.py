@@ -35,6 +35,7 @@ import subprocess
 import sys
 import queue
 import threading
+import time
 import tkinter as tk
 import traceback
 from pathlib import Path
@@ -106,7 +107,7 @@ from config import (  # noqa: E402
 import configuracao  # noqa: E402
 from main import (  # noqa: E402
     ESTADO_FILE,  # noqa: F401  (mantido pra deixar claro de onde vem o estado)
-    PROFILE_DIR,
+    pasta_do_perfil,
     RECURSOS_DISPONIVEIS,
     agora_sc,
     carregar_enviados,
@@ -120,6 +121,7 @@ from main import (  # noqa: E402
 from sed_form_filler import (  # noqa: E402
     abrir_formulario,
     enviar,
+    estado_da_conta_google,
     iniciar_conferencia,
     pegar_conferencia,
     preencher_atividade_com_estudantes,
@@ -149,6 +151,28 @@ def _texto_conferencia(itens) -> str:
             valor = valor[:70] + "..."
         linhas.append(f"  · {campo}: {valor}")
     return "\n".join(linhas)
+
+
+def _mensagem_amigavel_de_erro(detalhe: str) -> str:
+    """
+    Traduz erro de CONEXÃO (site fora do ar, wifi caiu, internet lenta)
+    pra uma frase que qualquer professor entende, em vez do texto cru do
+    Playwright ("net::ERR_CONNECTION_TIMED_OUT at https://...").
+
+    "net::ERR_" é a marca específica que o Chromium usa pra falha de
+    REDE — não aparece em erro de lógica do programa (ex: "não achei tal
+    botão na página"), então dá pra trocar a mensagem aqui sem risco de
+    confundir um tipo de erro com outro. O texto técnico continua indo
+    junto, só que como detalhe menor, não como a frase principal.
+    """
+    if "net::err_" in detalhe.lower():
+        return (
+            "Não consegui acessar o site — parece internet, não o "
+            "programa. Confira a conexão e tente de novo (clique em "
+            '"Atualizar agenda", ou tente preencher/enviar outra vez).\n\n'
+            f"Detalhe técnico: {detalhe.strip()}"
+        )
+    return detalhe
 
 
 def _texto_componente(comp) -> str:
@@ -347,9 +371,12 @@ class NavegadorWorker(threading.Thread):
     Roda o Playwright numa thread só dele, recebendo comandos por fila.
 
     Comandos aceitos (colocados em comandos):
-        ("carregar",)
-        ("preencher", grupo, n_estudantes, recursos, etapa)
+        ("carregar", quieto, cpf, senha, escola)
+        ("preencher", grupo, n_estudantes, recursos, etapa, conteudos,
+         prof_nome, prof_tipo, prof_escola, subetapa, curso, mostrar)
+        ("conta_google", escola)
         ("enviar", grupo)
+        ("sair_google", escola)
         ("reiniciar",)
         ("sair",)
 
@@ -368,12 +395,13 @@ class NavegadorWorker(threading.Thread):
         self._page = None
         self._context = None
         self._visivel = None
+        self._escola_atual = None
 
     # -- utilidades ---------------------------------------------------------
     def _status(self, texto: str) -> None:
         self.eventos.put(("status", texto))
 
-    def _garantir_navegador(self, p, visivel: bool = False):
+    def _garantir_navegador(self, p, visivel: bool = False, escola: str = ""):
         """
         O navegador que preenche o formulário da SED.
 
@@ -388,9 +416,14 @@ class NavegadorWorker(threading.Thread):
         para entrar na conta Google da escola e quando o professor pede
         para acompanhar.
 
-        Usa sempre o mesmo perfil salvo em disco (PROFILE_DIR) — é ele que
-        guarda o login do Google entre uma execução e outra, nos dois
-        modos.
+        Usa o perfil salvo em disco de CADA escola (`pasta_do_perfil`,
+        uma pasta por escola) — é ele que guarda o login do Google entre
+        uma execução e outra, nos dois modos. Trocar de escola (quem dá
+        aula em mais de uma, no mesmo computador — ver
+        configuracao.pedir_escola) força reabrir o navegador com o
+        perfil certo: reaproveitar o perfil de OUTRA escola faria o
+        programa preencher o formulário logado na conta Google errada,
+        sem avisar ninguém.
 
         Antes de reaproveitar a página guardada, confere se ela ainda
         está viva. Se a pessoa fechou a janela do Chrome na mão (ou ela
@@ -400,7 +433,7 @@ class NavegadorWorker(threading.Thread):
         ("TargetClosedError: Target page, context or browser has been
         closed") em vez de simplesmente abrir o navegador de novo.
         """
-        if self._page is not None and self._visivel == visivel:
+        if self._page is not None and self._visivel == visivel and self._escola_atual == escola:
             try:
                 ainda_aberta = not self._page.is_closed()
             except Exception:
@@ -410,16 +443,19 @@ class NavegadorWorker(threading.Thread):
             self._status("A janela do Chrome tinha fechado — abrindo de novo...")
             self._fechar_navegador()
         if self._page is not None:
-            # trocar de modo exige reabrir: um navegador já aberto não
-            # muda de invisível para visível no meio do caminho
+            # trocar de modo (ou de escola) exige reabrir: um navegador
+            # já aberto não muda de invisível para visível no meio do
+            # caminho, nem troca sozinho o perfil/login de uma escola
+            # para o de outra.
             self._fechar_navegador()
 
         self._status("Abrindo o navegador..." if visivel else "Preparando em segundo plano...")
         extras = {"args": ["--start-maximized"], "no_viewport": True} if visivel else {}
         self._context, nome = abrir_contexto(
-            p, PROFILE_DIR, headless=not visivel, **extras
+            p, pasta_do_perfil(escola), headless=not visivel, **extras
         )
         self._visivel = visivel
+        self._escola_atual = escola
         self._status(f"Navegador pronto ({nome}).")
         self._page = self._context.pages[0] if self._context.pages else self._context.new_page()
         return self._page
@@ -434,8 +470,9 @@ class NavegadorWorker(threading.Thread):
         self._context = None
         self._page = None
         self._visivel = None
+        self._escola_atual = None
 
-    def _raspar_agenda(self, p, cpf: str, senha: str, invisivel: bool, quieto: bool = False):
+    def _raspar_agenda(self, p, cpf: str, senha: str, escola: str, invisivel: bool, quieto: bool = False):
         """
         Abre a agenda, lê a semana e FECHA o navegador ao terminar.
 
@@ -449,7 +486,7 @@ class NavegadorWorker(threading.Thread):
             pagina = navegador.new_page()
             if not quieto:
                 self._status("Entrando no site da agenda...")
-            login(pagina, cpf, senha)
+            login(pagina, cpf, senha, escola or ESCOLA)
             if not quieto:
                 self._status("Lendo os agendamentos da semana...")
             agendamentos = scrape_week(pagina, monday_of(dt.date.today()), list(TURNOS))
@@ -457,7 +494,7 @@ class NavegadorWorker(threading.Thread):
         finally:
             navegador.close()
 
-    def _ler_agenda(self, p, cpf: str, senha: str, quieto: bool = False):
+    def _ler_agenda(self, p, cpf: str, senha: str, escola: str = "", quieto: bool = False):
         """
         Lê a agenda num navegador SEM JANELA (segundo plano).
 
@@ -473,14 +510,14 @@ class NavegadorWorker(threading.Thread):
         dois navegadores não podem usar o mesmo perfil ao mesmo tempo.
         """
         try:
-            return self._raspar_agenda(p, cpf, senha, invisivel=True, quieto=quieto)
+            return self._raspar_agenda(p, cpf, senha, escola, invisivel=True, quieto=quieto)
         except Exception:
             # Alguns sites se comportam diferente sem janela. Se a leitura
             # em segundo plano falhar, tenta de novo com janela visível
             # antes de desistir — melhor uma janela aparecendo do que o
             # programa sem a lista de aulas.
             self._status("Não deu para ler em segundo plano; tentando com janela...")
-            return self._raspar_agenda(p, cpf, senha, invisivel=False)
+            return self._raspar_agenda(p, cpf, senha, escola, invisivel=False)
 
     # -- laço principal -----------------------------------------------------
     def run(self) -> None:
@@ -511,22 +548,23 @@ class NavegadorWorker(threading.Thread):
                     break
                 try:
                     if acao == "carregar":
-                        # ("carregar", quieto, cpf, senha)
+                        # ("carregar", quieto, cpf, senha, escola)
                         quieto = bool(comando[1]) if len(comando) > 1 else False
                         cpf = comando[2] if len(comando) > 2 else ""
                         senha = comando[3] if len(comando) > 3 else ""
-                        grupos = self._ler_agenda(p, cpf, senha, quieto=quieto)
+                        escola = comando[4] if len(comando) > 4 else ""
+                        grupos = self._ler_agenda(p, cpf, senha, escola, quieto=quieto)
                         self.eventos.put(("aulas", grupos, quieto))
                         if not quieto:
                             self._status("Agenda carregada.")
 
                     elif acao == "preencher":
                         (_, grupo, n_estudantes, recursos, etapa, conteudos,
-                         prof_nome, prof_tipo, subetapa, curso, mostrar) = comando
-                        page = self._garantir_navegador(p, visivel=bool(mostrar))
+                         prof_nome, prof_tipo, prof_escola, subetapa, curso, mostrar) = comando
+                        page = self._garantir_navegador(p, visivel=bool(mostrar), escola=prof_escola)
                         iniciar_conferencia()
                         self._status("Abrindo o formulário e preenchendo...")
-                        preencher_dados_fixos(page, prof_nome, prof_tipo)
+                        preencher_dados_fixos(page, prof_nome, prof_tipo, prof_escola)
                         resumo = (
                             f"{grupo.disciplina} ({grupo.turma}) - "
                             f"Prof(a). {grupo.professor} - {grupo.inicio}-{grupo.fim}"
@@ -572,23 +610,90 @@ class NavegadorWorker(threading.Thread):
                         self._status("Formulário pronto — confira e clique em Enviar.")
 
                     elif acao == "conta_google":
+                        # ("conta_google", escola)
+                        escola_conta = comando[1] if len(comando) > 1 else ""
                         # Abre o formulário SÓ para ver (e resolver) o estado
                         # da conta Google da escola. Nada é preenchido aqui.
                         # Sempre VISÍVEL: é impossível fazer login numa janela
                         # que não aparece.
-                        page = self._garantir_navegador(p, visivel=True)
+                        page = self._garantir_navegador(p, visivel=True, escola=escola_conta)
                         self._status("Abrindo o formulário da SED...")
                         estado = abrir_formulario(page)
-                        self.eventos.put(("conta_google", estado))
+                        if not estado.get("conectado"):
+                            # Avisa AGORA (antes de esperar) que precisa
+                            # entrar — só depois disso espera a pessoa
+                            # terminar de digitar a senha na janela do
+                            # Chrome. A espera é em pedaços curtos (não um
+                            # timeout único de minutos): se a pessoa
+                            # desistir e clicar "Sair da conta" (ou
+                            # fechar o programa) no meio disso, o comando
+                            # "sair" cai na fila e este laço solta o
+                            # navegador rápido, em vez de segurar a
+                            # thread presa aqui e travar o fechamento.
+                            self.eventos.put(("conta_google", estado))
+                            prazo = time.monotonic() + 300  # 5 min de paciência
+                            while time.monotonic() < prazo and self.comandos.empty():
+                                try:
+                                    page.wait_for_url(
+                                        lambda url: "accounts.google.com" not in url
+                                        and "signin" not in url.lower(),
+                                        timeout=2000,
+                                    )
+                                    break
+                                except Exception:
+                                    continue
+                            estado = estado_da_conta_google(page)
+                        if estado.get("conectado"):
+                            # Login resolvido (ou já estava): a janela do
+                            # Chrome não precisa mais ficar na tela —
+                            # fecha sozinha e o programa volta pra frente.
+                            self._fechar_navegador()
+                            self.eventos.put(("conta_google_pronta", estado))
 
                     elif acao == "enviar":
                         _, grupo = comando
-                        page = self._garantir_navegador(p, visivel=self._visivel or False)
+                        # Reaproveita o que já está aberto (não abre nada
+                        # novo aqui) — mas precisa dizer a MESMA escola de
+                        # antes, senão _garantir_navegador acha que trocou
+                        # de escola e fecha o formulário preenchido bem na
+                        # hora de enviar.
+                        page = self._garantir_navegador(
+                            p, visivel=self._visivel or False, escola=self._escola_atual or ""
+                        )
                         self._status("Enviando para a SED...")
                         enviar(page)
                         marcar_enviado(chave_grupo(grupo))
                         self.eventos.put(("enviado", grupo))
                         self._status("Enviado com sucesso.")
+
+                    elif acao == "sair_google":
+                        # ("sair_google", escola)
+                        #
+                        # Chamado ao clicar "Sair da conta": quem saiu do
+                        # programa provavelmente encerrou o uso do
+                        # laboratório, e o próximo a usar o computador pode
+                        # ser outro professor, de outra escola. Por
+                        # segurança, a conta Google institucional não fica
+                        # logada esperando o próximo — desloga de verdade
+                        # (não só esquece localmente), acessando a página de
+                        # logout do Google no perfil desta escola.
+                        #
+                        # Roda em segundo plano (sem abrir janela visível) e
+                        # nunca deixa isto impedir o fechamento do programa:
+                        # sem internet, ou se o Google mudar essa página, o
+                        # login local só continua guardado até a próxima vez
+                        # — não trava nem avisa com erro.
+                        escola_sair = comando[1] if len(comando) > 1 else ""
+                        try:
+                            self._status("Saindo da conta Google da escola...")
+                            page = self._garantir_navegador(p, visivel=False, escola=escola_sair)
+                            page.goto(
+                                "https://accounts.google.com/Logout",
+                                wait_until="domcontentloaded",
+                                timeout=8000,
+                            )
+                        except Exception:
+                            pass
 
                     elif acao == "reiniciar":
                         # Só reabre o formulário em branco. Não é preciso
@@ -666,6 +771,10 @@ class Janela(tk.Tk):
         # marcar a aula como enviada aqui — risco de duplicar depois.
         self._envio_em_andamento = False
         self._ja_avisadas: set = set()
+        # Controla o convite automático pra conferir a conta Google da
+        # escola: só faz sentido uma vez por sessão, na primeira agenda
+        # carregada — não a cada releitura silenciosa. Ver _processar_evento.
+        self._conta_google_verificada = False
 
         # Professor ativo. Numa escola com dois orientadores dividindo o
         # computador, é ele que define o nome no registro E o login usado
@@ -704,7 +813,10 @@ class Janela(tk.Tk):
 
         # carrega a agenda sozinho ao abrir
         self._definir_status("Carregando a agenda da semana...")
-        self.comandos.put(("carregar", False, self.orientador["cpf"], self.orientador["senha"]))
+        self.comandos.put((
+            "carregar", False, self.orientador["cpf"], self.orientador["senha"],
+            self.orientador.get("escola", ""),
+        ))
 
         # relógio do aviso de início de aula + reconsulta periódica
         self.after(INTERVALO_CHECAGEM_MS, self._verificar_inicio_de_aula)
@@ -723,7 +835,7 @@ class Janela(tk.Tk):
         estilo.configure("TLabel", background=COR_FUNDO, foreground=COR_TEXTO)
         estilo.configure("Cartao.TLabel", background=COR_CARTAO, foreground=COR_TEXTO)
         estilo.configure("Suave.TLabel", background=COR_CARTAO, foreground=COR_SUAVE)
-        estilo.configure("Titulo.TLabel", background=COR_FUNDO, font=("Segoe UI", 17, "bold"))
+        estilo.configure("Titulo.TLabel", background=COR_FUNDO, font=("Segoe UI", 14, "bold"))
         estilo.configure("Sub.TLabel", background=COR_FUNDO, foreground=COR_SUAVE, font=("Segoe UI", 10))
         estilo.configure(
             "Rodape.TLabel", background=COR_FUNDO, foreground="#9aa5b1", font=("Segoe UI", 8)
@@ -747,7 +859,7 @@ class Janela(tk.Tk):
         )
         self._estilo = estilo  # guardado para o piscar mexer na seleção
 
-        topo = ttk.Frame(self, padding=(20, 16, 20, 8))
+        topo = ttk.Frame(self, padding=(20, 8, 20, 4))
         topo.pack(fill="x")
         ttk.Label(topo, text="Registro de Atividades — SED-SC", style="Titulo.TLabel").pack(anchor="w")
         # Escola e nome vêm da configuração, não fixos no código: assim,
@@ -766,9 +878,10 @@ class Janela(tk.Tk):
             subtitulo = "Configuração pendente — abra o arquivo .env e preencha seus dados"
             estilo_sub = "SubAviso.TLabel"
         else:
-            subtitulo = f"{ESCOLA} · {ORIENTADOR_NOME} · Tecnologias Educacionais"
+            escola_exibida = self.orientador.get("escola") or ESCOLA
+            subtitulo = f"{escola_exibida} · {self.orientador.get('nome', ORIENTADOR_NOME)} · Tecnologias Educacionais"
             estilo_sub = "Sub.TLabel"
-        ttk.Label(topo, text=subtitulo, style=estilo_sub).pack(anchor="w", pady=(2, 0))
+        ttk.Label(topo, text=subtitulo, style=estilo_sub).pack(anchor="w", pady=(0, 0))
 
         # Seletor de professor — só aparece quando a escola tem mais de um
         # orientador configurado. Com um professor só, um seletor de uma
@@ -1052,7 +1165,7 @@ class Janela(tk.Tk):
         rodape = ttk.Frame(self, padding=(20, 0, 20, 6))
         ttk.Label(
             rodape,
-            text=f"versão {atualizador.versao_atual()}",
+            text=f"Versão {atualizador.versao_atual()}",
             style="Rodape.TLabel",
         ).pack(side="right")
         ttk.Label(
@@ -1360,7 +1473,7 @@ class Janela(tk.Tk):
             self.botao_enviar.configure(state="disabled")
             self.botao_ver_no_navegador.configure(state="disabled")
         self._definir_status("Conferindo a conta Google da escola...")
-        self.comandos.put(("conta_google",))
+        self.comandos.put(("conta_google", self.orientador.get("escola", "")))
 
     def _procurar_atualizacao_diaria(self) -> None:
         """
@@ -1674,7 +1787,10 @@ class Janela(tk.Tk):
 
     def _recarregar_silencioso(self) -> None:
         """Relê a agenda de tempos em tempos, sem chamar atenção."""
-        self.comandos.put(("carregar", True, self.orientador["cpf"], self.orientador["senha"]))
+        self.comandos.put((
+            "carregar", True, self.orientador["cpf"], self.orientador["senha"],
+            self.orientador.get("escola", ""),
+        ))
         self.after(INTERVALO_RECONSULTA_MS, self._recarregar_silencioso)
 
     def _escrever(self, texto: str) -> None:
@@ -1901,6 +2017,11 @@ class Janela(tk.Tk):
         A senha vive só na memória; ao sair, ela some junto com a janela.
         É assim que o professor do noturno assume a máquina sem herdar a
         conta de quem usou de manhã.
+
+        Isto também desloga a conta Google DESTA escola — sair do
+        programa é o sinal de que o uso acabou, e o próximo a mexer no
+        computador pode ser outro professor, de outra escola. Não faria
+        sentido a conta institucional continuar logada esperando por ele.
         """
         if self.preenchido_para is not None:
             if not messagebox.askyesno(
@@ -1910,15 +2031,16 @@ class Janela(tk.Tk):
             ):
                 return
         self.sair_da_conta = True
+        self.comandos.put(("sair_google", self.orientador.get("escola", "")))
         self._fechar()
 
     def _editar_cadastro(self) -> None:
-        """Abre o cadastro deste professor (nome, CPF, turnos, escola)."""
+        """Abre o cadastro deste professor (nome, CPF, turnos, escola(s))."""
         atual = next(
             (
                 p
                 for p in (configuracao.carregar().get("professores") or [])
-                if p.get("nome") == self.orientador["nome"]
+                if p.get("cpf") == self.orientador.get("cpf")
             ),
             None,
         )
@@ -1965,6 +2087,9 @@ class Janela(tk.Tk):
         self.orientador = novo
         salvar_ultimo_professor(novo["nome"])
         self._ja_avisadas.clear()  # os avisos valem para a agenda do novo login
+        # Troca de professor pode ser troca de escola também — confere de
+        # novo a conta Google assim que a agenda deste voltar.
+        self._conta_google_verificada = False
 
         # A aula selecionada na tabela é da agenda do professor ANTERIOR —
         # ela só é substituída quando o evento "aulas" do novo login
@@ -1978,12 +2103,17 @@ class Janela(tk.Tk):
         self.grupo_atual = None
 
         self._definir_status(f"Professor: {novo['nome']} — relendo a agenda...")
-        self.comandos.put(("carregar", False, novo["cpf"], novo["senha"]))
+        self.comandos.put((
+            "carregar", False, novo["cpf"], novo["senha"], novo.get("escola", ""),
+        ))
 
     def _recarregar(self) -> None:
         self.enviados = carregar_enviados()
         self._definir_status("Atualizando a agenda...")
-        self.comandos.put(("carregar", False, self.orientador["cpf"], self.orientador["senha"]))
+        self.comandos.put((
+            "carregar", False, self.orientador["cpf"], self.orientador["senha"],
+            self.orientador.get("escola", ""),
+        ))
 
     def _preencher(self) -> None:
         if str(self.botao_preencher.cget("state")) == "disabled":
@@ -2070,8 +2200,8 @@ class Janela(tk.Tk):
         self._definir_status("Preenchendo o formulário...")
         self.comandos.put(
             ("preencher", self.grupo_atual, int(bruto), recursos, etapa, conteudo,
-             self.orientador["nome"], self.orientador["tipo"], subetapa, curso,
-             bool(self.mostrar_navegador.get()))
+             self.orientador["nome"], self.orientador["tipo"], self.orientador.get("escola", ""),
+             subetapa, curso, bool(self.mostrar_navegador.get()))
         )
 
     def _ver_no_navegador(self) -> None:
@@ -2115,8 +2245,8 @@ class Janela(tk.Tk):
         self._definir_status("Abrindo o formulário no Chrome para você conferir...")
         self.comandos.put(
             ("preencher", grupo, int(bruto), recursos, etapa, conteudo,
-             self.orientador["nome"], self.orientador["tipo"], subetapa, curso,
-             True)  # sempre visível — é o propósito deste botão
+             self.orientador["nome"], self.orientador["tipo"], self.orientador.get("escola", ""),
+             subetapa, curso, True)  # sempre visível — é o propósito deste botão
         )
 
     def _enviar(self) -> None:
@@ -2249,7 +2379,11 @@ class Janela(tk.Tk):
         antigo (arriscando a trava) do que travar para sempre esperando.
         """
         self.comandos.put(("sair",))
-        self.worker.join(timeout=8)
+        # 15s, não 8: "Sair da conta" agora enfileira um "sair_google" antes
+        # deste "sair" (ver _sair_da_conta), que faz uma ida de verdade até
+        # o site do Google para deslogar a conta da escola — precisa de
+        # folga além do simples fechar do Chrome.
+        self.worker.join(timeout=15)
 
     # -- eventos vindos da thread do navegador ------------------------------
     def _ler_eventos(self) -> None:
@@ -2300,6 +2434,19 @@ class Janela(tk.Tk):
                 self._escrever("Nenhuma aula encontrada nesta semana.")
             if not quieto:
                 self._trazer_para_frente()
+                # Primeira agenda carregada nesta sessão (não as
+                # releituras silenciosas de 30 em 30 min): aproveita para
+                # já conferir a conta Google da escola, em vez de esperar
+                # a pessoa lembrar de clicar em "Conta Google da escola"
+                # e só descobrir no meio do preenchimento que precisa
+                # logar. Faz sentido logo aqui porque "Sair da conta"
+                # agora desloga o Google da escola — toda sessão nova
+                # começa deslogada de propósito.
+                if not self._conta_google_verificada:
+                    self._conta_google_verificada = True
+                    self.comandos.put(
+                        ("conta_google", self.orientador.get("escola", ""))
+                    )
         elif tipo == "preenchido":
             _, grupo, resumo = evento
             self.preenchido_para = grupo
@@ -2340,31 +2487,27 @@ class Janela(tk.Tk):
         elif tipo == "aviso_atualizacao":
             messagebox.showinfo("Atualização", evento[1])
         elif tipo == "conta_google":
+            # Só chega aqui quando NÃO está conectado (ver NavegadorWorker)
+            # — pede pra entrar. O caso já-conectado nem passa por cá; ele
+            # some direto pra "conta_google_pronta", sem interromper a
+            # pessoa com uma mensagem à toa.
+            self._definir_status("Entre com a conta da escola na janela do Chrome.")
+            messagebox.showinfo(
+                "Entrar na conta da escola",
+                "Abri o formulário numa janela do Chrome e ele parou "
+                "na tela de entrada do Google.\n\n"
+                "Entre ali com o e-mail institucional da escola (o "
+                "mesmo que responde o formulário da SED). Assim que "
+                "você terminar, o programa fecha essa janela sozinho "
+                "e volta pra tela principal.",
+            )
+        elif tipo == "conta_google_pronta":
             estado = evento[1]
-            if estado.get("conectado"):
-                conta = estado.get("conta") or ""
-                self._definir_status("Conta Google da escola conectada.")
-                messagebox.showinfo(
-                    "Conta Google da escola",
-                    "Está tudo certo: o formulário abriu já conectado"
-                    + (f" ({conta})" if conta else "")
-                    + ".\n\nVocê não precisa entrar de novo neste "
-                    "computador — o programa guarda essa sessão e abre "
-                    "conectado a partir de agora.",
-                )
-            else:
-                self._definir_status(
-                    "Entre com a conta da escola na janela do Chrome."
-                )
-                messagebox.showinfo(
-                    "Entrar na conta da escola",
-                    "Abri o formulário numa janela do Chrome e ele parou "
-                    "na tela de entrada do Google.\n\n"
-                    "Entre ali com o e-mail institucional da escola (o "
-                    "mesmo que responde o formulário da SED). Assim que "
-                    "aparecer o formulário, pode fechar esta mensagem: o "
-                    "programa passa a abrir conectado, sem pedir de novo.",
-                )
+            conta = estado.get("conta") or ""
+            self._definir_status(
+                "Conta Google da escola conectada" + (f" ({conta})" if conta else "") + "."
+            )
+            self._trazer_para_frente()
         elif tipo == "erro":
             self.botao_preencher.configure(state="normal")
             # Erro ao ENVIAR: o formulário preenchido continua lá na
@@ -2375,7 +2518,7 @@ class Janela(tk.Tk):
                 self.botao_enviar.configure(state="normal")
                 self.botao_ver_no_navegador.configure(state="normal")
                 self._envio_em_andamento = False
-            self._escrever("DEU ERRO\n\n" + evento[1])
+            self._escrever("DEU ERRO\n\n" + _mensagem_amigavel_de_erro(evento[1]))
 
 
 def _reabrir_e_sair() -> None:
@@ -2405,6 +2548,7 @@ def _professores_cadastrados() -> list:
     sem precisar reabrir nada.
     """
     dados = configuracao.carregar()
+    escola_global = dados.get("escola") or ESCOLA
     return [
         {
             "nome": p.get("nome", ""),
@@ -2412,6 +2556,16 @@ def _professores_cadastrados() -> list:
             "senha": "",
             "tipo": p.get("tipo", "tecnologias"),
             "turnos": p.get("turnos") or list(TODOS_TURNOS),
+            # turno POR escola (pode ser diferente de uma pra outra) —
+            # repassado adiante pra TelaDeEntrada resolver qual vale assim
+            # que a escola da sessão é escolhida (ver configuracao.
+            # turnos_da_escola). Sem isto aqui, a distinção se perdia e
+            # toda escola usava o turno "geral" (a união de todas).
+            "turnos_por_escola": p.get("turnos_por_escola") or {},
+            # sempre em lista — pode ter mais de uma. `configuracao.
+            # pedir_escola()` decide se pergunta ou não (só pergunta
+            # havendo mais de uma).
+            "escolas": configuracao.escolas_do_professor(p) or [escola_global],
         }
         for p in (dados.get("professores") or [])
         if (p.get("nome") or "").strip()

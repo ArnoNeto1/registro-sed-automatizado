@@ -47,6 +47,12 @@ ARQUIVO = "configuracao.json"
 TIPOS = [("tecnologias", "Tecnologias Educacionais"), ("maker", "Laboratório Maker")]
 TURNOS = ["Matutino", "Vespertino", "Noturno"]
 
+# Texto que aparece no campo Escola quando ainda não foi escolhida nada
+# — de propósito, em vez de vir pré-preenchida com a escola de outro
+# professor (ou em branco, fácil de não notar): força a pessoa a
+# reparar e escolher a dela de verdade antes de salvar.
+PLACEHOLDER_ESCOLA = "Selecione uma escola"
+
 COR_FUNDO = "#eef1f5"
 COR_CARTAO = "#ffffff"
 COR_TEXTO = "#1f2933"
@@ -103,8 +109,10 @@ def validar_professor(dados: dict) -> str:
         return "Escreva o nome do professor orientador."
     if len(limpar_cpf(dados.get("cpf"))) != 11:
         return "O CPF precisa ter 11 números (só os números, sem ponto nem traço)."
-    if not dados.get("turnos"):
-        return "Marque pelo menos um turno em que você atende."
+    turnos_por_escola = dados.get("turnos_por_escola") or {}
+    for escola in dados.get("escolas") or []:
+        if not turnos_por_escola.get(escola):
+            return f'Marque pelo menos um turno em que você atende em "{escola}".'
     return ""
 
 
@@ -138,6 +146,11 @@ def _estilizar(janela) -> None:
     )
     estilo.configure("TCheckbutton", background=COR_CARTAO)
     estilo.configure("TRadiobutton", background=COR_CARTAO)
+    # Cor do aviso "SELECIONE UMA ESCOLA" dentro do combobox — mesma cor
+    # do texto de ajuda ("Suave.TLabel") logo abaixo, pra ficar claro que
+    # é aviso e não um nome de escola de verdade já escolhido.
+    estilo.configure("Placeholder.TCombobox", foreground=COR_SUAVE)
+    estilo.map("Placeholder.TCombobox", foreground=[("readonly", COR_SUAVE)])
     estilo.configure("TButton", font=("Segoe UI", 10), padding=8)
     estilo.configure("Principal.TButton", font=("Segoe UI", 11, "bold"), padding=10)
 
@@ -222,19 +235,115 @@ class TelaDeCadastro(_Dialogo):
         cartao.columnconfigure(1, weight=1)
         linha = 0
 
-        ttk.Label(cartao, text="Escola:", style="Cartao.TLabel").grid(
-            row=linha, column=0, sticky="w", pady=(0, 4)
+        escolas_do_professor = self.professor.get("escolas") or (
+            [self.professor["escola"]] if self.professor.get("escola") else []
         )
-        self.combo_escola = ttk.Combobox(
-            cartao, values=escolas_conhecidas(), width=44, font=("Segoe UI", 10)
-        )
-        self.combo_escola.set(self.dados.get("escola", ""))
-        self.combo_escola.grid(row=linha, column=1, sticky="ew", padx=(10, 0), pady=(0, 4))
-        linha += 1
+        turnos_por_escola_salvos = self.professor.get("turnos_por_escola") or {}
+        # formato de antes de existir turno por escola: um turno só,
+        # valendo pra escola única que o professor tinha
+        turnos_formato_antigo = self.professor.get("turnos")
+        # A escola "padrão do computador" (dados.get("escola")) só é um
+        # bom palpite para quem está CADASTRANDO ALGUÉM NOVO (poupa
+        # escolher de novo quem só tem uma mesmo) — nunca para editar
+        # alguém que JÁ existe e não tem escola própria salva (cadastro
+        # de antes desta função existir). Nesse segundo caso, usar o
+        # padrão do computador deixaria o campo pré-preenchido com a
+        # escola de QUALQUER outra pessoa cadastrada por último, e quem
+        # só olhasse e confirmasse acabaria salvando a escola errada de
+        # novo — foi exatamente assim que um cadastro antigo ficou preso
+        # na escola errada mesmo depois de "corrigido" pela tela.
+        eh_cadastro_novo = not self.professor
+
+        # Até 3 escolas — o estado permite dar aula em até 3. Escola 2 e 3
+        # são opcionais e ficam SEMPRE visíveis (nada de checkbox
+        # escondendo campo); em branco é a mesma coisa que "não tenho essa
+        # escola". Cada uma tem o PRÓPRIO turno: um professor pode atender
+        # de manhã numa escola e só à noite noutra — o turno de cada uma
+        # decide o que aparece em destaque (e o que aparece em cinza, "de
+        # outro turno") na agenda DAQUELA escola. Toda vez que o programa
+        # abre (ou troca de professor), ele pergunta em qual das escolas
+        # cadastradas você está agora — ver configuracao.pedir_escola.
+        self.combos_escola = []
+        self.vars_turnos_por_escola = []
+        for numero in (1, 2, 3):
+            indice = numero - 1
+            ttk.Label(
+                cartao,
+                text="Escola:" if numero == 1 else f"Escola {numero}:",
+                style="Cartao.TLabel",
+            ).grid(row=linha, column=0, sticky="w", pady=(0, 4))
+            # readonly: só dá pra escolher da lista (rolando ou digitando
+            # pra pular até o nome), nunca digitar/apagar livremente. Além
+            # de evitar nome que não bate com o exato da SED, é o que
+            # deixa o aviso "SELECIONE UMA ESCOLA" fixo — sem readonly,
+            # dava pra apagar aquele texto sem escolher nada de verdade.
+            combo = ttk.Combobox(
+                cartao,
+                values=escolas_conhecidas(),
+                width=44,
+                font=("Segoe UI", 10),
+                state="readonly",
+            )
+            valor_salvo = (
+                escolas_do_professor[indice] if len(escolas_do_professor) > indice else ""
+            )
+            # Só a Escola 1 (obrigatória) ganha o texto de aviso — 2 e 3
+            # são opcionais, e em branco já deixa isso claro sozinho. Cor
+            # de aviso (igual à do texto de ajuda) enquanto for só o
+            # aviso; some sozinha assim que escolher uma escola de
+            # verdade da lista.
+            if valor_salvo or numero != 1:
+                combo.set(valor_salvo)
+            else:
+                combo.set(PLACEHOLDER_ESCOLA)
+                combo.configure(style="Placeholder.TCombobox")
+            combo.bind(
+                "<<ComboboxSelected>>",
+                lambda _e, c=combo: c.configure(style="TCombobox"),
+            )
+            combo.grid(row=linha, column=1, sticky="ew", padx=(10, 0), pady=(0, 4))
+            self.combos_escola.append(combo)
+            linha += 1
+            if numero == 1:
+                ttk.Label(
+                    cartao,
+                    text="Escolha na lista — é o nome exato que a SED usa no formulário",
+                    style="Suave.TLabel",
+                ).grid(row=linha, column=1, sticky="w", padx=(10, 0), pady=(0, 6))
+                linha += 1
+
+            ttk.Label(cartao, text="Atende em:", style="Cartao.TLabel").grid(
+                row=linha, column=0, sticky="w", pady=(0, 12)
+            )
+            caixa_turnos = ttk.Frame(cartao, style="Cartao.TFrame")
+            caixa_turnos.grid(row=linha, column=1, sticky="w", padx=(10, 0), pady=(0, 12))
+            turnos_salvos = turnos_por_escola_salvos.get(valor_salvo) if valor_salvo else None
+            if turnos_salvos is None:
+                # Nada pré-marcado por padrão: cadastro novo (ou escola
+                # ainda sem turno salvo) começa com os 3 desmarcados —
+                # a pessoa escolhe cada vez, em vez de precisar notar e
+                # desmarcar o que não usa.
+                turnos_salvos = turnos_formato_antigo if (indice == 0 and turnos_formato_antigo) else []
+            vars_turno = {}
+            for turno in TURNOS:
+                var = tk.BooleanVar(value=turno in turnos_salvos)
+                vars_turno[turno] = var
+                ttk.Checkbutton(caixa_turnos, text=turno, variable=var).pack(
+                    side="left", padx=(0, 16)
+                )
+            self.vars_turnos_por_escola.append(vars_turno)
+            linha += 1
+
         ttk.Label(
             cartao,
-            text="escolha na lista — é o nome exato que a SED usa no formulário",
+            text=(
+                "Deixe a escola em branco quem tem menos de 3 — o turno de cada\n"
+                "escola decide o que aparece em destaque (ou em cinza, \"de outro\n"
+                "turno\") na agenda dela, e quem já abre escolhido quando dois\n"
+                "professores dividem o mesmo computador"
+            ),
             style="Suave.TLabel",
+            justify="left",
         ).grid(row=linha, column=1, sticky="w", padx=(10, 0), pady=(0, 12))
         linha += 1
 
@@ -258,7 +367,7 @@ class TelaDeCadastro(_Dialogo):
         linha += 1
         ttk.Label(
             cartao,
-            text="como deve aparecer no registro enviado à SED",
+            text="Como deve aparecer no registro enviado à SED",
             style="Suave.TLabel",
         ).grid(row=linha, column=1, sticky="w", padx=(10, 0), pady=(0, 12))
         linha += 1
@@ -272,7 +381,7 @@ class TelaDeCadastro(_Dialogo):
         linha += 1
         ttk.Label(
             cartao,
-            text="é o mesmo login do site da agenda do NTE (só os números)",
+            text="É o mesmo login do site da agenda do NTE (só os números)",
             style="Suave.TLabel",
         ).grid(row=linha, column=1, sticky="w", padx=(10, 0), pady=(0, 12))
         linha += 1
@@ -289,28 +398,6 @@ class TelaDeCadastro(_Dialogo):
             )
         linha += 1
 
-        ttk.Label(cartao, text="Você atende em:", style="Cartao.TLabel").grid(
-            row=linha, column=0, sticky="w"
-        )
-        caixa_turnos = ttk.Frame(cartao, style="Cartao.TFrame")
-        caixa_turnos.grid(row=linha, column=1, sticky="w", padx=(10, 0))
-        salvos = self.professor.get("turnos") or list(TURNOS)
-        self.vars_turnos = {}
-        for turno in TURNOS:
-            var = tk.BooleanVar(value=turno in salvos)
-            self.vars_turnos[turno] = var
-            ttk.Checkbutton(caixa_turnos, text=turno, variable=var).pack(side="left", padx=(0, 16))
-        linha += 1
-        ttk.Label(
-            cartao,
-            text=(
-                "com dois professores no mesmo computador, o turno é o que faz o\n"
-                "programa já abrir no nome de quem está de plantão"
-            ),
-            style="Suave.TLabel",
-            justify="left",
-        ).grid(row=linha, column=1, sticky="w", padx=(10, 0), pady=(4, 0))
-
         rodape = ttk.Frame(j, padding=(24, 0, 24, 18))
         rodape.pack(fill="x")
         ttk.Button(rodape, text="Salvar", style="Principal.TButton", command=self._salvar).pack(
@@ -319,22 +406,47 @@ class TelaDeCadastro(_Dialogo):
         ttk.Button(rodape, text="Cancelar", command=self._fechar).pack(side="left", padx=(10, 0))
         ttk.Label(
             rodape,
-            text="a senha da agenda não é pedida aqui — ela é digitada ao entrar",
+            text="A senha da agenda não é pedida aqui — ela é digitada ao entrar",
             style="Sub.TLabel",
         ).pack(side="right")
 
         self.campo_nome.focus_set()
 
     def _salvar(self) -> None:
-        escola = self.combo_escola.get().strip()
-        if not escola:
+        escola = self.combos_escola[0].get().strip()
+        if not escola or escola == PLACEHOLDER_ESCOLA:
             messagebox.showinfo("Escola", "Escolha a sua escola na lista.", parent=self.janela)
             return
+        escolas = [escola]
+        turnos_por_escola = {
+            escola: [t for t, v in self.vars_turnos_por_escola[0].items() if v.get()]
+        }
+        for numero, combo, vars_turno in zip(
+            (2, 3), self.combos_escola[1:], self.vars_turnos_por_escola[1:]
+        ):
+            extra = combo.get().strip()
+            if not extra:
+                continue
+            if extra in escolas:
+                messagebox.showinfo(
+                    f"Escola {numero}",
+                    f"A escola {numero} precisa ser diferente das outras já escolhidas.",
+                    parent=self.janela,
+                )
+                return
+            escolas.append(extra)
+            turnos_por_escola[extra] = [t for t, v in vars_turno.items() if v.get()]
         professor = {
             "nome": self.campo_nome.get().strip(),
             "cpf": limpar_cpf(self.campo_cpf.get()),
             "tipo": self.var_tipo.get(),
-            "turnos": [t for t, v in self.vars_turnos.items() if v.get()],
+            "escolas": escolas,
+            "turnos_por_escola": turnos_por_escola,
+            # "turnos" (achatado, sem separar por escola) fica só de eco:
+            # é a união de todas — usado antes de qualquer escola ser
+            # escolhida (ver app._quem_provavelmente_esta_usando), quando
+            # ainda não dá pra saber qual delas vale.
+            "turnos": [t for t in TURNOS if any(t in ts for ts in turnos_por_escola.values())],
         }
         pendencia = validar_professor(professor)
         if pendencia:
@@ -342,7 +454,16 @@ class TelaDeCadastro(_Dialogo):
             return
 
         dados = carregar()
-        dados["escola"] = escola
+        # SÓ define o padrão do computador na primeira vez (setdefault, não
+        # atribuição direta): esse campo é o que um cadastro ANTIGO (de
+        # antes de existir escola por professor — sem "escolas" próprio)
+        # usa como escola dele, em app._professores_cadastrados(). Se
+        # atualizasse a cada Salvar, cadastrar ou editar um professor
+        # QUALQUER (mesmo um com duas escolas, mesmo outra pessoa) mudava
+        # silenciosamente a escola de todo mundo que ainda não tem a
+        # própria — foi exatamente assim que um cadastro antigo "herdou"
+        # a escola de outro professor testado por último.
+        dados.setdefault("escola", escola)
         dados["regional"] = self.campo_regional.get().strip() or "BLUMENAU"
         lista = list(dados.get("professores") or [])
         for i, p in enumerate(lista):          # mesmo CPF = edição, não cadastro novo
@@ -360,6 +481,95 @@ class TelaDeCadastro(_Dialogo):
 # ---------------------------------------------------------------------------
 # Tela de entrada (quem é você + senha)
 # ---------------------------------------------------------------------------
+def escolas_do_professor(p: dict) -> list:
+    """
+    As escolas de um professor, sempre em lista — cadastros antigos (de
+    antes de existir a segunda escola) tinham só "escola" (texto); os
+    novos têm "escolas" (lista, de 1 item pra quem só tem uma mesmo).
+    """
+    if p.get("escolas"):
+        return list(p["escolas"])
+    if p.get("escola"):
+        return [p["escola"]]
+    return []
+
+
+def turnos_da_escola(p: dict, escola: str) -> list:
+    """
+    Os turnos deste professor NESTA escola — pode ser diferente de escola
+    pra escola (de manhã/tarde numa, só à noite noutra).
+
+    É o que decide, na agenda daquela escola, o que fica em destaque e o
+    que aparece em cinza ("de outro turno") — ver app._turno_e_meu.
+    """
+    por_escola = p.get("turnos_por_escola") or {}
+    if escola in por_escola:
+        return list(por_escola[escola])
+    # formato antigo (antes de turno valer por escola): usa o turno geral
+    # do professor, que valia pra escola única que ele tinha
+    if p.get("turnos"):
+        return list(p["turnos"])
+    return list(TURNOS)
+
+
+def pedir_escola(escolas: list, mestre=None):
+    """
+    Pergunta qual das escolas do professor vale para esta sessão.
+
+    Devolve a única escola direto, sem perguntar nada, quando só há uma —
+    é o caso de quase todo mundo. Só abre a telinha quando há de verdade
+    uma escolha a fazer.
+    """
+    if len(escolas) <= 1:
+        return escolas[0] if escolas else None
+    return TelaDeEscolha(escolas, mestre=mestre).mostrar()
+
+
+class TelaDeEscolha(_Dialogo):
+    """
+    "Qual escola hoje?" — só aparece para quem tem mais de uma cadastrada.
+
+    Não fica salva: é perguntada de novo toda vez que o programa abre (ou
+    troca de professor), do mesmo jeito que a senha — evita que o
+    registro vá para a escola errada por causa de uma escolha de ontem.
+    """
+
+    def __init__(self, escolas: list, mestre=None):
+        super().__init__(mestre, "Registro SED — qual escola?")
+        self.escolas = list(escolas)
+        self._montar()
+
+    def _montar(self) -> None:
+        j = self.janela
+        topo = ttk.Frame(j, padding=(24, 20, 24, 6))
+        topo.pack(fill="x")
+        ttk.Label(topo, text="Qual escola hoje?", style="Titulo.TLabel").pack(anchor="w")
+        ttk.Label(
+            topo,
+            text="Você está cadastrado em mais de uma — escolha em qual vai registrar agora.",
+            style="Sub.TLabel",
+        ).pack(anchor="w", pady=(4, 0))
+
+        cartao = ttk.Frame(j, style="Cartao.TFrame", padding=18)
+        cartao.pack(fill="both", expand=True, padx=24, pady=12)
+        self.combo_escola = ttk.Combobox(
+            cartao, values=self.escolas, width=44, state="readonly", font=("Segoe UI", 10, "bold")
+        )
+        self.combo_escola.set(self.escolas[0])
+        self.combo_escola.pack(fill="x")
+
+        rodape = ttk.Frame(j, padding=(24, 0, 24, 18))
+        rodape.pack(fill="x")
+        ttk.Button(rodape, text="Continuar", style="Principal.TButton", command=self._ok).pack(
+            side="left"
+        )
+        ttk.Button(rodape, text="Cancelar", command=self._fechar).pack(side="left", padx=(10, 0))
+
+    def _ok(self) -> None:
+        self.resultado = self.combo_escola.get()
+        self.janela.destroy()
+
+
 class TelaDeEntrada(_Dialogo):
     """
     Escolha do professor e senha da agenda.
@@ -409,7 +619,7 @@ class TelaDeEntrada(_Dialogo):
         ttk.Label(
             cartao,
             text=(
-                "a mesma senha que você usa no site da agenda do NTE.\n"
+                "A mesma senha que você usa no site da agenda do NTE.\n"
                 "Ela não fica salva: é pedida de novo na próxima vez que abrir."
             ),
             style="Suave.TLabel",
@@ -424,7 +634,36 @@ class TelaDeEntrada(_Dialogo):
         ttk.Button(rodape, text="Cadastrar outro professor", command=self._cadastrar).pack(
             side="left", padx=(10, 0)
         )
+        # À direita, separado dos botões principais de propósito — é uma
+        # ação destrutiva (tira o professor da lista deste computador),
+        # não algo pra clicar sem querer no meio do fluxo de sempre.
+        ttk.Button(rodape, text="Remover professor", command=self._remover).pack(side="right")
         self.campo_senha.focus_set()
+
+    def _remover(self) -> None:
+        nome = self.combo_nome.get()
+        if not nome:
+            messagebox.showinfo(
+                "Remover professor", "Escolha quem remover na lista.", parent=self.janela
+            )
+            return
+        professor = next((p for p in self.professores if p.get("nome") == nome), None)
+        if professor is None:
+            return
+        if not messagebox.askyesno(
+            "Remover professor",
+            f'Remover "{nome}" da lista de quem usa o programa neste computador?\n\n'
+            "Isso não mexe em nada na SED nem no site da agenda — só tira o "
+            "cadastro salvo aqui. Se precisar de novo, é só cadastrar outra vez.",
+            parent=self.janela,
+        ):
+            return
+        configuracao_atual = remover_professor(professor.get("cpf", ""))
+        self.professores = list(configuracao_atual.get("professores") or [])
+        nomes = [p.get("nome", "") for p in self.professores]
+        self.combo_nome.configure(values=nomes)
+        self.combo_nome.set(nomes[0] if nomes else "")
+        self.campo_senha.delete(0, "end")
 
     def _entrar(self) -> None:
         nome = self.combo_nome.get()
@@ -443,17 +682,43 @@ class TelaDeEntrada(_Dialogo):
         professor = next((p for p in self.professores if p.get("nome") == nome), None)
         if professor is None:
             return
-        self.resultado = (dict(professor), senha)
+
+        escolas = escolas_do_professor(professor)
+        if not escolas:
+            messagebox.showinfo(
+                "Escola",
+                "Falta cadastrar a escola deste professor — abra \"Meus dados\" depois de entrar.",
+                parent=self.janela,
+            )
+        escola = pedir_escola(escolas, mestre=self.janela) if escolas else ""
+        if escolas and escola is None:
+            return  # cancelou a escolha da escola -- não entra
+
+        professor = dict(professor)
+        professor["escola"] = escola or ""
+        # Substitui o turno "geral" (usado só pra sugerir o nome antes de
+        # escolher escola — ver app._quem_provavelmente_esta_usando) pelo
+        # turno DESTA escola especificamente: é ele que decide o que
+        # aparece em destaque (e o que fica cinza, "de outro turno") na
+        # agenda a partir daqui.
+        if escola:
+            professor["turnos"] = turnos_da_escola(professor, escola)
+        self.resultado = (professor, senha)
         self.janela.destroy()
 
     def _cadastrar(self) -> None:
-        tela = TelaDeCadastro(mestre=self.janela if not self.raiz_propria else None)
         # numa janela raiz própria não dá para abrir outra raiz: fecha esta
-        # devolvendo o pedido de cadastro para quem chamou
+        # devolvendo o pedido de cadastro para quem chamou. ESSA CONFERÊNCIA
+        # PRECISA VIR ANTES de construir TelaDeCadastro — não depois: criar
+        # a tela e SÓ ENTÃO decidir não usá-la já deixava uma segunda janela
+        # raiz nascida e abandonada (órfã, nunca destruída), sobrando em
+        # branco atrás da tela de cadastro de verdade que vinha a seguir.
+        # Exatamente o "tela congelada" que este comentário já avisava.
         if self.raiz_propria:
             self.resultado = ("CADASTRAR", None)
             self.janela.destroy()
             return
+        tela = TelaDeCadastro(mestre=self.janela)
         dados = tela.mostrar()
         if dados:
             self.professores = list(dados.get("professores") or [])

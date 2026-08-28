@@ -51,6 +51,18 @@ TIPO_LABEL = {
 # O que aparece no resumo é o estado real do formulário.
 _CONFERENCIA: list = []
 
+# As 4 opções "Computadores/notebooks (...) no laboratório" do formulário
+# da SED estão amarradas entre si no PRÓPRIO Google Forms: marcar
+# qualquer uma marca as 4 juntas (confirmado ao vivo — pedir só
+# "edição de imagens/vídeos" marcou também "pesquisa", "software/
+# programa" e "sites educacionais"). Ver uso em _depois_da_etapa.
+_RECURSOS_TRAVADOS_JUNTOS_NO_SED = {
+    "Computadores/notebooks (pesquisa) no laboratório",
+    "Computadores/notebooks (software/programa) no laboratório",
+    "Computadores/notebooks (edição de imagens/vídeos) no laboratório",
+    "Computadores/notebooks (sites educacionais) no laboratório",
+}
+
 
 def iniciar_conferencia() -> None:
     _CONFERENCIA.clear()
@@ -271,6 +283,37 @@ def _click_checkbox(page, label: str) -> None:
             f"Não consegui marcar o checkbox '{label}' — confira manualmente "
             "a janela do Chrome."
         )
+
+
+def _corrigir_grupo_computadores(page, recursos_utilizados: list[str]) -> None:
+    """
+    As 4 opções "Computadores/notebooks (...) no laboratório" estão
+    amarradas entre si dentro do PRÓPRIO formulário da SED: marcar
+    qualquer uma delas pode marcar as outras 3 junto — confirmado ao
+    vivo (pedir só "edição de imagens/vídeos" marcou também "pesquisa",
+    "software/programa" e "sites educacionais"), provável defeito de
+    quando a SED duplicou a opção 4 vezes ao criar o formulário.
+
+    DESMARCAR, ao contrário, é independente: desmarcar uma não desmarca
+    as outras (também confirmado ao vivo). Por isso, depois do loop
+    normal de marcar recursos, esta função confere as 4 e desmarca de
+    volta qualquer uma que tenha vindo marcada "de brinde" sem ter sido
+    escolhida — deixando o formulário batendo exatamente com o que a
+    pessoa marcou na tela, sem precisar de "Outros recursos" nem nada
+    fora do checkbox certo.
+    """
+    pedidos = {chave_comparacao(r) for r in recursos_utilizados}
+    for nome in _RECURSOS_TRAVADOS_JUNTOS_NO_SED:
+        if chave_comparacao(nome) in pedidos:
+            continue
+        box = _achar_checkbox(page, nome)
+        if box is None:
+            continue
+        for _ in range(4):
+            if not box.is_checked():
+                break
+            box.click()
+            page.wait_for_timeout(250)
 
 
 def _select_google_dropdown(page, current_or_placeholder: str, option_text: str) -> None:
@@ -652,7 +695,9 @@ def _marcar_enviar_por_email(page) -> None:
     )
 
 
-def preencher_dados_fixos(page, orientador_nome: str = "", orientador_tipo: str = "") -> None:
+def preencher_dados_fixos(
+    page, orientador_nome: str = "", orientador_tipo: str = "", escola: str = ""
+) -> None:
     """
     Página 1 (orientador/regional) + página 2 (escola).
 
@@ -660,9 +705,16 @@ def preencher_dados_fixos(page, orientador_nome: str = "", orientador_tipo: str 
     dois orientadores no mesmo computador (um no diurno, outro no
     noturno): quem chama diz qual dos dois está registrando. Sem eles,
     usa o professor configurado — que é o caso de quem tem um só.
+
+    `escola` existe pelo mesmo motivo, para quem dá aula em mais de uma
+    escola: cada uma tem seu próprio computador/laboratório (ver
+    caminhos.py), mas o mesmo professor pode estar cadastrado nos dois,
+    um cadastro por escola. Sem isso, o formulário sempre iria para a
+    escola configurada globalmente — errada para quem trocou.
     """
     nome = orientador_nome or ORIENTADOR_NOME
     tipo = orientador_tipo or ORIENTADOR_TIPO
+    esc = escola or ESCOLA
     page.goto(SED_FORM_URL, wait_until="domcontentloaded", timeout=60000)
     try:
         page.wait_for_load_state("networkidle", timeout=60000)
@@ -722,7 +774,7 @@ def preencher_dados_fixos(page, orientador_nome: str = "", orientador_tipo: str 
     _avancar(page, proxima_pagina="Selecione a sua Escola")
 
     # Página 2 — Escola
-    _select_google_dropdown(page, "Selecione a sua Escola", ESCOLA)
+    _select_google_dropdown(page, "Selecione a sua Escola", esc)
     _avancar(page, proxima_pagina="Atividade/Aula com estudantes")
 
 
@@ -893,6 +945,7 @@ def _depois_da_etapa(
     # Recursos utilizados
     for recurso in recursos_utilizados:
         _click_checkbox(page, recurso)
+    _corrigir_grupo_computadores(page, recursos_utilizados)
     _avancar(page, proxima_pagina="nome/resumo do seu projeto")
 
     # Objetivos / números / conteúdos

@@ -153,6 +153,14 @@ def _ler_orientadores() -> list:
                 "senha": "",
                 "tipo": p.get("tipo", "tecnologias"),
                 "turnos": p.get("turnos") or list(TODOS_TURNOS),
+                # Só usado no caminho de quem tem SENHA SALVA no .env (ver
+                # SENHAS_SALVAS): cadastro pela tela nunca guarda senha, e
+                # nesse caso app.py lê a escola de outro lugar — cada
+                # professor pode ter mais de uma, e ali é perguntado qual
+                # vale a cada entrada (ver configuracao.pedir_escola).
+                # Aqui, sem interação possível, cai sempre na escola única
+                # configurada para o computador.
+                "escola": ESCOLA,
             }
             for p in _PROFESSORES_DA_TELA
         ]
@@ -170,6 +178,7 @@ def _ler_orientadores() -> list:
                 "senha": _config(f"ORIENTADOR_{numero}_SENHA"),
                 "tipo": _config(f"ORIENTADOR_{numero}_TIPO", "tecnologias"),
                 "turnos": _turnos_do_config(f"ORIENTADOR_{numero}_TURNOS"),
+                "escola": _config(f"ORIENTADOR_{numero}_ESCOLA") or ESCOLA,
             }
         )
         numero += 1
@@ -185,6 +194,7 @@ def _ler_orientadores() -> list:
             "senha": _config("AGENDA_SENHA"),
             "tipo": ORIENTADOR_TIPO,
             "turnos": list(TODOS_TURNOS),
+            "escola": ESCOLA,
         }
     ]
 

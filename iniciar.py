@@ -27,6 +27,7 @@ precisasse do resto funcionando não seria rede de segurança nenhuma.
 import datetime
 import os
 import sys
+import time
 import traceback
 
 TITULO = "Registro SED — não consegui abrir"
@@ -84,7 +85,7 @@ def _guardar(detalhe: str) -> str:
                 with open(
                     os.path.join(_pasta_do_programa(), "VERSAO.txt"), encoding="utf-8"
                 ) as v:
-                    f.write("versão " + v.read().strip() + "\n")
+                    f.write("Versão " + v.read().strip() + "\n")
             except Exception:
                 pass
             f.write("\n" + detalhe)
@@ -149,29 +150,60 @@ def _garantir_configuracao() -> bool:
     return configuracao.pedir_configuracao_inicial() is not None
 
 
+def _falha_passageira_no_tcl(exc: BaseException) -> bool:
+    """
+    "Can't find a usable init.tcl" logo na abertura — visto ao vivo bem
+    depois de sair da versão 1.5.1, sempre num processo RECÉM aberto
+    sozinho (depois de cadastrar/editar um professor, ou depois de uma
+    atualização automática).
+
+    A causa mais provável é a mesma já documentada em `atualizador.
+    reiniciar()` para o navegador: alguma coisa (antivírus examinando o
+    .exe recém-criado, por exemplo) segura por um instante os arquivos
+    que o PyInstaller acabou de extrair para a pasta temporária — e
+    tentar criar a janela bem nesse instante encontra a extração pela
+    metade. Passageiro: tentar de novo alguns segundos depois resolve
+    sozinho.
+    """
+    return "init.tcl" in str(exc)
+
+
 def main() -> None:
     app = None
-    try:
-        if not _garantir_configuracao():
-            return
-        import app as modulo
+    # 6 tentativas, esperando mais a cada uma (3s, 6s, 9s...): visto ao
+    # vivo que 3 tentativas de 2s (6s no total) não bastavam sempre —
+    # ainda apareceu depois de esgotar as 3. Isso é espera parada, sem
+    # nada na tela ainda (a janela nem existe até dar certo), então
+    # alguns segundos a mais não incomodam ninguém — o que incomoda é
+    # desistir cedo demais e mostrar erro de algo que ia se resolver
+    # sozinho.
+    tentativas = 6
+    for tentativa in range(1, tentativas + 1):
+        try:
+            if not _garantir_configuracao():
+                return
+            import app as modulo
 
-        app = modulo
-        app.main()
-    except SystemExit:
-        raise                # reabrir o programa não é erro
-    except BaseException:
-        arquivo = _guardar(traceback.format_exc())
-        # o próprio programa já avisa dos erros que ele consegue tratar;
-        # avisar de novo só deixaria duas caixinhas na tela dizendo o mesmo
-        if not getattr(app, "ERRO_JA_MOSTRADO", False):
-            _avisar(
-                "O programa não conseguiu abrir.\n\n"
-                "Guardei o motivo neste arquivo:\n"
-                f"{arquivo}\n\n"
-                "Mande esse arquivo para quem cuida do programa."
-            )
-        raise
+            app = modulo
+            app.main()
+            return
+        except SystemExit:
+            raise            # reabrir o programa não é erro
+        except BaseException as exc:
+            if tentativa < tentativas and _falha_passageira_no_tcl(exc):
+                time.sleep(3 * tentativa)
+                continue
+            arquivo = _guardar(traceback.format_exc())
+            # o próprio programa já avisa dos erros que ele consegue tratar;
+            # avisar de novo só deixaria duas caixinhas na tela dizendo o mesmo
+            if not getattr(app, "ERRO_JA_MOSTRADO", False):
+                _avisar(
+                    "O programa não conseguiu abrir.\n\n"
+                    "Guardei o motivo neste arquivo:\n"
+                    f"{arquivo}\n\n"
+                    "Mande esse arquivo para quem cuida do programa."
+                )
+            raise
 
 
 if __name__ == "__main__":
