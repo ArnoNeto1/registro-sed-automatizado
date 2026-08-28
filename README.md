@@ -15,6 +15,11 @@ formulário da SED-SC de "Registro de Atividades dos Professores Orientadores
 de Tecnologias Educacionais ou Maker" — economizando o trabalho manual de
 copiar os dados da agenda para o formulário, aula por aula.
 
+Cobre os 4 tipos de registro que o formulário oferece: Atividade/Aula com
+estudantes, Suporte a outros espaços (instalar/configurar equipamento),
+Manutenção de equipamentos e Formação/Reunião — os dois últimos nem
+precisam de aula marcada na agenda.
+
 **Ele nunca envia nada sozinho.** Sempre para antes do envio, mostra um
 resumo de tudo que vai para a SED, e só manda depois que você clicar em
 "Enviar para a SED" e confirmar.
@@ -48,6 +53,11 @@ tarjados por privacidade; no seu computador eles aparecem normalmente.
    formulário preenchido com os próprios olhos antes de decidir.
 5. Só então clique em **"Enviar para a SED"** e confirme.
 
+Isso cobre uma aula normal de laboratório. Se o que você vai registrar é
+suporte/instalação de equipamento, manutenção, ou uma formação/reunião,
+use as outras abas em cima da lista de aulas — os campos do formulário se
+ajustam sozinhos para o tipo escolhido.
+
 Os dois formatos de instalação (portátil e instalador) se atualizam
 sozinhos quando sai versão nova, e compartilham os mesmos dados — dá para
 trocar de um para o outro sem perder nada. Depois de instalado, o arquivo
@@ -56,9 +66,6 @@ computador com outro professor do laboratório, perguntas frequentes.
 
 ## Limitações conhecidas
 
-- **Só cobre o fluxo "Atividade/Aula com estudantes".** Os outros tipos de
-  registro do formulário (Suporte a outros espaços, Manutenção de
-  equipamentos, Formação/Reunião) ainda não foram mapeados.
 - **Número de estudantes** continua manual — o site de agendamento não
   guarda essa informação.
 - **Layout do site do NTE ou do formulário da SED pode mudar** a qualquer

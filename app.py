@@ -128,6 +128,12 @@ from sed_form_filler import (  # noqa: E402
     pegar_conferencia,
     preencher_atividade_com_estudantes,
     preencher_dados_fixos,
+    preencher_formacao_reuniao,
+    preencher_manutencao_equipamentos,
+    preencher_suporte_outros_espacos,
+    ORGANIZADORES_DE_FORMACAO,
+    OPCOES_MANUTENCAO,
+    TIPOS_DE_SUPORTE,
 )
 
 # O iniciar.py olha esta marca para não repetir um aviso que a pessoa já viu.
@@ -145,6 +151,37 @@ def _categoria_da_atividade(g) -> str:
 
 
 CATEGORIAS_RECURSO_EM_ORDEM = ("Laboratório", "Projetores", "Tablets/Celular")
+
+# Duas abas que NÃO vêm de agendamento nenhum — "Manutenção de
+# equipamentos" e "Formação/Reunião" no formulário da SED não têm hora
+# marcada na agenda do NTE, então ficam sempre visíveis (diferente das
+# de cima, que só aparecem se a agenda de verdade trouxer aula daquele
+# recurso). Ver _atualizar_abas_recurso e _atualizar_area_dados_registro.
+CATEGORIAS_INDEPENDENTES = ("Manutenção", "Formação/Reunião")
+
+
+class _RegistroSemAgenda:
+    """
+    Ocupa o lugar de "grupo" para os dois tipos de registro que não vêm
+    de agendamento nenhum (ver CATEGORIAS_INDEPENDENTES) — só para
+    reaproveitar toda a infraestrutura de conferência/envio já pronta
+    (chave_grupo, marcar_enviado, o resumo "CONFIRA ANTES DE ENVIAR" na
+    tela) sem duplicar código para eles.
+
+    `disciplina` carrega o próprio nome do tipo de registro (aparece no
+    resumo); os demais campos ficam vazios/"hoje" — não fazem sentido
+    para estes dois tipos, que não têm turma nem horário.
+    """
+
+    def __init__(self, titulo: str):
+        self.data = dt.date.today().isoformat()
+        self.inicio = ""
+        self.fim = ""
+        self.professor = ""
+        self.disciplina = titulo
+        self.turma = ""
+        self.numero_aulas = 0
+        self.recurso = ""
 
 
 def _texto_conferencia(itens) -> str:
@@ -387,8 +424,10 @@ class NavegadorWorker(threading.Thread):
 
     Comandos aceitos (colocados em comandos):
         ("carregar", quieto, cpf, senha, escola)
-        ("preencher", grupo, n_estudantes, recursos, etapa, conteudos,
+        ("preencher", "aula", grupo, n_estudantes, recursos, etapa, conteudos,
          prof_nome, prof_tipo, prof_escola, subetapa, curso, mostrar)
+        ("preencher", "suporte", grupo, tipo_atendimento, descricao,
+         quantidade_aulas, prof_nome, prof_tipo, prof_escola, mostrar)
         ("conta_google", escola)
         ("enviar", grupo)
         ("sair_google", escola)
@@ -573,8 +612,96 @@ class NavegadorWorker(threading.Thread):
                         if not quieto:
                             self._status("Agenda carregada.")
 
+                    elif acao == "preencher" and comando[1] == "suporte":
+                        (_, _, grupo, tipo_atendimento, descricao, quantidade_aulas,
+                         prof_nome, prof_tipo, prof_escola, mostrar) = comando
+                        page = self._garantir_navegador(p, visivel=bool(mostrar), escola=prof_escola)
+                        iniciar_conferencia()
+                        self._status("Abrindo o formulário e preenchendo (suporte)...")
+                        preencher_dados_fixos(page, prof_nome, prof_tipo, prof_escola)
+                        preencher_suporte_outros_espacos(
+                            page,
+                            tipo_atendimento=tipo_atendimento,
+                            descricao=descricao,
+                            quantidade_aulas=quantidade_aulas,
+                        )
+                        self.eventos.put(
+                            (
+                                "preenchido",
+                                grupo,
+                                {
+                                    "tipo_registro": "suporte",
+                                    "tipo_atendimento": tipo_atendimento,
+                                    "descricao": descricao,
+                                    "aulas": quantidade_aulas,
+                                    "conferencia": pegar_conferencia(),
+                                },
+                            )
+                        )
+                        self._status("Formulário pronto — confira e clique em Enviar.")
+
+                    elif acao == "preencher" and comando[1] == "manutencao":
+                        (_, _, grupo, itens, outro_texto, descricao, quantidade_aulas,
+                         prof_nome, prof_tipo, prof_escola, mostrar) = comando
+                        page = self._garantir_navegador(p, visivel=bool(mostrar), escola=prof_escola)
+                        iniciar_conferencia()
+                        self._status("Abrindo o formulário e preenchendo (manutenção)...")
+                        preencher_dados_fixos(page, prof_nome, prof_tipo, prof_escola)
+                        preencher_manutencao_equipamentos(
+                            page,
+                            itens_manutencao=itens,
+                            outro_texto=outro_texto,
+                            descricao=descricao,
+                            quantidade_aulas=quantidade_aulas,
+                        )
+                        self.eventos.put(
+                            (
+                                "preenchido",
+                                grupo,
+                                {
+                                    "tipo_registro": "manutencao",
+                                    "itens": itens,
+                                    "outro_texto": outro_texto,
+                                    "descricao": descricao,
+                                    "aulas": quantidade_aulas,
+                                    "conferencia": pegar_conferencia(),
+                                },
+                            )
+                        )
+                        self._status("Formulário pronto — confira e clique em Enviar.")
+
+                    elif acao == "preencher" and comando[1] == "formacao":
+                        (_, _, grupo, organizador, outro_texto, descricao, quantidade_aulas,
+                         prof_nome, prof_tipo, prof_escola, mostrar) = comando
+                        page = self._garantir_navegador(p, visivel=bool(mostrar), escola=prof_escola)
+                        iniciar_conferencia()
+                        self._status("Abrindo o formulário e preenchendo (formação/reunião)...")
+                        preencher_dados_fixos(page, prof_nome, prof_tipo, prof_escola)
+                        preencher_formacao_reuniao(
+                            page,
+                            organizador=organizador,
+                            outro_texto=outro_texto,
+                            descricao=descricao,
+                            quantidade_aulas=quantidade_aulas,
+                        )
+                        self.eventos.put(
+                            (
+                                "preenchido",
+                                grupo,
+                                {
+                                    "tipo_registro": "formacao",
+                                    "organizador": organizador,
+                                    "outro_texto": outro_texto,
+                                    "descricao": descricao,
+                                    "aulas": quantidade_aulas,
+                                    "conferencia": pegar_conferencia(),
+                                },
+                            )
+                        )
+                        self._status("Formulário pronto — confira e clique em Enviar.")
+
                     elif acao == "preencher":
-                        (_, grupo, n_estudantes, recursos, etapa, conteudos,
+                        (_, _, grupo, n_estudantes, recursos, etapa, conteudos,
                          prof_nome, prof_tipo, prof_escola, subetapa, curso, mostrar) = comando
                         page = self._garantir_navegador(p, visivel=bool(mostrar), escola=prof_escola)
                         iniciar_conferencia()
@@ -610,6 +737,7 @@ class NavegadorWorker(threading.Thread):
                                 "preenchido",
                                 grupo,
                                 {
+                                    "tipo_registro": "aula",
                                     "etapa": etapa,
                                     "subetapa": subetapa,
                                     "componente": componente,
@@ -677,7 +805,12 @@ class NavegadorWorker(threading.Thread):
                         )
                         self._status("Enviando para a SED...")
                         enviar(page)
-                        marcar_enviado(chave_grupo(grupo))
+                        # Manutenção/Formação não vêm de agendamento — não
+                        # faz sentido guardar no histórico de "já enviados"
+                        # (que existe pra evitar duplicar o registro de uma
+                        # MESMA aula agendada, ver _RegistroSemAgenda).
+                        if not isinstance(grupo, _RegistroSemAgenda):
+                            marcar_enviado(chave_grupo(grupo))
                         self.eventos.put(("enviado", grupo))
                         self._status("Enviado com sucesso.")
 
@@ -780,6 +913,14 @@ class Janela(tk.Tk):
         self.nao_realizadas: set = carregar_nao_realizadas()
         self.grupo_atual = None
         self.preenchido_para = None
+        # Resumo do último "preenchido" (ver NavegadorWorker) — guardado à
+        # parte porque _enviar() precisa saber se foi "aula" ou "suporte"
+        # para montar a mensagem de confirmação certa.
+        self._ultimo_resumo_preenchido: dict | None = None
+        # Qual cartão de dados está visível agora embaixo da lista de aulas
+        # (cartao_dados, cartao_suporte ou cartao_tipo_registro) — usado só
+        # por _mostrar_dados_do_registro para rolar a tela até ele.
+        self._cartao_ativo = None
         # True do instante em que "enviar" é mandado pra fila até o evento
         # "enviado"/"erro" voltar. Ver `_fechar()`: fechar o programa no
         # meio disso pode deixar um envio que DEU CERTO do lado da SED sem
@@ -876,6 +1017,11 @@ class Janela(tk.Tk):
         )
         estilo.configure("TCheckbutton", background=COR_CARTAO)
         estilo.configure("Acoes.TCheckbutton", background=COR_FUNDO)
+        # Faltava esta linha pros Radiobutton (Tipo de registro, Suporte,
+        # Formação/Reunião) — sem ela o fundo deles ficava diferente do
+        # cartão, dando a impressão de um retângulo cinza atrás do texto
+        # ("como se estivesse sublinhado").
+        estilo.configure("TRadiobutton", background=COR_CARTAO)
         estilo.map(
             "Treeview",
             background=[("selected", SELECAO_BG)],
@@ -985,9 +1131,18 @@ class Janela(tk.Tk):
                 self._linha_abas_recurso, text=cat, command=lambda c=cat: self._selecionar_categoria(c)
             )
             self.botoes_categoria[cat] = botao
+        # "Manutenção" e "Formação/Reunião" não dependem da agenda (ver
+        # CATEGORIAS_INDEPENDENTES) — ficam SEMPRE visíveis, ao contrário
+        # das de cima.
+        for cat in CATEGORIAS_INDEPENDENTES:
+            botao = ttk.Button(
+                self._linha_abas_recurso, text=cat, command=lambda c=cat: self._selecionar_categoria(c)
+            )
+            self.botoes_categoria[cat] = botao
 
         corpo_lista = ttk.Frame(cartao_lista, style="Cartao.TFrame")
         corpo_lista.pack(fill="both", expand=True, pady=(10, 0))
+        self.corpo_lista = corpo_lista
 
         colunas = ("quando", "professor", "disciplina", "turma", "situacao")
         self.tabela = ttk.Treeview(
@@ -1028,10 +1183,41 @@ class Janela(tk.Tk):
         self.tabela.tag_configure("sugerida", background="#dff3e7", foreground="#14532d")
         self.after(INTERVALO_PISCA_MS, self._piscar_sugerida)
 
+        # --- tipo de registro (só aparece para Projetores/Tablets-Celular) ---
+        # Um agendamento de Laboratório sempre foi só uma coisa: aula com
+        # estudantes. Mas um de Projetor/Tablets pode ser isso OU o
+        # professor orientador só foi instalar/dar suporte a um
+        # equipamento levado para outra sala — fluxo BEM mais simples no
+        # formulário da SED (ver preencher_suporte_outros_espacos). Como
+        # os dois usam o mesmo agendamento, pergunta explicitamente toda
+        # vez em vez de adivinhar: nenhuma opção vem pré-marcada.
+        self.cartao_tipo_registro = ttk.Frame(self.conteudo, style="Cartao.TFrame", padding=14)
+        ttk.Label(
+            self.cartao_tipo_registro, text="Tipo de registro", style="Secao.TLabel"
+        ).pack(anchor="w")
+        self.var_tipo_registro = tk.StringVar(value="")
+        linha_tipo_registro = ttk.Frame(self.cartao_tipo_registro, style="Cartao.TFrame")
+        linha_tipo_registro.pack(fill="x", pady=(6, 0))
+        ttk.Radiobutton(
+            linha_tipo_registro,
+            text="Aula com estudantes",
+            value="aula",
+            variable=self.var_tipo_registro,
+            command=self._ao_escolher_tipo_registro,
+        ).pack(side="left", padx=(0, 24))
+        ttk.Radiobutton(
+            linha_tipo_registro,
+            text="Suporte/instalação de equipamento",
+            value="suporte",
+            variable=self.var_tipo_registro,
+            command=self._ao_escolher_tipo_registro,
+        ).pack(side="left")
+
         # --- dados da aula ---
         cartao_dados = ttk.Frame(self.conteudo, style="Cartao.TFrame", padding=14)
         cartao_dados.pack(fill="x", padx=20, pady=(0, 8))
         self.cartao_dados = cartao_dados
+        self._cartao_ativo = cartao_dados
 
         ttk.Label(cartao_dados, text="Dados do registro", style="Secao.TLabel").grid(
             row=0, column=0, columnspan=4, sticky="w"
@@ -1123,6 +1309,143 @@ class Janela(tk.Tk):
                 row=i % por_coluna, column=i // por_coluna, sticky="w",
                 padx=(0, 18), pady=1
             )
+
+        # --- suporte/instalação de equipamento (Projetor, Tablets/Celular) ---
+        # Fluxo BEM mais simples que o de cima: uma página só no formulário,
+        # 3 perguntas — nada de nº de estudantes, etapa ou "Recursos
+        # utilizados" (ver preencher_suporte_outros_espacos). Escondido por
+        # padrão; _atualizar_area_dados_registro mostra este OU cartao_dados,
+        # nunca os dois.
+        cartao_suporte = ttk.Frame(self.conteudo, style="Cartao.TFrame", padding=14)
+        self.cartao_suporte = cartao_suporte
+
+        ttk.Label(cartao_suporte, text="Dados do suporte", style="Secao.TLabel").grid(
+            row=0, column=0, columnspan=2, sticky="w"
+        )
+        self.rotulo_aula_suporte = ttk.Label(cartao_suporte, text="", style="Suave.TLabel")
+        self.rotulo_aula_suporte.grid(row=1, column=0, columnspan=2, sticky="w", pady=(4, 10))
+
+        ttk.Label(
+            cartao_suporte,
+            text="Qual foi o atendimento/suporte realizado?",
+            style="Cartao.TLabel",
+        ).grid(row=2, column=0, columnspan=2, sticky="w", pady=(0, 4))
+        self.var_tipo_suporte = tk.StringVar(value="")
+        for i, texto in enumerate(TIPOS_DE_SUPORTE):
+            ttk.Radiobutton(
+                cartao_suporte, text=texto, value=texto, variable=self.var_tipo_suporte,
+            ).grid(row=3 + i, column=0, columnspan=2, sticky="w", pady=1)
+        linha_base = 3 + len(TIPOS_DE_SUPORTE)
+
+        ttk.Label(
+            cartao_suporte,
+            text="Breve descrição da atividade (quem, onde e para quê):",
+            style="Cartao.TLabel",
+        ).grid(row=linha_base, column=0, columnspan=2, sticky="w", pady=(12, 4))
+        self.campo_descricao_suporte = ttk.Entry(cartao_suporte, width=70, font=("Segoe UI", 10))
+        self.campo_descricao_suporte.grid(row=linha_base + 1, column=0, columnspan=2, sticky="ew")
+        cartao_suporte.columnconfigure(1, weight=1)
+
+        ttk.Label(cartao_suporte, text="Quantidade de aulas:", style="Cartao.TLabel").grid(
+            row=linha_base + 2, column=0, sticky="w", pady=(12, 0)
+        )
+        self.campo_aulas_suporte = ttk.Entry(cartao_suporte, width=8, font=("Segoe UI", 11))
+        self.campo_aulas_suporte.grid(
+            row=linha_base + 2, column=1, sticky="w", padx=(8, 0), pady=(12, 0)
+        )
+        self.campo_aulas_suporte.bind("<Return>", lambda _e: self._preencher())
+
+        # --- manutenção de equipamentos (aba independente, sem agenda) ---
+        cartao_manutencao = ttk.Frame(self.conteudo, style="Cartao.TFrame", padding=14)
+        self.cartao_manutencao = cartao_manutencao
+
+        ttk.Label(
+            cartao_manutencao, text="Manutenção de equipamentos", style="Secao.TLabel"
+        ).grid(row=0, column=0, columnspan=4, sticky="w")
+        ttk.Label(
+            cartao_manutencao,
+            text="O que recebeu manutenção? (marque quantos precisar)",
+            style="Cartao.TLabel",
+        ).grid(row=1, column=0, columnspan=4, sticky="w", pady=(8, 4))
+        self.vars_manutencao: dict = {}
+        caixa_manutencao = ttk.Frame(cartao_manutencao, style="Cartao.TFrame")
+        caixa_manutencao.grid(row=2, column=0, columnspan=4, sticky="w")
+        colunas_manutencao = 2
+        por_coluna_m = -(-len(OPCOES_MANUTENCAO) // colunas_manutencao)
+        for i, item in enumerate(OPCOES_MANUTENCAO):
+            var = tk.BooleanVar(value=False)
+            self.vars_manutencao[item] = var
+            ttk.Checkbutton(caixa_manutencao, text=item, variable=var).grid(
+                row=i % por_coluna_m, column=i // por_coluna_m, sticky="w",
+                padx=(0, 18), pady=1
+            )
+        linha_outro_m = ttk.Frame(cartao_manutencao, style="Cartao.TFrame")
+        linha_outro_m.grid(row=3, column=0, columnspan=4, sticky="w", pady=(6, 0))
+        self.var_manutencao_outro = tk.BooleanVar(value=False)
+        ttk.Checkbutton(linha_outro_m, text="Outro:", variable=self.var_manutencao_outro).pack(
+            side="left"
+        )
+        # registrado também no dicionário — quem coleta os dados (ver
+        # _coletar_dados_manutencao) trata "Outro:" igual aos outros itens.
+        self.vars_manutencao["Outro:"] = self.var_manutencao_outro
+        self.campo_manutencao_outro = ttk.Entry(linha_outro_m, width=40, font=("Segoe UI", 10))
+        self.campo_manutencao_outro.pack(side="left", padx=(8, 0))
+
+        ttk.Label(
+            cartao_manutencao, text="Breve descrição da manutenção:", style="Cartao.TLabel"
+        ).grid(row=4, column=0, columnspan=4, sticky="w", pady=(12, 4))
+        self.campo_manutencao_descricao = ttk.Entry(
+            cartao_manutencao, width=70, font=("Segoe UI", 10)
+        )
+        self.campo_manutencao_descricao.grid(row=5, column=0, columnspan=4, sticky="ew")
+        cartao_manutencao.columnconfigure(3, weight=1)
+
+        ttk.Label(cartao_manutencao, text="Quantidade de aulas:", style="Cartao.TLabel").grid(
+            row=6, column=0, sticky="w", pady=(12, 0)
+        )
+        self.campo_manutencao_aulas = ttk.Entry(cartao_manutencao, width=8, font=("Segoe UI", 11))
+        self.campo_manutencao_aulas.grid(row=6, column=1, sticky="w", padx=(8, 0), pady=(12, 0))
+        self.campo_manutencao_aulas.bind("<Return>", lambda _e: self._preencher())
+
+        # --- formação/reunião (aba independente, sem agenda) ---
+        cartao_formacao = ttk.Frame(self.conteudo, style="Cartao.TFrame", padding=14)
+        self.cartao_formacao = cartao_formacao
+
+        ttk.Label(cartao_formacao, text="Formação/ Reunião", style="Secao.TLabel").grid(
+            row=0, column=0, columnspan=4, sticky="w"
+        )
+        ttk.Label(
+            cartao_formacao, text="Quem organizou a reunião/formação?", style="Cartao.TLabel"
+        ).grid(row=1, column=0, columnspan=4, sticky="w", pady=(8, 4))
+        self.var_formacao_organizador = tk.StringVar(value="")
+        for i, texto in enumerate(ORGANIZADORES_DE_FORMACAO):
+            ttk.Radiobutton(
+                cartao_formacao, text=texto, value=texto, variable=self.var_formacao_organizador,
+            ).grid(row=2 + i, column=0, columnspan=4, sticky="w", pady=1)
+        linha_base_f = 2 + len(ORGANIZADORES_DE_FORMACAO)
+        linha_outro_f = ttk.Frame(cartao_formacao, style="Cartao.TFrame")
+        linha_outro_f.grid(row=linha_base_f, column=0, columnspan=4, sticky="w", pady=(1, 0))
+        ttk.Radiobutton(
+            linha_outro_f, text="Outro:", value="Outro:", variable=self.var_formacao_organizador,
+        ).pack(side="left")
+        self.campo_formacao_outro = ttk.Entry(linha_outro_f, width=40, font=("Segoe UI", 10))
+        self.campo_formacao_outro.pack(side="left", padx=(8, 0))
+
+        ttk.Label(
+            cartao_formacao, text="Breve descrição do encontro:", style="Cartao.TLabel"
+        ).grid(row=linha_base_f + 1, column=0, columnspan=4, sticky="w", pady=(12, 4))
+        self.campo_formacao_descricao = ttk.Entry(cartao_formacao, width=70, font=("Segoe UI", 10))
+        self.campo_formacao_descricao.grid(row=linha_base_f + 2, column=0, columnspan=4, sticky="ew")
+        cartao_formacao.columnconfigure(3, weight=1)
+
+        ttk.Label(cartao_formacao, text="Quantidade de aulas:", style="Cartao.TLabel").grid(
+            row=linha_base_f + 3, column=0, sticky="w", pady=(12, 0)
+        )
+        self.campo_formacao_aulas = ttk.Entry(cartao_formacao, width=8, font=("Segoe UI", 11))
+        self.campo_formacao_aulas.grid(
+            row=linha_base_f + 3, column=1, sticky="w", padx=(8, 0), pady=(12, 0)
+        )
+        self.campo_formacao_aulas.bind("<Return>", lambda _e: self._preencher())
 
         # --- ações ---
         # (empacotadas no fim do método, ancoradas na base da janela)
@@ -1402,10 +1725,11 @@ class Janela(tk.Tk):
         """
         if not self._barra_visivel:
             return
+        cartao = self._cartao_ativo or self.cartao_dados
         try:
             topo_atual = self._tela.canvasy(0)
-            topo_cartao = self.cartao_dados.winfo_rooty() - self.conteudo.winfo_rooty()
-            base_cartao = topo_cartao + self.cartao_dados.winfo_height() + 8
+            topo_cartao = cartao.winfo_rooty() - self.conteudo.winfo_rooty()
+            base_cartao = topo_cartao + cartao.winfo_height() + 8
             falta = base_cartao - (topo_atual + self._tela.winfo_height())
             if falta <= 0:
                 return
@@ -1928,16 +2252,28 @@ class Janela(tk.Tk):
         a grande maioria das escolas só tem o laboratório, e 3 abas para
         escolher entre uma coisa só seria só confusão.
 
+        "Manutenção" e "Formação/Reunião" não seguem essa regra: elas não
+        vêm de agendamento nenhum (ver CATEGORIAS_INDEPENDENTES), então
+        ficam SEMPRE visíveis — mas encostadas na ponta DIREITA da linha
+        (embaixo de "Atualizar agenda"), separadas das de cima, que ficam
+        à esquerda.
+
         Uma aba que não é a selecionada, mas tem uma "sugerida agora" dela
         mesma, ganha destaque de aviso (cor de "SubAviso") — é o sinal de
         que tem aula acontecendo ali que a pessoa ainda não olhou.
         """
         presentes = {"Laboratório"} | {_categoria_da_atividade(g) for g in self.grupos}
         sugeridas = self._sugerida_por_categoria()
+        # Desempacota TUDO primeiro e reempacota na ordem certa — pack()
+        # sem pack_forget() antes não reordena um botão já visível, só
+        # atualiza as opções dele; sem isto, uma aba que sumiu e voltou
+        # (ex: Projetores, que só aparece quando a agenda tem aula lá)
+        # ficava fora de ordem em relação às outras.
+        for botao in self.botoes_categoria.values():
+            botao.pack_forget()
         if len(presentes) > 1:
             for cat in CATEGORIAS_RECURSO_EM_ORDEM:
                 if cat not in presentes:
-                    self.botoes_categoria[cat].pack_forget()
                     continue
                 if cat == self.categoria_atual:
                     estilo = "Principal.TButton"
@@ -1947,11 +2283,23 @@ class Janela(tk.Tk):
                     estilo = "TButton"
                 self.botoes_categoria[cat].configure(style=estilo)
                 self.botoes_categoria[cat].pack(side="left", padx=(0, 6))
-        else:
-            for botao in self.botoes_categoria.values():
-                botao.pack_forget()
-        if self.categoria_atual not in presentes:
+        # Empacotadas da direita pra esquerda: a ÚLTIMA da lista fica mais
+        # à esquerda das duas, então percorre a lista ao contrário pra
+        # "Manutenção" aparecer antes de "Formação/Reunião" na leitura.
+        for cat in reversed(CATEGORIAS_INDEPENDENTES):
+            estilo = "Principal.TButton" if cat == self.categoria_atual else "TButton"
+            self.botoes_categoria[cat].configure(style=estilo)
+            self.botoes_categoria[cat].pack(side="right", padx=(6, 0))
+        if self.categoria_atual not in presentes and self.categoria_atual not in CATEGORIAS_INDEPENDENTES:
             self.categoria_atual = "Laboratório"
+        # "Manutenção" e "Formação/Reunião" não têm aula nenhuma pra listar
+        # — some a tabela inteira e sobra só o formulário daquele tipo
+        # (ver _atualizar_area_dados_registro, chamada no fim de
+        # _preencher_tabela, depois que self.grupo_atual está resolvido).
+        if self.categoria_atual in CATEGORIAS_INDEPENDENTES:
+            self.corpo_lista.pack_forget()
+        else:
+            self.corpo_lista.pack(fill="both", expand=True, pady=(10, 0))
 
     def _preencher_tabela(self) -> None:
         self._atualizar_abas_recurso()
@@ -2008,6 +2356,13 @@ class Janela(tk.Tk):
                 ),
                 tags=tags,
             )
+        # Atualiza os cartões de baixo (Dados do registro / Suporte /
+        # Manutenção / Formação) pra bater com a categoria atual — feito
+        # AQUI, e não em _atualizar_abas_recurso, porque self.grupo_atual
+        # só está no valor final (None, acabou de ser resetado acima)
+        # depois deste ponto. Roda mesmo se o formulário atual redesenhar
+        # a tabela por baixo de um preenchimento pendente (ver abaixo).
+        self._atualizar_area_dados_registro()
         # IMPORTANTE: se há um formulário preenchido esperando envio, a
         # seleção NÃO pode mudar. Trocar a seleção dispara a limpeza dos
         # campos, e a reconsulta automática (de 30 em 30 min) apagaria o
@@ -2090,12 +2445,12 @@ class Janela(tk.Tk):
         self.botao_enviar.configure(state="disabled")
         self.botao_ver_no_navegador.configure(state="disabled")
         dia = dt.date.fromisoformat(grupo.data).strftime("%d/%m/%Y")
-        self.rotulo_aula.configure(
-            text=(
-                f"{dia} · {grupo.inicio}-{grupo.fim} · {grupo.professor.title()} · "
-                f"{grupo.disciplina} · {grupo.turma} · {grupo.numero_aulas} aula(s)"
-            )
+        texto_aula = (
+            f"{dia} · {grupo.inicio}-{grupo.fim} · {grupo.professor.title()} · "
+            f"{grupo.disciplina} · {grupo.turma} · {grupo.numero_aulas} aula(s)"
         )
+        self.rotulo_aula.configure(text=texto_aula)
+        self.rotulo_aula_suporte.configure(text=texto_aula)
         etapa = etapa_para_turma(grupo.turma)
         self.combo_etapa.set(etapa or "")
         self._ajustar_campo_extra(sugerir_de=grupo.turma)
@@ -2103,6 +2458,19 @@ class Janela(tk.Tk):
         # professor ajusta/reescreve antes de registrar.
         self.campo_conteudo.delete("1.0", "end")
         self.campo_conteudo.insert("1.0", grupo.conteudo or "")
+
+        # Projetor/Tablets-Celular: pergunta de novo a cada aula
+        # selecionada — nunca assume "foi aula com estudantes" só porque
+        # foi a última escolha (ver _atualizar_area_dados_registro).
+        # Laboratório continua exatamente como sempre foi.
+        categoria = _categoria_da_atividade(grupo)
+        self.var_tipo_registro.set("aula" if categoria == "Laboratório" else "")
+        self.var_tipo_suporte.set("")
+        self.campo_descricao_suporte.delete(0, "end")
+        self.campo_aulas_suporte.delete(0, "end")
+        self.campo_aulas_suporte.insert(0, str(grupo.numero_aulas))
+        self._atualizar_area_dados_registro()
+
         # o mesmo botão marca e desmarca, conforme a aula selecionada
         marcada = chave_grupo(grupo) in self.nao_realizadas
         self.botao_nao_realizada.configure(
@@ -2125,6 +2493,66 @@ class Janela(tk.Tk):
             )
         else:
             self._escrever("")
+
+    def _atualizar_area_dados_registro(self) -> None:
+        """
+        Mostra o(s) cartão(ões) certo(s) abaixo da lista de aulas, conforme
+        a aba/categoria atual:
+
+        - Laboratório: sempre o cartão de sempre (cartao_dados).
+        - Projetores/Tablets-Celular: pergunta o tipo de registro (aula com
+          estudantes ou suporte/instalação, ver
+          preencher_suporte_outros_espacos em sed_form_filler.py).
+        - Manutenção / Formação-Reunião (CATEGORIAS_INDEPENDENTES): não
+          dependem de aula nenhuma selecionada — mostram direto o cartão
+          daquele tipo.
+
+        Esconde todos primeiro e reempacota só o que faz sentido, NA ORDEM
+        CERTA: pack() sem "before"/"after" reaparece no FIM de quem já
+        estiver visível, então reempacotar por cima do que já estava lá
+        bagunçaria a ordem dependendo de qual cartão apareceu por último.
+        """
+        self.cartao_tipo_registro.pack_forget()
+        self.cartao_dados.pack_forget()
+        self.cartao_suporte.pack_forget()
+        self.cartao_manutencao.pack_forget()
+        self.cartao_formacao.pack_forget()
+
+        if self.categoria_atual == "Manutenção":
+            self.cartao_manutencao.pack(fill="x", padx=20, pady=(0, 8))
+            self._cartao_ativo = self.cartao_manutencao
+            return
+        if self.categoria_atual == "Formação/Reunião":
+            self.cartao_formacao.pack(fill="x", padx=20, pady=(0, 8))
+            self._cartao_ativo = self.cartao_formacao
+            return
+
+        grupo = self.grupo_atual
+        if grupo is None:
+            self._cartao_ativo = self.cartao_dados
+            return
+        if _categoria_da_atividade(grupo) == "Laboratório":
+            self.cartao_dados.pack(fill="x", padx=20, pady=(0, 8))
+            self._cartao_ativo = self.cartao_dados
+            return
+
+        self.cartao_tipo_registro.pack(fill="x", padx=20, pady=(0, 8))
+        tipo = self.var_tipo_registro.get()
+        if tipo == "aula":
+            self.cartao_dados.pack(fill="x", padx=20, pady=(0, 8))
+            self._cartao_ativo = self.cartao_dados
+        elif tipo == "suporte":
+            self.cartao_suporte.pack(fill="x", padx=20, pady=(0, 8))
+            self._cartao_ativo = self.cartao_suporte
+        else:
+            # ainda não escolheu: não mostra nenhum dos dois, força a
+            # pessoa a escolher em vez de assumir "aula" por padrão.
+            self._cartao_ativo = self.cartao_tipo_registro
+
+    def _ao_escolher_tipo_registro(self) -> None:
+        self._atualizar_area_dados_registro()
+        # em tela pequena, leva o cartão que acabou de aparecer para a vista
+        self.after_idle(self._mostrar_dados_do_registro)
 
     # -- ações --------------------------------------------------------------
     def _sair_da_conta(self) -> None:
@@ -2232,17 +2660,72 @@ class Janela(tk.Tk):
             self.orientador.get("escola", ""),
         ))
 
-    def _preencher(self) -> None:
-        if str(self.botao_preencher.cget("state")) == "disabled":
-            # O botão já reflete "preenchimento em andamento" — mas o
-            # atalho <Return> no campo de estudantes chama esta função
-            # direto, sem passar pelo botão. Sem esta checagem, um Enter
-            # a mais (ou Enter logo depois de um clique) enfileira um
-            # segundo "preencher" pro mesmo formulário.
-            return
-        if self.grupo_atual is None:
-            messagebox.showinfo("Escolha uma aula", "Selecione uma aula na lista primeiro.")
-            return
+    def _coletar_dados_para_preencher(self, grupo, mostrar: bool):
+        """
+        Lê e valida os campos da tela para `grupo`, conforme o tipo de
+        registro escolhido (aula com estudantes ou suporte/instalação —
+        só existe essa escolha para Projetores/Tablets-Celular; Laboratório
+        continua sendo sempre "aula"). Devolve o comando pronto para o
+        NavegadorWorker, ou None se faltar algo — já tendo avisado a
+        pessoa, então quem chama só precisa checar o retorno.
+
+        Compartilhado entre "Preencher formulário" e "Ver no navegador":
+        os dois preenchem os MESMOS dados, só muda se a janela do Chrome
+        aparece ou não.
+
+        "Manutenção" e "Formação/Reunião" não têm `grupo` nenhum (não vêm
+        de agendamento) — desvia pros coletores próprios deles, que montam
+        um _RegistroSemAgenda do zero.
+        """
+        if self.categoria_atual == "Manutenção":
+            return self._coletar_dados_manutencao(mostrar)
+        if self.categoria_atual == "Formação/Reunião":
+            return self._coletar_dados_formacao(mostrar)
+
+        categoria = _categoria_da_atividade(grupo)
+        tipo_registro = self.var_tipo_registro.get() if categoria != "Laboratório" else "aula"
+        if categoria != "Laboratório" and not tipo_registro:
+            messagebox.showinfo(
+                "Tipo de registro",
+                "Escolha se foi uma aula com estudantes ou um "
+                "suporte/instalação de equipamento antes de preencher.",
+            )
+            return None
+
+        if tipo_registro == "suporte":
+            tipo_atendimento = self.var_tipo_suporte.get().strip()
+            if not tipo_atendimento:
+                messagebox.showinfo(
+                    "Qual foi o atendimento/suporte realizado?",
+                    "Escolha uma das opções antes de preencher.",
+                )
+                return None
+            descricao = self.campo_descricao_suporte.get().strip()
+            if not descricao:
+                messagebox.showinfo(
+                    "Breve descrição da atividade",
+                    "Descreva rapidamente quem, onde e para quê — esse "
+                    "texto vai para o formulário da SED.",
+                )
+                self.campo_descricao_suporte.focus_set()
+                return None
+            bruto_aulas = self.campo_aulas_suporte.get().strip()
+            if not bruto_aulas.isdigit() or int(bruto_aulas) <= 0:
+                messagebox.showinfo(
+                    "Quantidade de aulas",
+                    "Digite quantas aulas (blocos de 45 min) você levou "
+                    "para o suporte/instalação — só números.",
+                )
+                self.campo_aulas_suporte.focus_set()
+                return None
+            return (
+                "preencher", "suporte", grupo, tipo_atendimento, descricao, int(bruto_aulas),
+                self.orientador["nome"], self.orientador["tipo"], self.orientador.get("escola", ""),
+                mostrar,
+            )
+
+        # tipo_registro == "aula" (Laboratório sempre, ou Projetor/Tablets
+        # quando a pessoa escolheu "Aula com estudantes")
         bruto = self.campo_estudantes.get().strip()
         if not bruto.isdigit() or int(bruto) <= 0:
             messagebox.showinfo(
@@ -2250,13 +2733,13 @@ class Janela(tk.Tk):
                 "Digite quantos estudantes foram atendidos (só números).",
             )
             self.campo_estudantes.focus_set()
-            return
+            return None
         etapa = self.combo_etapa.get().strip()
         if not etapa:
             messagebox.showinfo(
                 "Etapa", "Não consegui deduzir a etapa pela turma — escolha na lista."
             )
-            return
+            return None
         # Etapas com página própria no formulário pedem uma resposta a mais.
         subetapa = ""
         curso = ""
@@ -2270,7 +2753,7 @@ class Janela(tk.Tk):
                     "etapa e tente de novo.",
                 )
                 self.combo_extra.focus_set()
-                return
+                return None
         elif etapa == ETAPA_PROFISSIONAL:
             curso = self.campo_curso.get().strip()
             if not curso:
@@ -2280,12 +2763,12 @@ class Janela(tk.Tk):
                     "da SED. Preencha o campo \"Qual o curso?\" e tente de novo.",
                 )
                 self.campo_curso.focus_set()
-                return
+                return None
 
         recursos = [r for r, v in self.vars_recursos.items() if v.get()]
         if not recursos:
             messagebox.showinfo("Recursos", "Marque pelo menos um recurso utilizado.")
-            return
+            return None
         conteudo = self.campo_conteudo.get("1.0", "end").strip()
         if not conteudo:
             messagebox.showinfo(
@@ -2294,32 +2777,149 @@ class Janela(tk.Tk):
                 "campo de conteúdos da SED.",
             )
             self.campo_conteudo.focus_set()
+            return None
+        return (
+            "preencher", "aula", grupo, int(bruto), recursos, etapa, conteudo,
+            self.orientador["nome"], self.orientador["tipo"], self.orientador.get("escola", ""),
+            subetapa, curso, mostrar,
+        )
+
+    def _coletar_dados_manutencao(self, mostrar: bool):
+        """
+        Lê e valida os campos do cartão "Manutenção de equipamentos" —
+        chamado por _coletar_dados_para_preencher quando essa é a aba
+        atual. Devolve o comando pronto, ou None se faltar algo (já
+        tendo avisado a pessoa).
+        """
+        itens = [item for item, v in self.vars_manutencao.items() if v.get()]
+        if not itens:
+            messagebox.showinfo(
+                "O que recebeu manutenção?",
+                "Marque pelo menos um item antes de preencher.",
+            )
+            return None
+        outro_texto = self.campo_manutencao_outro.get().strip()
+        if "Outro:" in itens and not outro_texto:
+            messagebox.showinfo(
+                "O que recebeu manutenção?",
+                "Você marcou \"Outro\" — escreva o que foi no campo ao lado.",
+            )
+            self.campo_manutencao_outro.focus_set()
+            return None
+        descricao = self.campo_manutencao_descricao.get().strip()
+        if not descricao:
+            messagebox.showinfo(
+                "Breve descrição da manutenção",
+                "Descreva rapidamente o que foi feito — esse texto vai para "
+                "o formulário da SED.",
+            )
+            self.campo_manutencao_descricao.focus_set()
+            return None
+        bruto = self.campo_manutencao_aulas.get().strip()
+        if not bruto.isdigit() or int(bruto) <= 0:
+            messagebox.showinfo(
+                "Quantidade de aulas",
+                "Digite quantas aulas (blocos de 45 min) essa manutenção "
+                "levou — só números.",
+            )
+            self.campo_manutencao_aulas.focus_set()
+            return None
+        grupo = _RegistroSemAgenda("Manutenção de equipamentos")
+        return (
+            "preencher", "manutencao", grupo, itens, outro_texto, descricao, int(bruto),
+            self.orientador["nome"], self.orientador["tipo"], self.orientador.get("escola", ""),
+            mostrar,
+        )
+
+    def _coletar_dados_formacao(self, mostrar: bool):
+        """
+        Lê e valida os campos do cartão "Formação/ Reunião" — chamado por
+        _coletar_dados_para_preencher quando essa é a aba atual. Devolve
+        o comando pronto, ou None se faltar algo (já tendo avisado a
+        pessoa).
+        """
+        organizador = self.var_formacao_organizador.get().strip()
+        if not organizador:
+            messagebox.showinfo(
+                "Quem organizou a reunião/formação?",
+                "Escolha uma das opções antes de preencher.",
+            )
+            return None
+        outro_texto = self.campo_formacao_outro.get().strip()
+        if organizador == "Outro:" and not outro_texto:
+            messagebox.showinfo(
+                "Quem organizou a reunião/formação?",
+                "Você marcou \"Outro\" — escreva quem organizou no campo ao "
+                "lado.",
+            )
+            self.campo_formacao_outro.focus_set()
+            return None
+        descricao = self.campo_formacao_descricao.get().strip()
+        if not descricao:
+            messagebox.showinfo(
+                "Breve descrição do encontro",
+                "Descreva rapidamente do que se tratou — esse texto vai "
+                "para o formulário da SED.",
+            )
+            self.campo_formacao_descricao.focus_set()
+            return None
+        bruto = self.campo_formacao_aulas.get().strip()
+        if not bruto.isdigit() or int(bruto) <= 0:
+            messagebox.showinfo(
+                "Quantidade de aulas",
+                "Digite quantas aulas (blocos de 45 min) esse encontro "
+                "levou — só números.",
+            )
+            self.campo_formacao_aulas.focus_set()
+            return None
+        grupo = _RegistroSemAgenda("Formação/ Reunião")
+        return (
+            "preencher", "formacao", grupo, organizador, outro_texto, descricao, int(bruto),
+            self.orientador["nome"], self.orientador["tipo"], self.orientador.get("escola", ""),
+            mostrar,
+        )
+
+    def _preencher(self) -> None:
+        if str(self.botao_preencher.cget("state")) == "disabled":
+            # O botão já reflete "preenchimento em andamento" — mas o
+            # atalho <Return> no campo de estudantes chama esta função
+            # direto, sem passar pelo botão. Sem esta checagem, um Enter
+            # a mais (ou Enter logo depois de um clique) enfileira um
+            # segundo "preencher" pro mesmo formulário.
             return
-        if chave_grupo(self.grupo_atual) in self.nao_realizadas:
-            if not messagebox.askyesno(
-                "Aula marcada como não realizada",
-                "Esta aula está marcada como NÃO REALIZADA.\n\n"
-                "Quer registrá-la mesmo assim? (a marca será removida)",
-            ):
-                return
-            desmarcar_nao_realizada(chave_grupo(self.grupo_atual))
-            self.nao_realizadas = carregar_nao_realizadas()
-        if chave_grupo(self.grupo_atual) in self.enviados:
-            if not messagebox.askyesno(
-                "Aula já registrada",
-                "Esta aula já foi enviada antes. Registrar de novo vai duplicar na SED.\n\n"
-                "Quer continuar mesmo assim?",
-            ):
-                return
+        # "Manutenção" e "Formação/Reunião" não pedem aula selecionada —
+        # não vêm de agendamento nenhum (ver CATEGORIAS_INDEPENDENTES).
+        independente = self.categoria_atual in CATEGORIAS_INDEPENDENTES
+        if not independente and self.grupo_atual is None:
+            messagebox.showinfo("Escolha uma aula", "Selecione uma aula na lista primeiro.")
+            return
+        comando = self._coletar_dados_para_preencher(
+            self.grupo_atual, mostrar=bool(self.mostrar_navegador.get())
+        )
+        if comando is None:
+            return
+        if not independente:
+            if chave_grupo(self.grupo_atual) in self.nao_realizadas:
+                if not messagebox.askyesno(
+                    "Aula marcada como não realizada",
+                    "Esta aula está marcada como NÃO REALIZADA.\n\n"
+                    "Quer registrá-la mesmo assim? (a marca será removida)",
+                ):
+                    return
+                desmarcar_nao_realizada(chave_grupo(self.grupo_atual))
+                self.nao_realizadas = carregar_nao_realizadas()
+            if chave_grupo(self.grupo_atual) in self.enviados:
+                if not messagebox.askyesno(
+                    "Aula já registrada",
+                    "Esta aula já foi enviada antes. Registrar de novo vai duplicar na SED.\n\n"
+                    "Quer continuar mesmo assim?",
+                ):
+                    return
         self.botao_preencher.configure(state="disabled")
         self.botao_enviar.configure(state="disabled")
         self.botao_ver_no_navegador.configure(state="disabled")
         self._definir_status("Preenchendo o formulário...")
-        self.comandos.put(
-            ("preencher", self.grupo_atual, int(bruto), recursos, etapa, conteudo,
-             self.orientador["nome"], self.orientador["tipo"], self.orientador.get("escola", ""),
-             subetapa, curso, bool(self.mostrar_navegador.get()))
-        )
+        self.comandos.put(comando)
 
     def _ver_no_navegador(self) -> None:
         """
@@ -2347,34 +2947,40 @@ class Janela(tk.Tk):
         if self.preenchido_para is None:
             return
         grupo = self.preenchido_para
-        bruto = self.campo_estudantes.get().strip()
-        if not bruto.isdigit() or int(bruto) <= 0:
+        # sempre visível (True) — é o propósito deste botão
+        comando = self._coletar_dados_para_preencher(grupo, mostrar=True)
+        if comando is None:
             return  # não deveria acontecer: já foi validado ao preencher
-        etapa = self.combo_etapa.get().strip()
-        subetapa = self.combo_extra.get().strip() if opcoes_subetapa(etapa) else ""
-        curso = self.campo_curso.get().strip() if etapa == ETAPA_PROFISSIONAL else ""
-        recursos = [r for r, v in self.vars_recursos.items() if v.get()]
-        conteudo = self.campo_conteudo.get("1.0", "end").strip()
 
         self.botao_preencher.configure(state="disabled")
         self.botao_enviar.configure(state="disabled")
         self.botao_ver_no_navegador.configure(state="disabled")
         self._definir_status("Abrindo o formulário no Chrome para você conferir...")
-        self.comandos.put(
-            ("preencher", grupo, int(bruto), recursos, etapa, conteudo,
-             self.orientador["nome"], self.orientador["tipo"], self.orientador.get("escola", ""),
-             subetapa, curso, True)  # sempre visível — é o propósito deste botão
-        )
+        self.comandos.put(comando)
 
     def _enviar(self) -> None:
         if self.preenchido_para is None:
             return
         grupo = self.preenchido_para
+        resumo = self._ultimo_resumo_preenchido or {}
+        tipo_registro = resumo.get("tipo_registro")
+        if tipo_registro == "suporte":
+            detalhe = f"{resumo.get('aulas', '?')} aula(s) de suporte/instalação"
+        elif tipo_registro in ("manutencao", "formacao"):
+            detalhe = f"{resumo.get('aulas', '?')} aula(s)"
+        else:
+            detalhe = f"{self.campo_estudantes.get()} estudantes"
+        # Manutenção/Formação não têm turma nem horário (não vêm de
+        # agendamento — ver _RegistroSemAgenda), então a segunda linha
+        # ficaria vazia/estranha; mostra só disciplina + detalhe pra eles.
+        if grupo.turma or grupo.inicio:
+            linha_aula = f"{grupo.disciplina}\n{grupo.turma}\n{grupo.inicio}-{grupo.fim} · {detalhe}"
+        else:
+            linha_aula = f"{grupo.disciplina}\n{detalhe}"
         if not messagebox.askyesno(
             "Confirmar envio",
             f"Enviar este registro para a SED?\n\n"
-            f"{grupo.disciplina}\n{grupo.turma}\n"
-            f"{grupo.inicio}-{grupo.fim} · {self.campo_estudantes.get()} estudantes\n\n"
+            f"{linha_aula}\n\n"
             f"Registrando como: {self.orientador['nome']}",
         ):
             return
@@ -2567,24 +3173,58 @@ class Janela(tk.Tk):
         elif tipo == "preenchido":
             _, grupo, resumo = evento
             self.preenchido_para = grupo
+            self._ultimo_resumo_preenchido = resumo
             self.botao_preencher.configure(state="normal")
             self.botao_enviar.configure(state="normal")
             self.botao_ver_no_navegador.configure(state="normal")
-            linha_sub = ""
-            if resumo.get("subetapa"):
-                linha_sub = f"  Qual etapa? .... {resumo['subetapa']}\n"
-            self._escrever(
-                "CONFIRA ANTES DE ENVIAR\n"
-                f"  Etapa .......... {resumo['etapa']}\n"
-                + linha_sub
-                + f"  Componente ..... {_texto_componente(resumo['componente'])}\n"
-                f"  Resumo ......... {resumo['resumo']}\n"
-                f"  Nº de aulas .... {resumo['aulas']}\n"
-                f"  Estudantes ..... {resumo['estudantes']}\n"
-                f"  Conteúdos ...... {resumo['conteudos']}\n"
-                f"  Recursos ....... {', '.join(resumo['recursos'])}"
-                + _texto_conferencia(resumo.get("conferencia"))
-            )
+            if resumo.get("tipo_registro") == "suporte":
+                self._escrever(
+                    "CONFIRA ANTES DE ENVIAR\n"
+                    f"  Atendimento .... {resumo['tipo_atendimento']}\n"
+                    f"  Descrição ...... {resumo['descricao']}\n"
+                    f"  Nº de aulas .... {resumo['aulas']}"
+                    + _texto_conferencia(resumo.get("conferencia"))
+                )
+            elif resumo.get("tipo_registro") == "manutencao":
+                linha_outro = ""
+                if resumo.get("outro_texto"):
+                    linha_outro = f"  Outro .......... {resumo['outro_texto']}\n"
+                self._escrever(
+                    "CONFIRA ANTES DE ENVIAR\n"
+                    f"  Recebeu manutenção .... {', '.join(resumo['itens'])}\n"
+                    + linha_outro
+                    + f"  Descrição ...... {resumo['descricao']}\n"
+                    f"  Nº de aulas .... {resumo['aulas']}"
+                    + _texto_conferencia(resumo.get("conferencia"))
+                )
+            elif resumo.get("tipo_registro") == "formacao":
+                linha_outro = ""
+                if resumo.get("outro_texto"):
+                    linha_outro = f"  Outro .......... {resumo['outro_texto']}\n"
+                self._escrever(
+                    "CONFIRA ANTES DE ENVIAR\n"
+                    f"  Organizado por.. {resumo['organizador']}\n"
+                    + linha_outro
+                    + f"  Descrição ...... {resumo['descricao']}\n"
+                    f"  Nº de aulas .... {resumo['aulas']}"
+                    + _texto_conferencia(resumo.get("conferencia"))
+                )
+            else:
+                linha_sub = ""
+                if resumo.get("subetapa"):
+                    linha_sub = f"  Qual etapa? .... {resumo['subetapa']}\n"
+                self._escrever(
+                    "CONFIRA ANTES DE ENVIAR\n"
+                    f"  Etapa .......... {resumo['etapa']}\n"
+                    + linha_sub
+                    + f"  Componente ..... {_texto_componente(resumo['componente'])}\n"
+                    f"  Resumo ......... {resumo['resumo']}\n"
+                    f"  Nº de aulas .... {resumo['aulas']}\n"
+                    f"  Estudantes ..... {resumo['estudantes']}\n"
+                    f"  Conteúdos ...... {resumo['conteudos']}\n"
+                    f"  Recursos ....... {', '.join(resumo['recursos'])}"
+                    + _texto_conferencia(resumo.get("conferencia"))
+                )
             # o Chrome está na frente depois de preencher — traz o
             # programa de volta, que é onde fica o botão de enviar
             self._trazer_para_frente()
@@ -2597,6 +3237,19 @@ class Janela(tk.Tk):
             self.botao_ver_no_navegador.configure(state="disabled")
             self.botao_preencher.configure(state="normal")
             self.campo_estudantes.delete(0, "end")
+            self.var_tipo_suporte.set("")
+            self.campo_descricao_suporte.delete(0, "end")
+            self.campo_aulas_suporte.delete(0, "end")
+            for var in self.vars_manutencao.values():
+                var.set(False)
+            self.campo_manutencao_outro.delete(0, "end")
+            self.campo_manutencao_descricao.delete(0, "end")
+            self.campo_manutencao_aulas.delete(0, "end")
+            self.var_formacao_organizador.set("")
+            self.campo_formacao_outro.delete(0, "end")
+            self.campo_formacao_descricao.delete(0, "end")
+            self.campo_formacao_aulas.delete(0, "end")
+            self._ultimo_resumo_preenchido = None
             self._escrever("Registro enviado para a SED.")
             self._preencher_tabela()
         elif tipo == "atualizacao":

@@ -10,6 +10,22 @@ seção `## <número>` com o que mudou. O resto acontece sozinho.
 
 ---
 
+## 1.7.0
+
+- **O programa agora preenche os 4 tipos de registro do formulário da
+  SED, não só "Atividade/Aula com estudantes".** Numa aula de Projetor
+  ou Tablets/Celular, o programa pergunta se foi mesmo uma aula com
+  estudantes ou se foi só instalar/dar suporte a um equipamento — os
+  campos mudam na hora, conforme a resposta. E apareceram duas abas
+  novas, sempre disponíveis do lado direito da tela: **Manutenção** (pra
+  quando você conserta ou organiza algo do laboratório) e **Formação/
+  Reunião** (pra quando você participa de uma formação ou reunião) —
+  essas duas nem precisam de aula marcada na agenda, é só abrir a aba e
+  preencher.
+- Pequeno ajuste visual: as opções de múltipla escolha (os círculos e
+  quadrados de marcar) ficaram com o mesmo fundo do resto da tela — antes
+  aparecia um retângulo cinza atrás do texto de cada opção.
+
 ## 1.6.2
 
 - Faxina interna: removidos arquivos que só serviam pra uma forma bem

@@ -4,9 +4,13 @@ Preenche o formulário Google "REGISTRO DE ATIVIDADES DOS PROFESSORES
 ORIENTADORES DE TECNOLOGIAS EDUCACIONAIS OU MAKER" da SED-SC, página por
 página, para uma AtividadeAgrupada vinda do site de agendamento.
 
-Este módulo automatiza apenas o fluxo "Atividade/Aula com estudantes". Os
-fluxos "Suporte a outros espaços", "Manutenção de equipamentos" e
-"Formação/Reunião" ainda não estão implementados (ver README).
+Os 4 fluxos que a página "Tipo de registro" oferece estão automatizados:
+"Atividade/Aula com estudantes" (preencher_atividade_com_estudantes),
+"Suporte do professor orientador a outros espaços"
+(preencher_suporte_outros_espacos), "Manutenção de equipamentos"
+(preencher_manutencao_equipamentos) e "Formação/ Reunião"
+(preencher_formacao_reuniao) — todos confirmados ao vivo, direto no
+formulário.
 
 IMPORTANTE: por padrão o script SEMPRE para na última página (antes do botão
 "Enviar") e espera confirmação no terminal — ele nunca envia um registro para
@@ -35,6 +39,15 @@ TIPO_LABEL = {
     "tecnologias": "Tecnologias Educacionais",
     "maker": "Laboratório Maker",
 }
+
+# As 3 opções da pergunta "Qual foi o atendimento/suporte realizado?" do
+# fluxo "Suporte do professor orientador a outros espaços" — texto exato
+# confirmado ao vivo no formulário (ver preencher_suporte_outros_espacos).
+TIPOS_DE_SUPORTE = [
+    "Instalação de equipamento (projetor, computador, lousa digital, etc.)",
+    "Suporte/configuração de equipamentos",
+    "Outros",
+]
 
 
 # ---------------------------------------------------------------------------
@@ -145,6 +158,34 @@ def _descrever_pagina(page) -> str:
     return " ".join(partes)
 
 
+def _achar_radio(page, label: str):
+    """
+    Acha o radio de um rótulo, com um fallback pro caso específico do
+    "Outro:" não ter aria-label nenhum.
+
+    Achado ao vivo explorando o fluxo "Formação/Reunião": as opções
+    normais da pergunta "Quem organizou..." têm aria-label certinho, mas
+    o radio de "Outro:" não tem aria-label ARIA NENHUM (o texto "Outro:"
+    fica escrito do lado, sem ligação de acessibilidade com o elemento) —
+    diferente do checkbox "Outro:" de outras perguntas, que TEM aria-label
+    igual ao texto. Sem este fallback, `get_by_role("radio", name="Outro:")`
+    simplesmente não acha nada.
+
+    Fallback: dentro do listitem que contém o texto do rótulo, pega o
+    ÚLTIMO radio — é sempre onde o Forms bota a opção "Outro" em qualquer
+    pergunta de escolha única (confirmado ao vivo).
+    """
+    exato = page.get_by_role("radio", name=label, exact=True)
+    if exato.count():
+        return exato.first
+    if chave_comparacao(label) in (chave_comparacao("outro"), chave_comparacao("outro:")):
+        item = page.locator(f'div[role="listitem"]:has-text("{label}")').last
+        radios_do_item = item.get_by_role("radio")
+        if radios_do_item.count():
+            return radios_do_item.last
+    return None
+
+
 def _click_radio(page, label: str) -> None:
     """
     Marca uma opção redonda e confere se pegou.
@@ -153,13 +194,12 @@ def _click_radio(page, label: str) -> None:
     numa opção redonda ele é pior, porque várias delas decidem para qual
     página o formulário vai em seguida.
     """
-    alvo = page.get_by_role("radio", name=label, exact=True)
-    if alvo.count() == 0:
+    alvo = _achar_radio(page, label)
+    if alvo is None:
         raise RuntimeError(
             f"Não encontrei a opção '{label}' nesta página do formulário. "
             + _descrever_pagina(page)
         )
-    alvo = alvo.first
     alvo.scroll_into_view_if_needed(timeout=3000)
     for _ in range(4):
         try:
@@ -776,6 +816,129 @@ def preencher_dados_fixos(
     # Página 2 — Escola
     _select_google_dropdown(page, "Selecione a sua Escola", esc)
     _avancar(page, proxima_pagina="Atividade/Aula com estudantes")
+
+
+def preencher_suporte_outros_espacos(
+    page,
+    tipo_atendimento: str,
+    descricao: str,
+    quantidade_aulas: int,
+) -> None:
+    """
+    Preenche o fluxo "Suporte do professor orientador a outros espaços" —
+    para quando o registro NÃO é uma aula com estudantes, e sim instalar
+    ou dar suporte a um equipamento (projetor, computador, lousa digital)
+    levado para outra sala. Chame preencher_dados_fixos(page) antes.
+
+    Bem mais simples que "Atividade/Aula com estudantes": uma página só,
+    3 perguntas — nada de nº de estudantes, etapa, componente curricular
+    ou "Recursos utilizados", que não fazem sentido aqui. Confirmado ao
+    vivo, direto no formulário.
+
+    `tipo_atendimento` precisa ser um dos textos de TIPOS_DE_SUPORTE.
+    """
+    # Página 3 — Tipo de registro
+    _click_radio(page, "Suporte do professor orientador a outros espaços.")
+    _avancar(page, proxima_pagina="atendimento/suporte")
+
+    # Página 4 — as 3 perguntas do suporte
+    _click_radio(page, tipo_atendimento)
+    _fill_textbox_near(page, "Breve descrição da atividade", descricao)
+    _fill_textbox_near(page, "Quantidade de aulas", str(quantidade_aulas))
+    _avancar(page)
+
+
+# Opções da pergunta "O que recebeu manutenção?" do fluxo "Manutenção de
+# equipamentos" — texto exato confirmado ao vivo no formulário. É de
+# MÚLTIPLA escolha (dá pra marcar mais de uma). "Outro:" é tratado à
+# parte — tem uma caixa de texto associada (ver
+# preencher_manutencao_equipamentos).
+OPCOES_MANUTENCAO = [
+    "Laboratório (limpeza/organização)",
+    "Computadores/ notebooks",
+    "Tablets",
+    "Celulares",
+    "Lousa Digital",
+    "Projetor",
+    "Cortadora a laser",
+    "Impressora 3D",
+]
+
+
+def preencher_manutencao_equipamentos(
+    page,
+    itens_manutencao: list[str],
+    outro_texto: str,
+    descricao: str,
+    quantidade_aulas: int,
+) -> None:
+    """
+    Preenche o fluxo "Manutenção de equipamentos" — para quando o
+    registro é consertar, organizar ou dar manutenção em algo do
+    laboratório, sem ser aula nem suporte a outro espaço. Chame
+    preencher_dados_fixos(page) antes.
+
+    Uma página só, 3 perguntas — a primeira ("O que recebeu manutenção?")
+    é de MÚLTIPLA escolha, diferente do "Suporte", que é escolha única.
+    Confirmado ao vivo, direto no formulário.
+
+    `itens_manutencao` deve conter textos de OPCOES_MANUTENCAO; inclua
+    "Outro:" na lista (e preencha `outro_texto`) se nada da lista serve.
+    """
+    # Página 3 — Tipo de registro
+    _click_radio(page, "Manutenção de equipamentos")
+    _avancar(page, proxima_pagina="recebeu manutenção")
+
+    # Página 4 — as 3 perguntas da manutenção
+    for item in itens_manutencao:
+        _click_checkbox(page, item)
+    if "Outro:" in itens_manutencao and outro_texto:
+        _fill_textbox_near(page, "O que recebeu manutenção", outro_texto)
+    _fill_textbox_near(page, "Breve descrição da manutenção", descricao)
+    _fill_textbox_near(page, "Quantidade de aulas", str(quantidade_aulas))
+    _avancar(page)
+
+
+# Opções da pergunta "Quem organizou a reunião/ formação?" do fluxo
+# "Formação/ Reunião" — texto exato confirmado ao vivo. Escolha única.
+# "Outro:" também existe (texto livre), tratado à parte.
+ORGANIZADORES_DE_FORMACAO = [
+    "CRE/NTE",
+    "Unidade Escolar",
+    "SED-SC",
+    "O próprio professor orientador",
+]
+
+
+def preencher_formacao_reuniao(
+    page,
+    organizador: str,
+    outro_texto: str,
+    descricao: str,
+    quantidade_aulas: int,
+) -> None:
+    """
+    Preenche o fluxo "Formação/ Reunião" — para quando o registro é uma
+    formação ou reunião da qual o professor participou, sem ser aula.
+    Chame preencher_dados_fixos(page) antes.
+
+    Uma página só, 3 perguntas — a primeira ("Quem organizou...") é de
+    escolha única. Confirmado ao vivo, direto no formulário.
+
+    `organizador` deve ser um texto de ORGANIZADORES_DE_FORMACAO, ou
+    "Outro:" (preenchendo `outro_texto`).
+    """
+    # Página 3 — Tipo de registro
+    _click_radio(page, "Formação/ Reunião")
+    _avancar(page, proxima_pagina="organizou a reunião")
+
+    # Página 4 — as 3 perguntas da formação/reunião
+    _click_radio(page, organizador)
+    if organizador == "Outro:" and outro_texto:
+        _fill_textbox_near(page, "organizou a reunião", outro_texto)
+    _fill_textbox_near(page, "Breve descrição do encontro", descricao)
+    _fill_textbox_near(page, "Quantidade de aulas", str(quantidade_aulas))
+    _avancar(page)
 
 
 def preencher_atividade_com_estudantes(
