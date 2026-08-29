@@ -10,6 +10,13 @@ seção `## <número>` com o que mudou. O resto acontece sozinho.
 
 ---
 
+## 1.7.3
+
+- Corrigido: a caixa de "Nova versão disponível" mostrava o texto desta
+  lista com asteriscos duplos literais (a caixa é do Windows, não
+  entende Markdown) e cortava cada item no meio da frase. Agora aparece
+  como texto normal, com um espaço separando um item do outro.
+
 ## 1.7.2
 
 - **Modo claro, escuro, ou igual ao do computador.** Em "Meus dados" tem

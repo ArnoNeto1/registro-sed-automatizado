@@ -228,6 +228,37 @@ def _mensagem_amigavel_de_erro(detalhe: str) -> str:
     return detalhe
 
 
+def _notas_para_dialogo(texto: str) -> str:
+    """
+    Prepara o texto de NOVIDADES.md pra aparecer na caixa de "nova versão
+    disponível" — que é uma caixa NATIVA do Windows, não desenhada pelo
+    programa: ela não entende Markdown (mostraria **negrito** do jeito
+    que está escrito, asteriscos e tudo) e também não sabe juntar de
+    volta uma frase que o .md quebrou em várias linhas só pra ficar
+    legível dentro do arquivo — sem isso, cada item de lista aparecia
+    picado em pedacinhos curtos e difíceis de acompanhar.
+    """
+    paragrafos = []
+    atual = []
+    for linha in texto.split("\n"):
+        linha = linha.strip()
+        if not linha:
+            if atual:
+                paragrafos.append(" ".join(atual))
+                atual = []
+            continue
+        if linha.startswith("- ") and atual:
+            paragrafos.append(" ".join(atual))
+            atual = [linha]
+        else:
+            atual.append(linha)
+    if atual:
+        paragrafos.append(" ".join(atual))
+    # Uma linha em branco entre cada item — pedido explícito depois de ver
+    # a caixa de verdade: sem isso, os itens ficavam colados um no outro.
+    return "\n\n".join(paragrafos).replace("**", "")
+
+
 def _texto_componente(comp) -> str:
     """
     Deixa o componente legível no resumo de conferência.
@@ -1987,10 +2018,12 @@ class Janela(tk.Tk):
         # texto muito longo estouraria a caixinha do Windows e sairia
         # cortado sem aviso, então ele é limitado aqui — o texto inteiro
         # continua na página da versão, no GitHub.
-        texto_notas = (info.get("notas") or "").strip()
+        texto_notas = _notas_para_dialogo((info.get("notas") or "").strip())
         if len(texto_notas) > 1200:
-            texto_notas = texto_notas[:1200].rsplit("\n", 1)[0] + "\n(...)"
-        notas = f"\n\nO que mudou nesta versão:\n{texto_notas}" if texto_notas else ""
+            texto_notas = texto_notas[:1200].rsplit("\n\n", 1)[0] + "\n\n(...)"
+        notas = (
+            f"\n\nO que mudou nesta versão:\n\n{texto_notas}" if texto_notas else ""
+        )
         if not messagebox.askyesno(
             "Nova versão disponível",
             f"Saiu a versão {info['versao']} do programa "
