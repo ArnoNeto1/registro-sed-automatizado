@@ -1,7 +1,7 @@
 {
-  "versao": "1.7.2",
-  "exe": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v1.7.2/Registro-SED.exe",
-  "instalador": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v1.7.2/Registro-SED-Instalador.exe",
+  "versao": "1.7.3",
+  "exe": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v1.7.3/Registro-SED.exe",
+  "instalador": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v1.7.3/Registro-SED-Instalador.exe",
   "zip": "https://github.com/ArnoNeto1/registro-sed-automatizado/archive/refs/heads/main.zip",
-  "notas": "- **Modo claro, escuro, ou igual ao do computador.** Em \"Meus dados\" tem\n  agora uma opção de \"Aparência\" com três escolhas: Claro, Escuro, ou\n  Igual ao sistema (segue o que o Windows já está usando). Vale pra tela\n  principal e pras telas de entrar/cadastrar.\n- Corrigido: no tema escuro, passar o mouse por cima de uma opção\n  (Tecnologias Educacionais/Laboratório Maker, Aparência, \"Ver o\n  formulário sendo preenchido\"...) deixava o texto invisível por cima de\n  um fundo claro. Agora o texto continua legível com o mouse em cima."
+  "notas": "- Corrigido: a caixa de \"Nova versão disponível\" mostrava o texto desta\n  lista com asteriscos duplos literais (a caixa é do Windows, não\n  entende Markdown) e cortava cada item no meio da frase. Agora aparece\n  como texto normal, com um espaço separando um item do outro."
 }
