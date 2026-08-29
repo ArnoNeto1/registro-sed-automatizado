@@ -1,7 +1,7 @@
 {
-  "versao": "1.7.3",
-  "exe": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v1.7.3/Registro-SED.exe",
-  "instalador": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v1.7.3/Registro-SED-Instalador.exe",
+  "versao": "1.7.4",
+  "exe": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v1.7.4/Registro-SED.exe",
+  "instalador": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v1.7.4/Registro-SED-Instalador.exe",
   "zip": "https://github.com/ArnoNeto1/registro-sed-automatizado/archive/refs/heads/main.zip",
-  "notas": "- Corrigido: a caixa de \"Nova versão disponível\" mostrava o texto desta\n  lista com asteriscos duplos literais (a caixa é do Windows, não\n  entende Markdown) e cortava cada item no meio da frase. Agora aparece\n  como texto normal, com um espaço separando um item do outro."
+  "notas": "- Corrigido: às vezes, depois de uma atualização automática, o programa\n  mostrava uma tela de erro do navegador (\"Security validation\n  failure...\") e não reabria sozinho — era preciso abrir na mão de novo.\n  Agora o programa dá uma folga de alguns segundos antes de carregar a\n  agenda pela primeira vez, logo depois de reabrir sozinho, evitando a\n  corrida que causava o erro."
 }
