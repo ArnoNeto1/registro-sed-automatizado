@@ -150,7 +150,7 @@ def _categoria_da_atividade(g) -> str:
     return categoria_do_recurso(g.recurso) or "Laboratório"
 
 
-CATEGORIAS_RECURSO_EM_ORDEM = ("Laboratório", "Projetores", "Tablets/Celular")
+CATEGORIAS_RECURSO_EM_ORDEM = ("Laboratório", "Tablets/Celular", "Projetores")
 
 # Duas abas que NÃO vêm de agendamento nenhum — "Manutenção de
 # equipamentos" e "Formação/Reunião" no formulário da SED não têm hora
@@ -1214,10 +1214,12 @@ class Janela(tk.Tk):
         ).pack(side="left")
 
         # --- dados da aula ---
+        # Não empacota ainda: fica em branco até uma aula ser selecionada
+        # (ver _atualizar_area_dados_registro) — antes disso não há nada
+        # pra mostrar, então nem aparece.
         cartao_dados = ttk.Frame(self.conteudo, style="Cartao.TFrame", padding=14)
-        cartao_dados.pack(fill="x", padx=20, pady=(0, 8))
         self.cartao_dados = cartao_dados
-        self._cartao_ativo = cartao_dados
+        self._cartao_ativo = None
 
         ttk.Label(cartao_dados, text="Dados do registro", style="Secao.TLabel").grid(
             row=0, column=0, columnspan=4, sticky="w"
@@ -1411,7 +1413,7 @@ class Janela(tk.Tk):
         cartao_formacao = ttk.Frame(self.conteudo, style="Cartao.TFrame", padding=14)
         self.cartao_formacao = cartao_formacao
 
-        ttk.Label(cartao_formacao, text="Formação/ Reunião", style="Secao.TLabel").grid(
+        ttk.Label(cartao_formacao, text="Formação/Reunião", style="Secao.TLabel").grid(
             row=0, column=0, columnspan=4, sticky="w"
         )
         ttk.Label(
@@ -2486,13 +2488,32 @@ class Janela(tk.Tk):
             )
         elif marcada:
             self._escrever(
-                "Marcada como NÃO REALIZADA — o professor agendou mas não usou "
+                "Marcada como NÃO REALIZADA — o(a) professor(a) agendou mas não usou "
                 "o laboratório.\n"
                 "Ela não vai para a SED e não aparece mais como pendente.\n\n"
                 "Se foi engano, use o botão 'Desfazer não realizada'."
             )
         else:
             self._escrever("")
+
+    def _limpar_dados_do_registro(self) -> None:
+        """
+        Volta o cartão "Dados do registro" para o estado de "nada
+        selecionado" — mesmo texto/campos vazios de quando a janela abre.
+
+        Chamado quando self.grupo_atual vira None sem uma aula nova ter
+        sido selecionada (ex: trocar de aba). Sem isto, os campos ficavam
+        com os dados da ÚLTIMA aula selecionada, mesmo depois de trocar
+        de aba — parecia que uma aula da aba nova estava selecionada, sem
+        estar.
+        """
+        self.rotulo_aula.configure(text="Nenhuma aula selecionada.")
+        self.campo_estudantes.delete(0, "end")
+        self.combo_etapa.set("")
+        self._ajustar_campo_extra()
+        self.campo_conteudo.delete("1.0", "end")
+        for var in self.vars_recursos.values():
+            var.set(False)
 
     def _atualizar_area_dados_registro(self) -> None:
         """
@@ -2529,7 +2550,18 @@ class Janela(tk.Tk):
 
         grupo = self.grupo_atual
         if grupo is None:
-            self._cartao_ativo = self.cartao_dados
+            # Nenhuma aula selecionada ainda (agenda carregando, trocou
+            # de aba, ou ninguém clicou em nada) — fica em branco de
+            # propósito, sem nenhum cartão. Só aparece quando o professor
+            # escolhe uma aula na lista.
+            #
+            # IMPORTANTE limpar os campos aqui mesmo assim: se voltar a
+            # aparecer (ex: por causa de algum outro caminho de código),
+            # não pode trazer dado da aula ANTERIOR junto — bug real
+            # encontrado testando a tela, dava a entender que uma aula
+            # estava selecionada quando não estava.
+            self._limpar_dados_do_registro()
+            self._cartao_ativo = None
             return
         if _categoria_da_atividade(grupo) == "Laboratório":
             self.cartao_dados.pack(fill="x", padx=20, pady=(0, 8))
@@ -2616,10 +2648,10 @@ class Janela(tk.Tk):
         # enviá-lo com o nome do outro seria registro errado na SED.
         if self.preenchido_para is not None:
             if not messagebox.askyesno(
-                "Trocar de professor",
+                "Trocar de professor(a)",
                 "Existe um formulário preenchido esperando envio, no nome de\n"
                 f"{self.orientador['nome']}.\n\n"
-                "Trocar de professor agora descarta esse preenchimento.\n"
+                "Trocar de professor(a) agora descarta esse preenchimento.\n"
                 "Quer trocar mesmo assim?",
             ):
                 self.combo_professor.set(self.orientador["nome"])
@@ -2647,7 +2679,7 @@ class Janela(tk.Tk):
         # de verdade, já que nada mais o reabilita.
         self.grupo_atual = None
 
-        self._definir_status(f"Professor: {novo['nome']} — relendo a agenda...")
+        self._definir_status(f"Professor(a): {novo['nome']} — relendo a agenda...")
         self.comandos.put((
             "carregar", False, novo["cpf"], novo["senha"], novo.get("escola", ""),
         ))
@@ -2833,7 +2865,7 @@ class Janela(tk.Tk):
 
     def _coletar_dados_formacao(self, mostrar: bool):
         """
-        Lê e valida os campos do cartão "Formação/ Reunião" — chamado por
+        Lê e valida os campos do cartão "Formação/Reunião" — chamado por
         _coletar_dados_para_preencher quando essa é a aba atual. Devolve
         o comando pronto, ou None se faltar algo (já tendo avisado a
         pessoa).
@@ -2872,7 +2904,7 @@ class Janela(tk.Tk):
             )
             self.campo_formacao_aulas.focus_set()
             return None
-        grupo = _RegistroSemAgenda("Formação/ Reunião")
+        grupo = _RegistroSemAgenda("Formação/Reunião")
         return (
             "preencher", "formacao", grupo, organizador, outro_texto, descricao, int(bruto),
             self.orientador["nome"], self.orientador["tipo"], self.orientador.get("escola", ""),
@@ -3414,7 +3446,7 @@ def main() -> None:
             raiz.withdraw()
             messagebox.showerror("Erro ao abrir o programa", detalhe)
             raiz.destroy()
-            # avisa o iniciar.py de que a pessoa JA viu a mensagem, para
+            # avisa o iniciar.py de que a pessoa JÁ viu a mensagem, para
             # não aparecerem duas caixinhas dizendo a mesma coisa
             ERRO_JA_MOSTRADO = True
         except Exception:

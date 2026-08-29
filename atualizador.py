@@ -30,7 +30,7 @@ oferecer de novo aulas já registradas — ou seja, risco de duplicar
 registro na SED.
 
 Antes de substituir qualquer coisa, é feita uma cópia de segurança em
-`backup_versao_anterior/`, para dar como voltar atrás.
+`backup_versao_anterior/`, para dar pra voltar atrás.
 """
 
 from __future__ import annotations
@@ -38,8 +38,8 @@ from __future__ import annotations
 import json
 import os
 import shutil
-import subprocess
 import sys
+import time
 import urllib.request
 import zipfile
 from pathlib import Path
@@ -200,43 +200,37 @@ def _aplicar_exe(info: dict) -> list:
                 pass
 
 
-# Sinalizadores do Windows para soltar o programa novo do que está saindo.
-# Números fixos porque subprocess.DETACHED_PROCESS só existe no Windows —
-# referenciá-lo direto quebraria o programa em qualquer outro sistema.
-_DESACOPLADO = 0x00000008      # DETACHED_PROCESS
-_NOVO_GRUPO = 0x00000200       # CREATE_NEW_PROCESS_GROUP
-
-
 def reiniciar() -> None:
     """
     Abre a versão nova e deixa esta sair.
 
-    OS TRÊS "DEVNULL" NÃO SÃO FRESCURA. Como .exe, o programa roda sem
-    janela de terminal — e, nesse modo, os canais de entrada e saída que
-    o Windows entrega ao processo não valem nada. Um subprocess.Popen que
-    tente herdá-los falha na hora, com "[WinError 6] identificador
-    inválido". Foi exatamente isso que aconteceu: o executável era
-    trocado com sucesso e, na hora de reabrir, o programa dizia que não
-    tinha conseguido. Apontando entrada e saída para o vazio, não há o
-    que herdar.
+    Usa os.startfile — a mesma chamada de "dar duplo clique" no arquivo
+    — em vez de subprocess.Popen. Resolve de verdade o "[WinError 6]
+    identificador inválido" que subprocess.Popen já causou aqui: como
+    .exe, o programa roda sem janela de terminal, e os canais de
+    entrada/saída que o Windows entrega nesse modo não valem nada para
+    herdar (era pra isso que existiam os três DEVNULL de antes).
 
-    DETACHED_PROCESS solta o programa novo do que está fechando: sem
-    ele, o filho pode morrer junto com o pai que acabou de chamá-lo.
+    O TIME.SLEEP ABAIXO é sobre um problema DIFERENTE, ainda não
+    totalmente explicado: uma vez, logo depois de uma atualização
+    automática, o programa novo mostrou "Security validation failure:
+    parent process has different executable!" ao abrir o navegador —
+    mensagem do PRÓPRIO Chromium (Playwright), não deste programa.
+    Reabrir na mão, do jeito normal, funcionou sem problema — ou seja,
+    não é reprodutível à vontade, e pode até ser algo fora do nosso
+    controle (antivírus, por exemplo). A suspeita mais forte: este
+    processo (o antigo) morre quase no mesmo instante em que abre o
+    novo, e o Windows pode reaproveitar o PID dele quase na hora — se o
+    Chromium checa alguma coisa sobre "quem é meu processo avô" bem
+    cedo, pode achar um PID já reaproveitado por outro programa
+    qualquer. Este sleep NÃO tem certeza de resolver — é só folga
+    barata para reduzir a chance da corrida, mantendo o PID antigo vivo
+    mais um pouco.
     """
     if not empacotado():
         return
-    extras = {}
-    if os.name == "nt":
-        extras["creationflags"] = _DESACOPLADO | _NOVO_GRUPO
-    subprocess.Popen(
-        [sys.executable],
-        cwd=str(pasta_do_programa()),
-        stdin=subprocess.DEVNULL,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        close_fds=True,
-        **extras,
-    )
+    os.startfile(sys.executable, cwd=str(pasta_do_programa()))
+    time.sleep(2)
 
 
 def _arquivos_do_pacote(caminho_zip: str) -> dict:

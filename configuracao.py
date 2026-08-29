@@ -35,6 +35,7 @@ já estava trabalhando perde o que tinha.
 
 from __future__ import annotations
 
+import ctypes
 import json
 import re
 import tkinter as tk
@@ -47,7 +48,7 @@ ARQUIVO = "configuracao.json"
 TIPOS = [("tecnologias", "Tecnologias Educacionais"), ("maker", "Laboratório Maker")]
 TURNOS = ["Matutino", "Vespertino", "Noturno"]
 
-# Texto que aparece no campo Escola quando ainda não foi escolhida nada
+# Texto que aparece no campo Escola quando ainda não foi escolhido nada
 # — de propósito, em vez de vir pré-preenchida com a escola de outro
 # professor (ou em branco, fácil de não notar): força a pessoa a
 # reparar e escolher a dela de verdade antes de salvar.
@@ -106,7 +107,7 @@ def limpar_cpf(texto: str) -> str:
 def validar_professor(dados: dict) -> str:
     """Devolve a primeira pendência encontrada, ou "" se está tudo certo."""
     if not (dados.get("nome") or "").strip():
-        return "Escreva o nome do professor orientador."
+        return "Escreva o nome do(a) professor(a) orientador(a)."
     if len(limpar_cpf(dados.get("cpf"))) != 11:
         return "O CPF precisa ter 11 números (só os números, sem ponto nem traço)."
     turnos_por_escola = dados.get("turnos_por_escola") or {}
@@ -153,6 +154,47 @@ def _estilizar(janela) -> None:
     estilo.map("Placeholder.TCombobox", foreground=[("readonly", COR_SUAVE)])
     estilo.configure("TButton", font=("Segoe UI", 10), padding=8)
     estilo.configure("Principal.TButton", font=("Segoe UI", 11, "bold"), padding=10)
+    # Mesma cor de aviso usada no resto do programa (app.py: "Aula não
+    # realizada", abas com sugestão pendente) — pra quem já usa o
+    # programa reconhecer de cara que é um alerta, não um texto comum.
+    estilo.configure(
+        "Aviso.TLabel", background=COR_CARTAO, foreground="#a1663a",
+        font=("Segoe UI", 9, "bold"),
+    )
+
+
+def _caps_lock_ativo() -> bool:
+    """
+    Confere se o Caps Lock está ligado AGORA — sem depender de nenhuma
+    tecla ter sido apertada dentro de campo nenhum.
+
+    GetKeyState(VK_CAPITAL) conta o estado de ALTERNÂNCIA da tecla (bit
+    mais baixo do retorno), não se ela está pressionada neste instante —
+    é a mesma informação que o LED do teclado mostra. Assim pega tanto o
+    Caps Lock que já estava ligado ANTES de abrir a tela quanto o que a
+    pessoa liga/desliga com o foco em outro campo, coisa que só escutar
+    tecla apertada dentro do campo de senha não pegaria.
+
+    Só existe de verdade no Windows — único sistema onde este programa
+    roda (ver caminhos.py). Em qualquer outro, devolve False sem quebrar
+    nada: a pessoa só não vê o aviso.
+
+    restype/argtypes declarados à mão (em vez do "int" que o ctypes
+    assume sozinho): GetKeyState devolve SHORT de verdade, não int — sem
+    isto, o "& 1" que a gente lê aqui continua certo (é só o bit mais
+    baixo, que sobra igual dos dois jeitos), mas se um dia este código
+    crescer pra também conferir o bit mais alto (tecla fisicamente
+    pressionada agora, 0x8000), aí sim precisaria do tipo certo pra não
+    ler sinal errado. Declarar já deixa isso à prova de futuro.
+    """
+    try:
+        VK_CAPITAL = 0x14
+        get_key_state = ctypes.windll.user32.GetKeyState
+        get_key_state.restype = ctypes.c_short
+        get_key_state.argtypes = [ctypes.c_int]
+        return bool(get_key_state(VK_CAPITAL) & 1)
+    except Exception:
+        return False
 
 
 def _centralizar(janela) -> None:
@@ -217,7 +259,7 @@ class TelaDeCadastro(_Dialogo):
         topo.pack(fill="x")
         ttk.Label(
             topo,
-            text="Bem-vindo" if primeira_vez else "Dados do professor",
+            text="Bem-vindo(a)" if primeira_vez else "Dados do(a) professor(a)",
             style="Titulo.TLabel",
         ).pack(anchor="w")
         ttk.Label(
@@ -616,6 +658,20 @@ class TelaDeEntrada(_Dialogo):
         self.campo_senha.grid(row=1, column=1, sticky="w", padx=(10, 0))
         self.campo_senha.bind("<Return>", lambda _e: self._entrar())
 
+        # Aviso de Caps Lock — a senha vem escondida (show="•"), então é
+        # o único jeito de perceber que vai sair tudo em maiúscula antes
+        # de tentar entrar e levar um "senha incorreta" sem entender por
+        # quê. Escondido por padrão; _checar_caps_lock (chamada no fim
+        # deste método) decide se mostra, e continua conferindo sozinha
+        # enquanto esta tela estiver aberta.
+        self.aviso_caps = ttk.Label(
+            cartao,
+            text="⚠ Caps Lock ativado",
+            style="Aviso.TLabel",
+        )
+        self.aviso_caps.grid(row=2, column=1, sticky="w", padx=(10, 0), pady=(4, 0))
+        self.aviso_caps.grid_remove()
+
         ttk.Label(
             cartao,
             text=(
@@ -624,34 +680,76 @@ class TelaDeEntrada(_Dialogo):
             ),
             style="Suave.TLabel",
             justify="left",
-        ).grid(row=2, column=1, sticky="w", padx=(10, 0), pady=(8, 0))
+        ).grid(row=3, column=1, sticky="w", padx=(10, 0), pady=(8, 0))
 
         rodape = ttk.Frame(j, padding=(24, 0, 24, 18))
         rodape.pack(fill="x")
         ttk.Button(rodape, text="Entrar", style="Principal.TButton", command=self._entrar).pack(
             side="left"
         )
-        ttk.Button(rodape, text="Cadastrar outro professor", command=self._cadastrar).pack(
+        ttk.Button(rodape, text="Cadastrar outro(a) professor(a)", command=self._cadastrar).pack(
             side="left", padx=(10, 0)
         )
         # À direita, separado dos botões principais de propósito — é uma
         # ação destrutiva (tira o professor da lista deste computador),
         # não algo pra clicar sem querer no meio do fluxo de sempre.
-        ttk.Button(rodape, text="Remover professor", command=self._remover).pack(side="right")
+        ttk.Button(rodape, text="Remover professor(a)", command=self._remover).pack(side="right")
         self.campo_senha.focus_set()
+
+        # Cancela a checagem de Caps Lock pendente assim que a tela
+        # fecha — de QUALQUER jeito que ela feche (Entrar, Cancelar,
+        # Cadastrar outro professor, fechar pelo X). Sem isto, achado
+        # testando de verdade: o after() já agendado tenta rodar depois
+        # que a janela (e o interpretador Tcl inteiro, se for a raiz)
+        # já foi destruída, e dá "invalid command name" — um erro que
+        # nem passa pelo try/except de dentro de _checar_caps_lock,
+        # porque o Tcl nem chega a achar o comando pra chamar.
+        self._id_caps_lock = None
+        self.janela.bind("<Destroy>", self._parar_checagem_caps_lock, add="+")
+        self._checar_caps_lock()
+
+    def _parar_checagem_caps_lock(self, evento) -> None:
+        if evento.widget is not self.janela:
+            return  # <Destroy> também dispara pra cada widget filho
+        if self._id_caps_lock is not None:
+            try:
+                self.janela.after_cancel(self._id_caps_lock)
+            except Exception:
+                pass
+            self._id_caps_lock = None
+
+    def _checar_caps_lock(self) -> None:
+        """
+        Mostra/esconde o aviso de Caps Lock, e se chama de novo em
+        seguida — continua conferindo sozinha enquanto esta tela estiver
+        aberta, pega o Caps Lock ligado/desligado a qualquer momento
+        (não só quando aperta uma tecla dentro do campo de senha).
+
+        Para sozinha quando a tela fecha — winfo_exists() cobre o caso
+        comum, e _parar_checagem_caps_lock (ligada no <Destroy>) cobre a
+        corrida de uma checagem que já tinha sido agendada bem na hora
+        do fechamento.
+        """
+        if not self.janela.winfo_exists():
+            return
+        if _caps_lock_ativo():
+            self.aviso_caps.grid()
+        else:
+            self.aviso_caps.grid_remove()
+        self._id_caps_lock = self.janela.after(250, self._checar_caps_lock)
 
     def _remover(self) -> None:
         nome = self.combo_nome.get()
         if not nome:
             messagebox.showinfo(
-                "Remover professor", "Escolha quem remover na lista.", parent=self.janela
+                "Remover professor(a)", "Escolha quem remover na lista.", parent=self.janela
             )
             return
         professor = next((p for p in self.professores if p.get("nome") == nome), None)
         if professor is None:
             return
         if not messagebox.askyesno(
-            "Remover professor",
+            "Remover professor(a)",
             f'Remover "{nome}" da lista de quem usa o programa neste computador?\n\n'
             "Isso não mexe em nada na SED nem no site da agenda — só tira o "
             "cadastro salvo aqui. Se precisar de novo, é só cadastrar outra vez.",
@@ -669,7 +767,7 @@ class TelaDeEntrada(_Dialogo):
         nome = self.combo_nome.get()
         senha = self.campo_senha.get()
         if not nome:
-            messagebox.showinfo("Professor", "Escolha quem está registrando.", parent=self.janela)
+            messagebox.showinfo("Professor(a)", "Escolha quem está registrando.", parent=self.janela)
             return
         if not senha:
             messagebox.showinfo(
@@ -687,7 +785,7 @@ class TelaDeEntrada(_Dialogo):
         if not escolas:
             messagebox.showinfo(
                 "Escola",
-                "Falta cadastrar a escola deste professor — abra \"Meus dados\" depois de entrar.",
+                "Falta cadastrar a escola do(a) professor(a) — abra \"Meus dados\" depois de entrar.",
                 parent=self.janela,
             )
         escola = pedir_escola(escolas, mestre=self.janela) if escolas else ""

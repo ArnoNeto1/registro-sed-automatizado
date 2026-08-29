@@ -169,7 +169,7 @@ def _escolher_escola_se_pedir(page, escola: str) -> None:
 
 def login(page, cpf: str, senha: str, escola: str = "") -> None:
     """Loga no site de agendamento, se a tela de login aparecer."""
-    # wait_until="domcontentloaded" + timeout maior: o site as vezes demora
+    # wait_until="domcontentloaded" + timeout maior: o site às vezes demora
     # a disparar o evento "load" (recursos externos lentos), mas o
     # formulário de login já está pronto bem antes disso.
     page.goto(AGENDA_LOGIN_URL, wait_until="domcontentloaded", timeout=60000)

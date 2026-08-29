@@ -10,6 +10,22 @@ seção `## <número>` com o que mudou. O resto acontece sozinho.
 
 ---
 
+## 1.7.1
+
+- **Aviso de Caps Lock na tela de entrar.** Como o campo de senha vem
+  escondido, não dava pra perceber que o Caps Lock estava ligado antes
+  de tentar entrar e levar um "senha incorreta" sem entender por quê.
+  Agora aparece um aviso na hora.
+- Corrigido: depois de selecionar uma aula e trocar de aba, os dados da
+  aula anterior (dia, etapa, conteúdo) ficavam aparecendo por engano em
+  "Dados do registro", mesmo sem nenhuma aula selecionada na aba nova.
+- A ordem das abas mudou: Tablets/Celular agora vem antes de Projetores.
+- Deixamos mais confiável o reinício automático depois de baixar uma
+  atualização.
+- Revisão geral de texto: alguns pontos onde só aparecia a forma
+  masculina ("professor") agora mostram "professor(a)", e corrigimos
+  alguns erros de digitação espalhados pela tela.
+
 ## 1.7.0
 
 - **O programa agora preenche os 4 tipos de registro do formulário da
