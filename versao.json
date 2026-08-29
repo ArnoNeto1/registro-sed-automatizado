@@ -1,7 +1,7 @@
 {
-  "versao": "1.7.1",
-  "exe": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v1.7.1/Registro-SED.exe",
-  "instalador": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v1.7.1/Registro-SED-Instalador.exe",
+  "versao": "1.7.2",
+  "exe": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v1.7.2/Registro-SED.exe",
+  "instalador": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v1.7.2/Registro-SED-Instalador.exe",
   "zip": "https://github.com/ArnoNeto1/registro-sed-automatizado/archive/refs/heads/main.zip",
-  "notas": "- **Aviso de Caps Lock na tela de entrar.** Como o campo de senha vem\n  escondido, não dava pra perceber que o Caps Lock estava ligado antes\n  de tentar entrar e levar um \"senha incorreta\" sem entender por quê.\n  Agora aparece um aviso na hora.\n- Corrigido: depois de selecionar uma aula e trocar de aba, os dados da\n  aula anterior (dia, etapa, conteúdo) ficavam aparecendo por engano em\n  \"Dados do registro\", mesmo sem nenhuma aula selecionada na aba nova.\n- A ordem das abas mudou: Tablets/Celular agora vem antes de Projetores.\n- Deixamos mais confiável o reinício automático depois de baixar uma\n  atualização.\n- Revisão geral de texto: alguns pontos onde só aparecia a forma\n  masculina (\"professor\") agora mostram \"professor(a)\", e corrigimos\n  alguns erros de digitação espalhados pela tela."
+  "notas": "- **Modo claro, escuro, ou igual ao do computador.** Em \"Meus dados\" tem\n  agora uma opção de \"Aparência\" com três escolhas: Claro, Escuro, ou\n  Igual ao sistema (segue o que o Windows já está usando). Vale pra tela\n  principal e pras telas de entrar/cadastrar.\n- Corrigido: no tema escuro, passar o mouse por cima de uma opção\n  (Tecnologias Educacionais/Laboratório Maker, Aparência, \"Ver o\n  formulário sendo preenchido\"...) deixava o texto invisível por cima de\n  um fundo claro. Agora o texto continua legível com o mouse em cima."
 }
