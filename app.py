@@ -107,6 +107,7 @@ from config import (  # noqa: E402
     turno_do_horario,
 )
 import configuracao  # noqa: E402
+import tema  # noqa: E402
 from main import (  # noqa: E402
     ESTADO_FILE,  # noqa: F401  (mantido pra deixar claro de onde vem o estado)
     pasta_do_perfil,
@@ -282,19 +283,32 @@ INTERVALO_ATUALIZACAO_MS = 24 * 60 * 60 * 1000
 # Ritmo do verde piscando na linha "Sugerida agora". 700ms chama atenção
 # sem virar aquele pisca-pisca que cansa a vista em poucos minutos.
 INTERVALO_PISCA_MS = 700
-VERDE_PISCA = ("#dff3e7", "#7fd4a8")
+
+# Paleta atual (Claro/Escuro/Igual ao sistema — escolhido em "Meus
+# dados", guardado em configuracao.json). Lida uma vez aqui, na
+# abertura do programa; trocar de tema pede reabrir, pelo mesmo caminho
+# já usado para qualquer outra mudança em "Meus dados" (ver tema.py).
+_PALETA = tema.resolver_paleta(configuracao.carregar().get("tema", tema.SISTEMA))
+
+VERDE_PISCA = _PALETA["verde_pisca"]
 
 # Cor da linha selecionada. Cinza-ardósia de propósito: azul, laranja e
 # verde já significam coisas na coluna Situação, e mais uma cor com
 # significado atrapalharia a leitura.
-SELECAO_BG = "#4a5568"
-SELECAO_FG = "#ffffff"
+SELECAO_BG = _PALETA["selecao_bg"]
+SELECAO_FG = _PALETA["selecao_fg"]
 
-COR_FUNDO = "#f4f6f8"
-COR_CARTAO = "#ffffff"
-COR_TEXTO = "#1f2933"
-COR_SUAVE = "#6b7280"
-COR_DESTAQUE = "#2f6f4e"
+COR_FUNDO = _PALETA["fundo"]
+COR_CARTAO = _PALETA["cartao"]
+COR_CAMPO = _PALETA["campo"]
+COR_TEXTO = _PALETA["texto"]
+COR_SUAVE = _PALETA["suave"]
+COR_DESTAQUE = _PALETA["destaque"]
+COR_AZUL = _PALETA["azul"]
+COR_LARANJA = _PALETA["laranja"]
+COR_CINZA = _PALETA["cinza"]
+COR_SUGERIDA_FG = _PALETA["sugerida_fg"]
+COR_SUGERIDA_FG_SELECIONADA = _PALETA["sugerida_fg_selecionada"]
 
 
 # ---------------------------------------------------------------------------
@@ -953,9 +967,23 @@ class Janela(tk.Tk):
         # sobra de uma atualização anterior (o .exe antigo), se houver
         limpar_sobras()
 
+        # Job ids dos relógios que se re-agendam sozinhos enquanto o
+        # programa está aberto (_ler_eventos, _verificar_inicio_de_aula,
+        # _recarregar_silencioso, _procurar_atualizacao_diaria e
+        # _piscar_sugerida — ver cada um mais abaixo). Guardados aqui para
+        # poder cancelar todos de uma vez no <Destroy>, ligado logo a
+        # seguir: sem isto, um after() já agendado tenta rodar depois que
+        # a janela (e o interpretador Tcl inteiro, se for a raiz) já foi
+        # destruída, e dá "invalid command name" — um erro que nem passa
+        # pelo try/except de dentro do relógio, porque o Tcl nem chega a
+        # achar o comando pra chamar. Mesmo problema, mesmo remédio, do
+        # Caps Lock em configuracao.TelaDeEntrada._checar_caps_lock.
+        self._after_ids: dict[str, str] = {}
+        self.bind("<Destroy>", self._cancelar_relogios_pendentes, add="+")
+
         self._montar()
         self._dimensionar()
-        self.after(100, self._ler_eventos)
+        self._after_ids["ler_eventos"] = self.after(100, self._ler_eventos)
         self.protocol("WM_DELETE_WINDOW", self._fechar)
 
         # Procura versão nova em segundo plano. Numa thread separada
@@ -965,7 +993,12 @@ class Janela(tk.Tk):
         # Antes de qualquer coisa: os dados obrigatórios estão
         # configurados? Se não, avisar AGORA — de nada adianta carregar a
         # agenda se o registro vai sair com o nome ou a escola errados.
-        self.after(300, self._checar_configuracao)
+        # Mesmo sendo só uma vez (não um relógio que se reagenda), entra
+        # no mesmo _after_ids: fechar o programa antes dos 300ms passarem
+        # deixa este after() pendente do mesmo jeito, e dá o mesmo
+        # "invalid command name" se não for cancelado — visto testando de
+        # verdade.
+        self._after_ids["checar_configuracao"] = self.after(300, self._checar_configuracao)
 
         # carrega a agenda sozinho ao abrir
         self._definir_status("Carregando a agenda da semana...")
@@ -975,9 +1008,15 @@ class Janela(tk.Tk):
         ))
 
         # relógio do aviso de início de aula + reconsulta periódica
-        self.after(INTERVALO_CHECAGEM_MS, self._verificar_inicio_de_aula)
-        self.after(INTERVALO_RECONSULTA_MS, self._recarregar_silencioso)
-        self.after(INTERVALO_ATUALIZACAO_MS, self._procurar_atualizacao_diaria)
+        self._after_ids["verificar_inicio_de_aula"] = self.after(
+            INTERVALO_CHECAGEM_MS, self._verificar_inicio_de_aula
+        )
+        self._after_ids["recarregar_silencioso"] = self.after(
+            INTERVALO_RECONSULTA_MS, self._recarregar_silencioso
+        )
+        self._after_ids["procurar_atualizacao_diaria"] = self.after(
+            INTERVALO_ATUALIZACAO_MS, self._procurar_atualizacao_diaria
+        )
 
     # -- construção da tela -------------------------------------------------
     def _montar(self) -> None:
@@ -994,18 +1033,40 @@ class Janela(tk.Tk):
         estilo.configure("Titulo.TLabel", background=COR_FUNDO, font=("Segoe UI", 14, "bold"))
         estilo.configure("Sub.TLabel", background=COR_FUNDO, foreground=COR_SUAVE, font=("Segoe UI", 10))
         estilo.configure(
-            "Rodape.TLabel", background=COR_FUNDO, foreground="#9aa5b1", font=("Segoe UI", 8)
+            "Rodape.TLabel", background=COR_FUNDO, foreground=COR_CINZA, font=("Segoe UI", 8)
         )
         estilo.configure("Rodape.TButton", font=("Segoe UI", 8), padding=(6, 2))
         estilo.configure(
             "SubAviso.TLabel",
             background=COR_FUNDO,
-            foreground="#a1663a",
+            foreground=COR_LARANJA,
             font=("Segoe UI", 10, "bold"),
         )
         estilo.configure("Secao.TLabel", background=COR_CARTAO, font=("Segoe UI", 11, "bold"))
-        estilo.configure("TButton", font=("Segoe UI", 10), padding=8)
-        estilo.configure("Principal.TButton", font=("Segoe UI", 11, "bold"), padding=10)
+        # Sem cor nenhuma aqui, todo botão (Salvar, Cancelar, Preencher
+        # formulário, as próprias abas...) ficava no cinza-claro padrão do
+        # tema "clam" com letra preta — um retângulo claro em cima da tela
+        # escura, e o "Principal" nem se destacava direito no claro.
+        estilo.configure(
+            "TButton", font=("Segoe UI", 10), padding=8, background=COR_CARTAO, foreground=COR_TEXTO
+        )
+        estilo.map(
+            "TButton",
+            background=[("pressed", COR_CAMPO), ("active", COR_CAMPO)],
+            foreground=[("disabled", COR_SUAVE)],
+        )
+        estilo.configure(
+            "Principal.TButton",
+            font=("Segoe UI", 11, "bold"),
+            padding=10,
+            background=COR_DESTAQUE,
+            foreground="#ffffff",
+        )
+        estilo.map(
+            "Principal.TButton",
+            background=[("pressed", COR_DESTAQUE), ("active", COR_DESTAQUE)],
+            foreground=[("disabled", COR_SUAVE)],
+        )
         # Aba de recurso (Laboratório/Projetores/Tablets-Celular) que TEM
         # aula acontecendo agora mas não é a aba aberta na tela — mesma cor
         # de aviso usada em "SubAviso.TLabel". Sem isto, duas aulas
@@ -1013,15 +1074,64 @@ class Janela(tk.Tk):
         # trocar para a aba dela escondia a outra sem nenhum sinal de que
         # também precisava de atenção.
         estilo.configure(
-            "AvisoAba.TButton", font=("Segoe UI", 10, "bold"), foreground="#a1663a", padding=8
+            "AvisoAba.TButton",
+            font=("Segoe UI", 10, "bold"),
+            foreground=COR_LARANJA,
+            background=COR_CARTAO,
+            padding=8,
         )
-        estilo.configure("TCheckbutton", background=COR_CARTAO)
-        estilo.configure("Acoes.TCheckbutton", background=COR_FUNDO)
+        # Sem "foreground" aqui, o texto de QUALQUER Checkbutton/Radiobutton
+        # (turnos, tipo de atuação, tipo de registro, recursos utilizados,
+        # aparência...) ficava preto por padrão do tema "clam" — ilegível
+        # em cima de um cartão escuro. Achado testando o tema escuro de
+        # verdade (revisão adversarial confirmou com teste isolado).
+        estilo.configure("TCheckbutton", background=COR_CARTAO, foreground=COR_TEXTO)
+        estilo.configure("Acoes.TCheckbutton", background=COR_FUNDO, foreground=COR_TEXTO)
         # Faltava esta linha pros Radiobutton (Tipo de registro, Suporte,
         # Formação/Reunião) — sem ela o fundo deles ficava diferente do
         # cartão, dando a impressão de um retângulo cinza atrás do texto
         # ("como se estivesse sublinhado").
-        estilo.configure("TRadiobutton", background=COR_CARTAO)
+        estilo.configure("TRadiobutton", background=COR_CARTAO, foreground=COR_TEXTO)
+        # Passar o mouse por cima (estado "active") usa um fundo claro
+        # PRÓPRIO do tema "clam", que nunca foi sobrescrito acima — ficava
+        # uma pílula branca cobrindo todo o texto no tema escuro, tornando
+        # o item ilegível enquanto o mouse estava em cima dele. Achado
+        # testando o programa de verdade (bug relatado com prints).
+        estilo.map("TCheckbutton", background=[("active", COR_CARTAO)])
+        estilo.map("Acoes.TCheckbutton", background=[("active", COR_FUNDO)])
+        estilo.map("TRadiobutton", background=[("active", COR_CARTAO)])
+        # Campos de digitar (Entry/Combobox) e a tabela de aulas (Treeview)
+        # não seguiam o tema — no escuro, ficavam brancos por dentro de um
+        # tema escuro por fora, e a tabela nem tinha fundo/letra próprios,
+        # sempre a cor padrão do "clam" (branco). Sem isto, trocar pra
+        # escuro deixava metade da tela ainda clara.
+        estilo.configure(
+            "TEntry", fieldbackground=COR_CAMPO, foreground=COR_TEXTO, insertcolor=COR_TEXTO
+        )
+        estilo.configure("TCombobox", fieldbackground=COR_CAMPO, foreground=COR_TEXTO)
+        estilo.map(
+            "TCombobox",
+            fieldbackground=[("readonly", COR_CAMPO)],
+            foreground=[("readonly", COR_TEXTO)],
+            selectbackground=[("readonly", COR_CAMPO)],
+            selectforeground=[("readonly", COR_TEXTO)],
+        )
+        estilo.configure(
+            "Treeview", background=COR_CARTAO, fieldbackground=COR_CARTAO, foreground=COR_TEXTO
+        )
+        estilo.configure(
+            "Treeview.Heading", background=COR_FUNDO, foreground=COR_TEXTO, relief="flat"
+        )
+        estilo.map("Treeview.Heading", background=[("active", COR_FUNDO)])
+        # Barra de rolagem: sem isto ficava sempre no cinza-claro padrão
+        # do tema "clam", um retângulo claro em cima de um fundo escuro.
+        estilo.configure(
+            "TScrollbar",
+            background=COR_CARTAO,
+            troughcolor=COR_FUNDO,
+            bordercolor=COR_FUNDO,
+            arrowcolor=COR_TEXTO,
+        )
         estilo.map(
             "Treeview",
             background=[("selected", SELECAO_BG)],
@@ -1176,12 +1286,14 @@ class Janela(tk.Tk):
         # Uma cor por situação. Antes "Já enviada" e "Ainda não ocorreu"
         # dividiam o mesmo cinza, então não dava para distinguir de relance
         # o que já foi resolvido do que ainda nem aconteceu.
-        self.tabela.tag_configure("enviada", foreground="#1d5fa8")        # azul
-        self.tabela.tag_configure("nao_realizada", foreground="#a1663a")  # laranja
-        self.tabela.tag_configure("futura", foreground="#9aa5b1")         # cinza
-        self.tabela.tag_configure("pendente", foreground="#1f2933")       # escuro
-        self.tabela.tag_configure("sugerida", background="#dff3e7", foreground="#14532d")
-        self.after(INTERVALO_PISCA_MS, self._piscar_sugerida)
+        self.tabela.tag_configure("enviada", foreground=COR_AZUL)
+        self.tabela.tag_configure("nao_realizada", foreground=COR_LARANJA)
+        self.tabela.tag_configure("futura", foreground=COR_CINZA)
+        self.tabela.tag_configure("pendente", foreground=COR_TEXTO)
+        self.tabela.tag_configure(
+            "sugerida", background=VERDE_PISCA[0], foreground=COR_SUGERIDA_FG
+        )
+        self._after_ids["piscar_sugerida"] = self.after(INTERVALO_PISCA_MS, self._piscar_sugerida)
 
         # --- tipo de registro (só aparece para Projetores/Tablets-Celular) ---
         # Um agendamento de Laboratório sempre foi só uma coisa: aula com
@@ -1266,8 +1378,9 @@ class Janela(tk.Tk):
             font=("Segoe UI", 10),
             relief="solid",
             borderwidth=1,
-            background="#ffffff",
+            background=COR_CAMPO,
             foreground=COR_TEXTO,
+            insertbackground=COR_TEXTO,
         )
         self.campo_conteudo.grid(row=5, column=0, columnspan=4, sticky="ew")
         cartao_dados.columnconfigure(3, weight=1)
@@ -1510,8 +1623,9 @@ class Janela(tk.Tk):
             height=4,
             wrap="word",
             relief="flat",
-            background="#fbfcfd",
+            background=COR_CAMPO,
             foreground=COR_TEXTO,
+            insertbackground=COR_TEXTO,
             font=("Consolas", 10),
         )
         self._barra_resumo = ttk.Scrollbar(
@@ -1760,7 +1874,9 @@ class Janela(tk.Tk):
             self.deiconify()
             self.lift()
             self.attributes("-topmost", True)
-            self.after(400, lambda: self.attributes("-topmost", False))
+            self._after_ids["topmost"] = self.after(
+                400, lambda: self.attributes("-topmost", False)
+            )
             self.focus_force()
         except Exception:
             pass  # se o gerenciador de janelas não deixar, segue a vida
@@ -1854,7 +1970,9 @@ class Janela(tk.Tk):
         proximo = INTERVALO_RECONSULTA_MS if ocupado else INTERVALO_ATUALIZACAO_MS
         if not ocupado:
             threading.Thread(target=self._procurar_atualizacao, daemon=True).start()
-        self.after(proximo, self._procurar_atualizacao_diaria)
+        self._after_ids["procurar_atualizacao_diaria"] = self.after(
+            proximo, self._procurar_atualizacao_diaria
+        )
 
     def _procurar_atualizacao_agora(self) -> None:
         """Botão 'Procurar atualização' — a consulta vai para outra thread."""
@@ -1998,7 +2116,7 @@ class Janela(tk.Tk):
                 cor = VERDE_PISCA[1 if self._pisca_ligado else 0]
                 self.tag_sugerida_cor = cor
                 self.tabela.tag_configure(
-                    "sugerida", background=cor, foreground="#14532d"
+                    "sugerida", background=cor, foreground=COR_SUGERIDA_FG
                 )
 
                 # A linha selecionada é pintada pela cor de seleção, que
@@ -2016,7 +2134,7 @@ class Janela(tk.Tk):
                     self._estilo.map(
                         "Treeview",
                         background=[("selected", cor)],
-                        foreground=[("selected", "#0b3d26")],
+                        foreground=[("selected", COR_SUGERIDA_FG_SELECIONADA)],
                     )
                 else:
                     self._estilo.map(
@@ -2026,7 +2144,7 @@ class Janela(tk.Tk):
                     )
         except Exception:
             return  # janela fechando — para o ciclo
-        self.after(INTERVALO_PISCA_MS, self._piscar_sugerida)
+        self._after_ids["piscar_sugerida"] = self.after(INTERVALO_PISCA_MS, self._piscar_sugerida)
 
     def _piscar_na_barra(self) -> None:
         """
@@ -2122,7 +2240,9 @@ class Janela(tk.Tk):
         except Exception:
             pass  # nunca deixar o relógio morrer por causa de um erro pontual
         finally:
-            self.after(INTERVALO_CHECAGEM_MS, self._verificar_inicio_de_aula)
+            self._after_ids["verificar_inicio_de_aula"] = self.after(
+                INTERVALO_CHECAGEM_MS, self._verificar_inicio_de_aula
+            )
 
     def _avisar_aula_comecou(self, grupo) -> None:
         self._piscar_na_barra()
@@ -2171,7 +2291,9 @@ class Janela(tk.Tk):
             "carregar", True, self.orientador["cpf"], self.orientador["senha"],
             self.orientador.get("escola", ""),
         ))
-        self.after(INTERVALO_RECONSULTA_MS, self._recarregar_silencioso)
+        self._after_ids["recarregar_silencioso"] = self.after(
+            INTERVALO_RECONSULTA_MS, self._recarregar_silencioso
+        )
 
     def _escrever(self, texto: str) -> None:
         self.texto_resumo.configure(state="normal")
@@ -3093,6 +3215,30 @@ class Janela(tk.Tk):
         self.comandos.put(("reiniciar",))
         self._preencher_tabela()
 
+    def _cancelar_relogios_pendentes(self, evento) -> None:
+        """
+        Cancela todo after() ainda pendente assim que a janela é
+        destruída — de QUALQUER jeito que isso aconteça (X, _fechar(), ou
+        um destroy() direto, como num script de teste).
+
+        Ligada em <Destroy> (ver __init__) em vez de só confiar em
+        winfo_exists() dentro de cada relógio: uma checagem dessas não
+        ajuda aqui, porque o Tcl falha ao tentar CHAMAR o callback (não
+        dentro dele) depois que o interpretador/janela já sumiu — daí o
+        "invalid command name ..._ler_eventos" visto testando de verdade.
+        Cancelando o job aqui, o Tcl nem chega a tentar. Mesmo problema,
+        mesmo remédio, do Caps Lock em
+        configuracao.TelaDeEntrada._checar_caps_lock.
+        """
+        if evento.widget is not self:
+            return  # <Destroy> também dispara para cada widget filho
+        for job_id in self._after_ids.values():
+            try:
+                self.after_cancel(job_id)
+            except Exception:
+                pass
+        self._after_ids.clear()
+
     def _fechar(self) -> None:
         # Fechar no meio de um envio é o pior momento possível: se o
         # clique em "Enviar" já tiver dado certo do lado da SED e o
@@ -3167,7 +3313,7 @@ class Janela(tk.Tk):
                 except Exception:
                     traceback.print_exc()
         finally:
-            self.after(100, self._ler_eventos)
+            self._after_ids["ler_eventos"] = self.after(100, self._ler_eventos)
 
     def _processar_evento(self, evento) -> None:
         tipo = evento[0]

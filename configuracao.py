@@ -41,6 +41,7 @@ import re
 import tkinter as tk
 from tkinter import messagebox, ttk
 
+import tema
 from caminhos import caminho_de_dados
 
 ARQUIVO = "configuracao.json"
@@ -53,11 +54,6 @@ TURNOS = ["Matutino", "Vespertino", "Noturno"]
 # professor (ou em branco, fácil de não notar): força a pessoa a
 # reparar e escolher a dela de verdade antes de salvar.
 PLACEHOLDER_ESCOLA = "Selecione uma escola"
-
-COR_FUNDO = "#eef1f5"
-COR_CARTAO = "#ffffff"
-COR_TEXTO = "#1f2933"
-COR_SUAVE = "#6b7684"
 
 
 # ---------------------------------------------------------------------------
@@ -92,6 +88,20 @@ def carregar() -> dict:
 def salvar(dados: dict) -> None:
     with open(caminho_de_dados(ARQUIVO), "w", encoding="utf-8") as f:
         json.dump(dados, f, ensure_ascii=False, indent=2)
+
+
+# Paleta atual (Claro/Escuro/Igual ao sistema — escolhido em "Meus
+# dados" da tela principal, guardado aqui no mesmo configuracao.json).
+# Lida uma vez na abertura desta tela; ver tema.py.
+_PALETA = tema.resolver_paleta(carregar().get("tema", tema.SISTEMA))
+
+COR_FUNDO = _PALETA["fundo_dialogo"]
+COR_CARTAO = _PALETA["cartao"]
+COR_CAMPO = _PALETA["campo"]
+COR_TEXTO = _PALETA["texto"]
+COR_SUAVE = _PALETA["suave"]
+COR_LARANJA = _PALETA["laranja"]
+COR_DESTAQUE = _PALETA["destaque"]
 
 
 def esta_configurado() -> bool:
@@ -145,20 +155,69 @@ def _estilizar(janela) -> None:
     estilo.configure(
         "Sub.TLabel", background=COR_FUNDO, foreground=COR_SUAVE, font=("Segoe UI", 10)
     )
-    estilo.configure("TCheckbutton", background=COR_CARTAO)
-    estilo.configure("TRadiobutton", background=COR_CARTAO)
+    # Sem "foreground" aqui, o texto de todo Checkbutton/Radiobutton
+    # (turnos, tipo de atuação, aparência...) ficava preto por padrão do
+    # tema "clam" — ilegível em cima de um cartão escuro.
+    estilo.configure("TCheckbutton", background=COR_CARTAO, foreground=COR_TEXTO)
+    estilo.configure("TRadiobutton", background=COR_CARTAO, foreground=COR_TEXTO)
+    # Passar o mouse por cima (estado "active") usa um fundo claro PRÓPRIO
+    # do tema "clam", que nunca foi sobrescrito acima — ficava uma pílula
+    # branca cobrindo todo o texto no tema escuro, tornando o item (ex.:
+    # "Aparência", "Você é orientador de:") ilegível enquanto o mouse
+    # estava em cima. Achado testando o programa de verdade (bug relatado
+    # com prints).
+    estilo.map("TCheckbutton", background=[("active", COR_CARTAO)])
+    estilo.map("TRadiobutton", background=[("active", COR_CARTAO)])
+    # Traço entre seções do formulário — sem isto usa a cor de linha fixa
+    # do tema "clam", que não acompanha claro/escuro como o resto do cartão.
+    estilo.configure("TSeparator", background=COR_SUAVE)
+    # Campos de digitar (Entry/Combobox) não seguiam o tema — no escuro,
+    # ficavam brancos por dentro de um tema escuro por fora (mesma
+    # correção feita em app.py).
+    estilo.configure(
+        "TEntry", fieldbackground=COR_CAMPO, foreground=COR_TEXTO, insertcolor=COR_TEXTO
+    )
+    estilo.configure("TCombobox", fieldbackground=COR_CAMPO, foreground=COR_TEXTO)
+    estilo.map(
+        "TCombobox",
+        fieldbackground=[("readonly", COR_CAMPO)],
+        foreground=[("readonly", COR_TEXTO)],
+        selectbackground=[("readonly", COR_CAMPO)],
+        selectforeground=[("readonly", COR_TEXTO)],
+    )
     # Cor do aviso "SELECIONE UMA ESCOLA" dentro do combobox — mesma cor
     # do texto de ajuda ("Suave.TLabel") logo abaixo, pra ficar claro que
     # é aviso e não um nome de escola de verdade já escolhido.
     estilo.configure("Placeholder.TCombobox", foreground=COR_SUAVE)
     estilo.map("Placeholder.TCombobox", foreground=[("readonly", COR_SUAVE)])
-    estilo.configure("TButton", font=("Segoe UI", 10), padding=8)
-    estilo.configure("Principal.TButton", font=("Segoe UI", 11, "bold"), padding=10)
+    # Sem cor nenhuma aqui, todo botão (Salvar, Cancelar, Entrar,
+    # Cadastrar/Remover professor(a)...) ficava no cinza-claro padrão do
+    # tema "clam" com letra preta — mesma correção feita em app.py.
+    estilo.configure(
+        "TButton", font=("Segoe UI", 10), padding=8, background=COR_CARTAO, foreground=COR_TEXTO
+    )
+    estilo.map(
+        "TButton",
+        background=[("pressed", COR_CAMPO), ("active", COR_CAMPO)],
+        foreground=[("disabled", COR_SUAVE)],
+    )
+    estilo.configure(
+        "Principal.TButton",
+        font=("Segoe UI", 11, "bold"),
+        padding=10,
+        background=COR_DESTAQUE,
+        foreground="#ffffff",
+    )
+    estilo.map(
+        "Principal.TButton",
+        background=[("pressed", COR_DESTAQUE), ("active", COR_DESTAQUE)],
+        foreground=[("disabled", COR_SUAVE)],
+    )
     # Mesma cor de aviso usada no resto do programa (app.py: "Aula não
     # realizada", abas com sugestão pendente) — pra quem já usa o
     # programa reconhecer de cara que é um alerta, não um texto comum.
     estilo.configure(
-        "Aviso.TLabel", background=COR_CARTAO, foreground="#a1663a",
+        "Aviso.TLabel", background=COR_CARTAO, foreground=COR_LARANJA,
         font=("Segoe UI", 9, "bold"),
     )
 
@@ -440,6 +499,26 @@ class TelaDeCadastro(_Dialogo):
             )
         linha += 1
 
+        # Aparência: preferência do COMPUTADOR (ver tema.py), não deste
+        # professor — por isso vem de self.dados (o configuracao.json
+        # inteiro), não de self.professor. "Igual ao sistema" nunca vem
+        # pré-marcado por padrão sozinho por acaso: é só o valor salvo,
+        # ou "sistema" mesmo se nunca foi escolhido nada ainda.
+        ttk.Label(cartao, text="Aparência:", style="Cartao.TLabel").grid(
+            row=linha, column=0, sticky="w", pady=(0, 12)
+        )
+        caixa_tema = ttk.Frame(cartao, style="Cartao.TFrame")
+        caixa_tema.grid(row=linha, column=1, sticky="w", padx=(10, 0), pady=(0, 12))
+        tema_salvo = self.dados.get("tema")
+        self.var_tema = tk.StringVar(
+            value=tema_salvo if tema_salvo in tema.OPCOES else tema.SISTEMA
+        )
+        for valor in tema.OPCOES:
+            ttk.Radiobutton(
+                caixa_tema, text=tema.ROTULOS[valor], value=valor, variable=self.var_tema
+            ).pack(side="left", padx=(0, 16))
+        linha += 1
+
         rodape = ttk.Frame(j, padding=(24, 0, 24, 18))
         rodape.pack(fill="x")
         ttk.Button(rodape, text="Salvar", style="Principal.TButton", command=self._salvar).pack(
@@ -507,6 +586,7 @@ class TelaDeCadastro(_Dialogo):
         # a escola de outro professor testado por último.
         dados.setdefault("escola", escola)
         dados["regional"] = self.campo_regional.get().strip() or "BLUMENAU"
+        dados["tema"] = self.var_tema.get()
         lista = list(dados.get("professores") or [])
         for i, p in enumerate(lista):          # mesmo CPF = edição, não cadastro novo
             if p.get("cpf") == professor["cpf"]:

@@ -10,6 +10,17 @@ seção `## <número>` com o que mudou. O resto acontece sozinho.
 
 ---
 
+## 1.7.2
+
+- **Modo claro, escuro, ou igual ao do computador.** Em "Meus dados" tem
+  agora uma opção de "Aparência" com três escolhas: Claro, Escuro, ou
+  Igual ao sistema (segue o que o Windows já está usando). Vale pra tela
+  principal e pras telas de entrar/cadastrar.
+- Corrigido: no tema escuro, passar o mouse por cima de uma opção
+  (Tecnologias Educacionais/Laboratório Maker, Aparência, "Ver o
+  formulário sendo preenchido"...) deixava o texto invisível por cima de
+  um fundo claro. Agora o texto continua legível com o mouse em cima.
+
 ## 1.7.1
 
 - **Aviso de Caps Lock na tela de entrar.** Como o campo de senha vem
