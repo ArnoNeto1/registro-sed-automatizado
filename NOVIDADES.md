@@ -10,6 +10,15 @@ seção `## <número>` com o que mudou. O resto acontece sozinho.
 
 ---
 
+## 1.7.4
+
+- Corrigido: às vezes, depois de uma atualização automática, o programa
+  mostrava uma tela de erro do navegador ("Security validation
+  failure...") e não reabria sozinho — era preciso abrir na mão de novo.
+  Agora o programa dá uma folga de alguns segundos antes de carregar a
+  agenda pela primeira vez, logo depois de reabrir sozinho, evitando a
+  corrida que causava o erro.
+
 ## 1.7.3
 
 - Corrigido: a caixa de "Nova versão disponível" mostrava o texto desta

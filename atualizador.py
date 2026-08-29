@@ -49,6 +49,7 @@ from caminhos import empacotado, pasta_do_programa, recurso
 PASTA = str(pasta_do_programa())
 ARQUIVO_VERSAO = os.path.join(PASTA, "VERSAO.txt")
 PASTA_BACKUP = os.path.join(PASTA, "backup_versao_anterior")
+ARQUIVO_MARCADOR_REINICIO = os.path.join(PASTA, "_reiniciado_apos_atualizacao.marcador")
 
 # Só arquivos com estas extensões são substituídos. Note que .json está
 # fora da lista de propósito: todo arquivo de estado do programa é .json,
@@ -211,26 +212,62 @@ def reiniciar() -> None:
     entrada/saída que o Windows entrega nesse modo não valem nada para
     herdar (era pra isso que existiam os três DEVNULL de antes).
 
-    O TIME.SLEEP ABAIXO é sobre um problema DIFERENTE, ainda não
-    totalmente explicado: uma vez, logo depois de uma atualização
-    automática, o programa novo mostrou "Security validation failure:
-    parent process has different executable!" ao abrir o navegador —
-    mensagem do PRÓPRIO Chromium (Playwright), não deste programa.
-    Reabrir na mão, do jeito normal, funcionou sem problema — ou seja,
-    não é reprodutível à vontade, e pode até ser algo fora do nosso
-    controle (antivírus, por exemplo). A suspeita mais forte: este
-    processo (o antigo) morre quase no mesmo instante em que abre o
-    novo, e o Windows pode reaproveitar o PID dele quase na hora — se o
-    Chromium checa alguma coisa sobre "quem é meu processo avô" bem
-    cedo, pode achar um PID já reaproveitado por outro programa
-    qualquer. Este sleep NÃO tem certeza de resolver — é só folga
-    barata para reduzir a chance da corrida, mantendo o PID antigo vivo
-    mais um pouco.
+    O TIME.SLEEP ABAIXO é sobre um problema DIFERENTE, que JÁ SE REPETIU:
+    logo depois de uma atualização automática, o programa novo mostra
+    "Security validation failure: parent process has different
+    executable!" ao abrir o navegador — mensagem do PRÓPRIO Chromium
+    (Playwright), não deste programa, e o programa não volta sozinho (é
+    preciso abrir na mão de novo). A suspeita mais forte: este processo
+    (o antigo) morre quase no mesmo instante em que o novo abre, e o
+    Windows reaproveita o PID dele rápido demais — o Chromium checa
+    quem é o processo pai bem cedo, e pode achar um PID já reaproveitado
+    por outro programa qualquer. Este sleep sozinho NÃO resolve — o
+    programa novo carrega a agenda automaticamente ao abrir (primeiro
+    acesso ao navegador dele), o que pode acontecer bem rápido, antes
+    destes 2 segundos passarem. Por isso, além do sleep, um arquivo-
+    marcador avisa o programa novo para dar uma folga extra ANTES desse
+    primeiro acesso (ver `reiniciou_pos_atualizacao_ha_pouco` e o uso
+    dela em app.py) — essa folga é o que dá mais tempo de sobra para o
+    PID antigo de fato sumir do Windows antes do navegador novo nascer.
     """
     if not empacotado():
         return
+    try:
+        with open(ARQUIVO_MARCADOR_REINICIO, "w", encoding="utf-8") as f:
+            f.write(str(time.time()))
+    except OSError:
+        pass  # sem o marcador, só perde a folga extra — não impede reabrir
     os.startfile(sys.executable, cwd=str(pasta_do_programa()))
     time.sleep(2)
+
+
+def reiniciou_pos_atualizacao_ha_pouco() -> bool:
+    """
+    True só logo depois deste MESMO programa ter sido reaberto sozinho
+    por `reiniciar()` — verificado com um arquivo-marcador (não uma
+    variável de ambiente, porque `os.startfile` nem sempre garante que o
+    processo novo herde o ambiente de quem chamou).
+
+    CONSOME o marcador (apaga do disco) na primeira leitura — então só
+    vale uma vez por reinício, e uma leitura futura sem reinício nenhum
+    de permeio (abrir o programa do jeito normal, pelo atalho) volta a
+    dar False.
+
+    Um limite de 60 segundos evita que um marcador esquecido (o programa
+    caiu antes de consumir, por exemplo) fique fazendo TODA abertura
+    seguinte esperar à toa, para sempre.
+    """
+    try:
+        with open(ARQUIVO_MARCADOR_REINICIO, "r", encoding="utf-8") as f:
+            quando = float(f.read().strip())
+    except (OSError, ValueError):
+        return False
+    finally:
+        try:
+            os.remove(ARQUIVO_MARCADOR_REINICIO)
+        except OSError:
+            pass
+    return (time.time() - quando) < 60
 
 
 def _arquivos_do_pacote(caminho_zip: str) -> dict:

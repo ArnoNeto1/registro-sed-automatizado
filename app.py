@@ -1032,11 +1032,29 @@ class Janela(tk.Tk):
         self._after_ids["checar_configuracao"] = self.after(300, self._checar_configuracao)
 
         # carrega a agenda sozinho ao abrir
-        self._definir_status("Carregando a agenda da semana...")
-        self.comandos.put((
-            "carregar", False, self.orientador["cpf"], self.orientador["senha"],
-            self.orientador.get("escola", ""),
-        ))
+        def _enfileirar_carregamento_inicial() -> None:
+            self._definir_status("Carregando a agenda da semana...")
+            self.comandos.put((
+                "carregar", False, self.orientador["cpf"], self.orientador["senha"],
+                self.orientador.get("escola", ""),
+            ))
+
+        if atualizador.reiniciou_pos_atualizacao_ha_pouco():
+            # Acabou de reabrir sozinho depois de uma atualização
+            # automática — dar uma folga ANTES do primeiro acesso ao
+            # navegador (que este carregamento dispara) reduz a chance
+            # do erro "Security validation failure: parent process has
+            # different executable!" do Chromium, visto quando o
+            # processo antigo ainda não tinha sumido de vez do Windows
+            # na hora que o navegador novo verificava quem é o pai dele
+            # (ver atualizador.reiniciar()). A janela aparece na hora,
+            # normalmente — só o carregamento da agenda é adiado.
+            self._definir_status("Só um instante, terminando de reiniciar...")
+            self._after_ids["retomar_apos_atualizacao"] = self.after(
+                5000, _enfileirar_carregamento_inicial
+            )
+        else:
+            _enfileirar_carregamento_inicial()
 
         # relógio do aviso de início de aula + reconsulta periódica
         self._after_ids["verificar_inicio_de_aula"] = self.after(
