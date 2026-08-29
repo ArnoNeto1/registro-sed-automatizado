@@ -1,7 +1,7 @@
 {
-  "versao": "1.7.0",
-  "exe": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v1.7.0/Registro-SED.exe",
-  "instalador": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v1.7.0/Registro-SED-Instalador.exe",
+  "versao": "1.7.1",
+  "exe": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v1.7.1/Registro-SED.exe",
+  "instalador": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v1.7.1/Registro-SED-Instalador.exe",
   "zip": "https://github.com/ArnoNeto1/registro-sed-automatizado/archive/refs/heads/main.zip",
-  "notas": "- **O programa agora preenche os 4 tipos de registro do formulário da\n  SED, não só \"Atividade/Aula com estudantes\".** Numa aula de Projetor\n  ou Tablets/Celular, o programa pergunta se foi mesmo uma aula com\n  estudantes ou se foi só instalar/dar suporte a um equipamento — os\n  campos mudam na hora, conforme a resposta. E apareceram duas abas\n  novas, sempre disponíveis do lado direito da tela: **Manutenção** (pra\n  quando você conserta ou organiza algo do laboratório) e **Formação/\n  Reunião** (pra quando você participa de uma formação ou reunião) —\n  essas duas nem precisam de aula marcada na agenda, é só abrir a aba e\n  preencher.\n- Pequeno ajuste visual: as opções de múltipla escolha (os círculos e\n  quadrados de marcar) ficaram com o mesmo fundo do resto da tela — antes\n  aparecia um retângulo cinza atrás do texto de cada opção."
+  "notas": "- **Aviso de Caps Lock na tela de entrar.** Como o campo de senha vem\n  escondido, não dava pra perceber que o Caps Lock estava ligado antes\n  de tentar entrar e levar um \"senha incorreta\" sem entender por quê.\n  Agora aparece um aviso na hora.\n- Corrigido: depois de selecionar uma aula e trocar de aba, os dados da\n  aula anterior (dia, etapa, conteúdo) ficavam aparecendo por engano em\n  \"Dados do registro\", mesmo sem nenhuma aula selecionada na aba nova.\n- A ordem das abas mudou: Tablets/Celular agora vem antes de Projetores.\n- Deixamos mais confiável o reinício automático depois de baixar uma\n  atualização.\n- Revisão geral de texto: alguns pontos onde só aparecia a forma\n  masculina (\"professor\") agora mostram \"professor(a)\", e corrigimos\n  alguns erros de digitação espalhados pela tela."
 }
