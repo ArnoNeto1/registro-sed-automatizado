@@ -63,9 +63,10 @@ ajustam sozinhos para o tipo escolhido.
 
 Os dois formatos de instalação (portátil e instalador) se atualizam
 sozinhos quando sai versão nova, e compartilham os mesmos dados — dá para
-trocar de um para o outro sem perder nada. Depois de instalado, o arquivo
-**`COMECE AQUI.txt`** (vem junto) tem mais detalhes: como dividir o
-computador com outro professor do laboratório, perguntas frequentes.
+trocar de um para o outro sem perder nada. O arquivo
+[**`COMECE AQUI.txt`**](COMECE%20AQUI.txt), aqui no repositório, tem mais
+detalhes: como dividir o computador com outro professor do laboratório,
+perguntas frequentes.
 
 ## Limitações conhecidas
 

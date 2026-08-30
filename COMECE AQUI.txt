@@ -8,9 +8,6 @@ SED — parando antes de enviar, para você conferir.
 
 Ele NUNCA envia nada sem você clicar em "Enviar para a SED".
 
-Leia o PDF "Registro SED Automatizado.pdf" se quiser entender melhor o
-que ele faz.
-
 
 -----------------------------------------------------------------------
 INSTALAR (uns 3 minutos, uma vez só)
@@ -123,9 +120,10 @@ PERGUNTAS QUE TODO MUNDO FAZ
     Ele usa o Microsoft Edge, que já vem no Windows.
 
 "Como recebo as correções?"
-    Sozinho. Quando abrir o programa e houver versão nova, ele avisa e
-    pergunta se pode atualizar. Você clica em sim, ele se troca e reabre.
-    Seus dados e seu histórico ficam intactos.
+    Quase sozinho. Quando abrir o programa e houver versão nova, ele
+    avisa e pergunta se pode atualizar. Você clica em sim, ele baixa a
+    correção e pede pra você fechar e abrir de novo — um clique a mais,
+    só isso. Seus dados e seu histórico ficam intactos.
 
 "Ele pode enviar registro errado sem eu ver?"
     Não. Ele para na última página e mostra tudo o que vai mandar. O
