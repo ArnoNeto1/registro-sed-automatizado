@@ -1,7 +1,7 @@
 {
-  "versao": "1.7.5",
-  "exe": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v1.7.5/Registro-SED.exe",
-  "instalador": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v1.7.5/Registro-SED-Instalador.exe",
+  "versao": "1.7.6",
+  "exe": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v1.7.6/Registro-SED.exe",
+  "instalador": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v1.7.6/Registro-SED-Instalador.exe",
   "zip": "https://github.com/ArnoNeto1/registro-sed-automatizado/archive/refs/heads/main.zip",
-  "notas": "- **Nova opção: registrar uma aula sem agendamento.** Às vezes o\n  laboratório (ou tablet/projetor) é usado sem reserva na agenda do\n  NTE — agora dá pra registrar do mesmo jeito. Um link novo aparece\n  embaixo da lista de aulas: \"Não achou a sua aula na lista acima?\n  Registrar aula sem agendamento\".\n- Corrigido: as colunas da tabela de aulas (\"Dia e horário\",\n  \"Professor(a)\"...) ficavam sem nenhuma linha separando uma da outra.\n- Corrigido: passar o mouse sobre o campo \"Conteúdo aplicado\" e tentar\n  rolar a tela, com pouco texto ali dentro, não fazia nada.\n- Ajustes para o programa respeitar melhor a escala de tela do Windows\n  (125%/150%)."
+  "notas": "- Corrigido: às vezes, depois de reabrir sozinho (atualização\n  automática, ou salvar em \"Meus dados\"), o programa mostrava uma tela\n  de erro técnico (\"Can't find a usable init.tcl\") e não voltava —\n  precisava abrir na mão de novo. Agora, quando isso acontece, o próprio\n  programa se reabre sozinho de verdade (não só tenta de novo por\n  dentro) — que era exatamente o que já resolvia na mão."
 }
