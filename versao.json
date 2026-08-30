@@ -1,7 +1,7 @@
 {
-  "versao": "1.7.7",
-  "exe": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v1.7.7/Registro-SED.exe",
-  "instalador": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v1.7.7/Registro-SED-Instalador.exe",
+  "versao": "1.7.8",
+  "exe": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v1.7.8/Registro-SED.exe",
+  "instalador": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v1.7.8/Registro-SED-Instalador.exe",
   "zip": "https://github.com/ArnoNeto1/registro-sed-automatizado/archive/refs/heads/main.zip",
-  "notas": "- **Mudança: o programa não tenta mais se reabrir sozinho** depois de\n  atualizar ou de salvar em \"Meus dados\" — agora ele pede pra você\n  fechar e abrir de novo na mão. Dá um clique a mais, mas é bem mais\n  confiável: reabrir rápido demais era a causa de telas de erro\n  técnico (\"Security validation failure\", \"Can't find a usable\n  init.tcl\", \"Failed to start embedded python interpreter\") que só\n  sumiam reabrindo na mão mesmo — agora o programa já pede isso direto,\n  sem passar pela tela de erro no meio."
+  "notas": "- Ajuste interno para o Windows confiar mais no programa: o `.exe`\n  deixou de vir comprimido de um jeito que fazia alguns antivírus\n  desconfiarem à toa (a mesma técnica de compressão é usada por vírus\n  para se esconder), e agora mostra corretamente o nome, a empresa e a\n  versão do programa nas propriedades do arquivo do Windows. Nenhuma\n  mudança visível na tela do programa."
 }
