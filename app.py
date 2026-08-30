@@ -1075,29 +1075,11 @@ class Janela(tk.Tk):
         self._after_ids["checar_configuracao"] = self.after(300, self._checar_configuracao)
 
         # carrega a agenda sozinho ao abrir
-        def _enfileirar_carregamento_inicial() -> None:
-            self._definir_status("Carregando a agenda da semana...")
-            self.comandos.put((
-                "carregar", False, self.orientador["cpf"], self.orientador["senha"],
-                self.orientador.get("escola", ""),
-            ))
-
-        if atualizador.reiniciou_pos_atualizacao_ha_pouco():
-            # Acabou de reabrir sozinho depois de uma atualização
-            # automática — dar uma folga ANTES do primeiro acesso ao
-            # navegador (que este carregamento dispara) reduz a chance
-            # do erro "Security validation failure: parent process has
-            # different executable!" do Chromium, visto quando o
-            # processo antigo ainda não tinha sumido de vez do Windows
-            # na hora que o navegador novo verificava quem é o pai dele
-            # (ver atualizador.reiniciar()). A janela aparece na hora,
-            # normalmente — só o carregamento da agenda é adiado.
-            self._definir_status("Só um instante, terminando de reiniciar...")
-            self._after_ids["retomar_apos_atualizacao"] = self.after(
-                5000, _enfileirar_carregamento_inicial
-            )
-        else:
-            _enfileirar_carregamento_inicial()
+        self._definir_status("Carregando a agenda da semana...")
+        self.comandos.put((
+            "carregar", False, self.orientador["cpf"], self.orientador["senha"],
+            self.orientador.get("escola", ""),
+        ))
 
         # relógio do aviso de início de aula + reconsulta periódica
         self._after_ids["verificar_inicio_de_aula"] = self.after(
@@ -2160,51 +2142,35 @@ class Janela(tk.Tk):
                 f"A atualização não foi aplicada e nada mudou no programa.\n\n{exc}",
             )
             return
-        # Como .exe, o programa se reabre sozinho na versão nova — não faz
-        # sentido pedir para a pessoa fechar e abrir se ele pode fazer isso
-        # melhor do que ela (e sem esquecer).
+        # NÃO reabre mais sozinho (nem como .exe): reabrir rápido demais —
+        # o processo antigo morrendo quase no mesmo instante em que o novo
+        # nasce — já deu pelo menos três erros diferentes, vistos ao vivo
+        # com print de tela, nenhum consertável por dentro do programa
+        # porque acontecem ANTES ou DURANTE a inicialização do Python/Tcl
+        # (antes de qualquer código nosso rodar): "Security validation
+        # failure" do Chromium, "Can't find a usable init.tcl" e até
+        # "Failed to start embedded python interpreter" — este nem chega a
+        # ser uma exceção Python, é o PRÓPRIO INTERPRETADOR que não
+        # nasceu. Pedir para a pessoa fechar e abrir na mão é mais chato,
+        # mas sempre funcionou, porque dá um tempo natural entre o
+        # processo antigo sumir de vez e o novo começar.
         if empacotado():
-            messagebox.showinfo(
-                "Atualizado",
-                f"Pronto — agora na versão {info['versao']}.\n\n"
-                "O programa vai fechar e abrir de novo sozinho.",
-            )
-            # NESTA ORDEM: fecha (e espera) o Chrome da sessão persistente
-            # ANTES de abrir a versão nova — não depois. Abrir a versão
-            # nova primeiro e só fechar o Chrome antigo em seguida dava
-            # tempo de sobra para as duas coisas se atravessarem: a versão
-            # nova podia tentar abrir o MESMO browser_profile antes do
-            # Chrome antigo ter soltado a trava dele, e falhava com um
-            # erro que só ia embora fechando e abrindo de novo na mão.
+            # Fecha o Chrome da sessão persistente ANTES de avisar: sem
+            # isto, uma reabertura rápida da pessoa podia esbarrar na
+            # trava (SingletonLock) que ele deixa no browser_profile até
+            # terminar de fechar de verdade.
             self._encerrar_worker()
-            try:
-                atualizador.reiniciar()
-            except Exception as erro:
-                # O motivo vai junto: sem ele, "não consegui reabrir" é
-                # indistinguível de qualquer outra falha, e foi preciso
-                # deduzir a causa por eliminação da primeira vez que isto
-                # aconteceu.
-                messagebox.showinfo(
-                    "Atualizado — abra o programa de novo",
-                    f"A atualização foi aplicada: você já está na versão "
-                    f"{info['versao']}.\n\n"
-                    "Só não consegui reabrir o programa sozinho. Abra pelo "
-                    "atalho de sempre e estará tudo certo.\n\n"
-                    f"(motivo técnico: {erro})",
-                )
-            # Não usa _fechar() aqui: já fechamos o navegador acima, à
-            # mão, na ordem certa (antes de abrir a versão nova) — chamar
-            # de novo só mandaria um "sair" redundante para uma thread que
-            # já terminou.
-            self.destroy()
-            return
-
         messagebox.showinfo(
             "Atualizado",
-            f"Pronto — agora na versão {info['versao']}.\n"
-            f"({len(arquivos)} arquivos atualizados)\n\n"
-            "FECHE e abra o programa de novo para usar a versão nova.",
+            f"Pronto — agora na versão {info['versao']}.\n\n"
+            "FECHE o programa e abra de novo para usar a versão nova.",
         )
+        if empacotado():
+            # Não usa _fechar() aqui: já fechamos o navegador acima, à
+            # mão — chamar de novo só mandaria um "sair" redundante para
+            # uma thread que já terminou.
+            self.destroy()
+            return
         self._definir_status(
             f"Atualizado para a versão {info['versao']} — feche e abra o programa."
         )
@@ -2909,8 +2875,8 @@ class Janela(tk.Tk):
         if tela.mostrar():
             messagebox.showinfo(
                 "Dados salvos",
-                "Pronto. O programa vai fechar e abrir de novo para os dados "
-                "novos valerem.",
+                "Pronto. Feche o programa e abra de novo para os dados novos "
+                "valerem.",
             )
             self._fechar()
             _reabrir_e_sair()
@@ -3934,18 +3900,32 @@ class Janela(tk.Tk):
 
 def _reabrir_e_sair() -> None:
     """
-    Fecha e abre o programa de novo.
+    Sai do programa — quem chamou já avisou a pessoa pra abrir de novo NA
+    MÃO (ver o messagebox logo antes de cada chamada daqui).
 
     Necessário depois de mexer no cadastro: escola, regional e nome são
     lidos UMA vez, quando o programa abre, e distribuídos para os módulos
     que preenchem o formulário. Continuar rodando depois de mudá-los
     daria o pior dos mundos — a tela mostrando o dado novo e o registro
     saindo com o antigo.
+
+    NÃO reabre sozinho como .exe (mudou depois de visto ao vivo, com
+    print de tela: reabrir rápido demais — o processo antigo morrendo
+    quase no mesmo instante em que o novo nasce — deu no MÍNIMO três
+    erros diferentes, nenhum consertável por dentro do programa porque
+    acontecem ANTES ou DURANTE a inicialização do Python/Tcl, antes de
+    qualquer código nosso rodar: "Security validation failure" do
+    Chromium, "Can't find a usable init.tcl" e até "Failed to start
+    embedded python interpreter" — este último nem chega a ser uma
+    exceção Python, é o PRÓPRIO INTERPRETADOR que não conseguiu
+    nascer. Reabrir na mão sempre funcionou, porque dá um tempo natural
+    — nem que sejam só alguns segundos — entre o processo antigo sumir
+    de vez e o novo começar. Rodando do código-fonte (não empacotado)
+    continua reabrindo sozinho: é ambiente de desenvolvimento, sem
+    esse risco.
     """
     try:
-        if empacotado():
-            atualizador.reiniciar()
-        else:
+        if not empacotado():
             subprocess.Popen([sys.executable] + sys.argv, close_fds=True)
     except Exception:
         pass
@@ -4014,6 +3994,10 @@ def _entrar_no_programa():
         # sem ninguém cadastrado não há como entrar: cadastra e reabre
         if configuracao.pedir_configuracao_inicial() is None:
             return None
+        messagebox.showinfo(
+            "Cadastro feito",
+            "Pronto. Feche o programa e abra de novo pelo atalho de sempre.",
+        )
         _reabrir_e_sair()
 
     resposta = configuracao.pedir_entrada(
@@ -4023,6 +4007,10 @@ def _entrar_no_programa():
         return None
     if resposta[0] == "CADASTRAR":
         if configuracao.pedir_configuracao_inicial() is not None:
+            messagebox.showinfo(
+                "Cadastro feito",
+                "Pronto. Feche o programa e abra de novo pelo atalho de sempre.",
+            )
             _reabrir_e_sair()
         return _entrar_no_programa()
     professor, senha = resposta

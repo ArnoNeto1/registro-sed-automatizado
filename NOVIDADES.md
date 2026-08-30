@@ -10,6 +10,17 @@ seção `## <número>` com o que mudou. O resto acontece sozinho.
 
 ---
 
+## 1.7.7
+
+- **Mudança: o programa não tenta mais se reabrir sozinho** depois de
+  atualizar ou de salvar em "Meus dados" — agora ele pede pra você
+  fechar e abrir de novo na mão. Dá um clique a mais, mas é bem mais
+  confiável: reabrir rápido demais era a causa de telas de erro
+  técnico ("Security validation failure", "Can't find a usable
+  init.tcl", "Failed to start embedded python interpreter") que só
+  sumiam reabrindo na mão mesmo — agora o programa já pede isso direto,
+  sem passar pela tela de erro no meio.
+
 ## 1.7.6
 
 - Corrigido: às vezes, depois de reabrir sozinho (atualização

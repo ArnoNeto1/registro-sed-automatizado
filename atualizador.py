@@ -39,7 +39,6 @@ import json
 import os
 import shutil
 import sys
-import time
 import urllib.request
 import zipfile
 from pathlib import Path
@@ -49,7 +48,6 @@ from caminhos import empacotado, pasta_do_programa, recurso
 PASTA = str(pasta_do_programa())
 ARQUIVO_VERSAO = os.path.join(PASTA, "VERSAO.txt")
 PASTA_BACKUP = os.path.join(PASTA, "backup_versao_anterior")
-ARQUIVO_MARCADOR_REINICIO = os.path.join(PASTA, "_reiniciado_apos_atualizacao.marcador")
 
 # Só arquivos com estas extensões são substituídos. Note que .json está
 # fora da lista de propósito: todo arquivo de estado do programa é .json,
@@ -199,75 +197,6 @@ def _aplicar_exe(info: dict) -> list:
                 os.remove(novo)
             except OSError:
                 pass
-
-
-def reiniciar() -> None:
-    """
-    Abre a versão nova e deixa esta sair.
-
-    Usa os.startfile — a mesma chamada de "dar duplo clique" no arquivo
-    — em vez de subprocess.Popen. Resolve de verdade o "[WinError 6]
-    identificador inválido" que subprocess.Popen já causou aqui: como
-    .exe, o programa roda sem janela de terminal, e os canais de
-    entrada/saída que o Windows entrega nesse modo não valem nada para
-    herdar (era pra isso que existiam os três DEVNULL de antes).
-
-    O TIME.SLEEP ABAIXO é sobre um problema DIFERENTE, que JÁ SE REPETIU:
-    logo depois de uma atualização automática, o programa novo mostra
-    "Security validation failure: parent process has different
-    executable!" ao abrir o navegador — mensagem do PRÓPRIO Chromium
-    (Playwright), não deste programa, e o programa não volta sozinho (é
-    preciso abrir na mão de novo). A suspeita mais forte: este processo
-    (o antigo) morre quase no mesmo instante em que o novo abre, e o
-    Windows reaproveita o PID dele rápido demais — o Chromium checa
-    quem é o processo pai bem cedo, e pode achar um PID já reaproveitado
-    por outro programa qualquer. Este sleep sozinho NÃO resolve — o
-    programa novo carrega a agenda automaticamente ao abrir (primeiro
-    acesso ao navegador dele), o que pode acontecer bem rápido, antes
-    destes 2 segundos passarem. Por isso, além do sleep, um arquivo-
-    marcador avisa o programa novo para dar uma folga extra ANTES desse
-    primeiro acesso (ver `reiniciou_pos_atualizacao_ha_pouco` e o uso
-    dela em app.py) — essa folga é o que dá mais tempo de sobra para o
-    PID antigo de fato sumir do Windows antes do navegador novo nascer.
-    """
-    if not empacotado():
-        return
-    try:
-        with open(ARQUIVO_MARCADOR_REINICIO, "w", encoding="utf-8") as f:
-            f.write(str(time.time()))
-    except OSError:
-        pass  # sem o marcador, só perde a folga extra — não impede reabrir
-    os.startfile(sys.executable, cwd=str(pasta_do_programa()))
-    time.sleep(2)
-
-
-def reiniciou_pos_atualizacao_ha_pouco() -> bool:
-    """
-    True só logo depois deste MESMO programa ter sido reaberto sozinho
-    por `reiniciar()` — verificado com um arquivo-marcador (não uma
-    variável de ambiente, porque `os.startfile` nem sempre garante que o
-    processo novo herde o ambiente de quem chamou).
-
-    CONSOME o marcador (apaga do disco) na primeira leitura — então só
-    vale uma vez por reinício, e uma leitura futura sem reinício nenhum
-    de permeio (abrir o programa do jeito normal, pelo atalho) volta a
-    dar False.
-
-    Um limite de 60 segundos evita que um marcador esquecido (o programa
-    caiu antes de consumir, por exemplo) fique fazendo TODA abertura
-    seguinte esperar à toa, para sempre.
-    """
-    try:
-        with open(ARQUIVO_MARCADOR_REINICIO, "r", encoding="utf-8") as f:
-            quando = float(f.read().strip())
-    except (OSError, ValueError):
-        return False
-    finally:
-        try:
-            os.remove(ARQUIVO_MARCADOR_REINICIO)
-        except OSError:
-            pass
-    return (time.time() - quando) < 60
 
 
 def _arquivos_do_pacote(caminho_zip: str) -> dict:
