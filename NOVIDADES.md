@@ -10,6 +10,15 @@ seção `## <número>` com o que mudou. O resto acontece sozinho.
 
 ---
 
+## 1.7.8
+
+- Ajuste interno para o Windows confiar mais no programa: o `.exe`
+  deixou de vir comprimido de um jeito que fazia alguns antivírus
+  desconfiarem à toa (a mesma técnica de compressão é usada por vírus
+  para se esconder), e agora mostra corretamente o nome, a empresa e a
+  versão do programa nas propriedades do arquivo do Windows. Nenhuma
+  mudança visível na tela do programa.
+
 ## 1.7.7
 
 - **Mudança: o programa não tenta mais se reabrir sozinho** depois de

@@ -71,6 +71,27 @@ a versão já exista".
 
 
 -----------------------------------------------------------------------
+ONDE FICA A CONFIGURAÇÃO DO BUILD (IMPORTANTE)
+-----------------------------------------------------------------------
+
+Quem manda de verdade em como o .exe é montado (ícone, compressão UPX,
+metadados de versão, quais arquivos entram) é o passo "Montar o
+executável" dentro de `.github/workflows/montar-programa.yml` — a linha
+de comando do PyInstaller ali.
+
+O `Registro-SED.spec` que existe na pasta é IGNORADO pelo Git
+(`*.spec` no `.gitignore`) e o robô NUNCA o lê — ele só existe para
+testar uma montagem localmente antes de publicar, com as MESMAS flags
+do `.yml`, e é reescrito do zero toda vez que você roda `pyinstaller`
+com parâmetros na linha de comando (então não adianta comentar nele,
+o comentário some no próximo build).
+
+Ou seja: se um dia precisar mudar como o programa é montado, mude no
+`.yml` — mudar só o `.spec` local não afeta o que os professores
+recebem.
+
+
+-----------------------------------------------------------------------
 A REGRA DO NÚMERO DA VERSÃO
 -----------------------------------------------------------------------
 

@@ -71,6 +71,8 @@ jobs:
           --icon assets\icone.ico
           --add-data "VERSAO.txt;."
           --collect-all playwright
+          --noupx
+          --version-file version_info.txt
           iniciar.py
 
       - name: Conferir se o executável saiu inteiro

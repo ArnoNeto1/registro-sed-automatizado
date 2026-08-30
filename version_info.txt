@@ -1,0 +1,47 @@
+# Metadados do arquivo .exe (aba "Detalhes" nas propriedades do Windows).
+#
+# Sem isto, o executável nascia sem NENHUMA informação — nome, empresa,
+# versão — nem no Explorer, nem para o Windows Defender/SmartScreen, que
+# tratam um .exe "anônimo" com mais desconfiança do que um com essas
+# informações preenchidas (não resolve sozinho, mas ajuda). Gerado com
+# PyInstaller (pyi-grab_version/pyi-set_version usam este mesmo formato).
+#
+# O número de versão aqui é fixo (não lido de VERSAO.txt) de propósito:
+# o arquivo é montado ANTES do PyInstaller rodar, e a mudança automática
+# do número a cada versão publicada exigiria reescrever este arquivo
+# lendo VERSAO.txt na hora do build — mais uma peça pra quebrar sem
+# necessidade, já que este número só aparece na aba "Detalhes" do
+# Windows, nunca na tela do programa (que usa a leitura de verdade,
+# `atualizador.versao_atual()`, feita de dentro de VERSAO.txt).
+VSVersionInfo(
+  ffi=FixedFileInfo(
+    filevers=(1, 0, 0, 0),
+    prodvers=(1, 0, 0, 0),
+    mask=0x3f,
+    flags=0x0,
+    OS=0x40004,
+    fileType=0x1,
+    subtype=0x0,
+    date=(0, 0),
+  ),
+  kids=[
+    StringFileInfo(
+      [
+        StringTable(
+          "041604B0",
+          [
+            StringStruct("CompanyName", "Arno Neto"),
+            StringStruct("FileDescription", "Registro SED Automatizado"),
+            StringStruct("FileVersion", "1.0.0.0"),
+            StringStruct("InternalName", "Registro-SED"),
+            StringStruct("LegalCopyright", "Arno Neto"),
+            StringStruct("OriginalFilename", "Registro-SED.exe"),
+            StringStruct("ProductName", "Registro SED Automatizado"),
+            StringStruct("ProductVersion", "1.0.0.0"),
+          ],
+        )
+      ]
+    ),
+    VarFileInfo([VarStruct("Translation", [1046, 1200])]),
+  ],
+)
