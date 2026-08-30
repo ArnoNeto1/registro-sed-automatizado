@@ -15,12 +15,15 @@ Isso vai:
   3. Agrupar aulas emendadas da mesma turma/disciplina em uma única
      atividade (contando quantas "aulas de 45min" foram usadas);
   4. Para cada atividade, perguntar no terminal o número de estudantes
-     atendidos e quais recursos do laboratório foram usados (isso NÃO está
-     disponível no site de agendamento, por isso é sempre perguntado);
+     atendidos (isso NÃO está disponível no site de agendamento, por isso
+     é sempre perguntado); os recursos do laboratório usados já vêm com
+     os padrões de sempre, a não ser que você rode com
+     --perguntar-recursos para escolher aula por aula;
   5. Abrir o formulário da SED no navegador e preencher tudo automaticamente
      até a última página;
   6. Mostrar um resumo e pedir confirmação explícita antes de clicar em
-     "Enviar" — nada é enviado sem você digitar "s".
+     "Enviar" — nada é enviado sem você digitar "s", a não ser que rode
+     com --auto-submit (aí ele envia sozinho, sem perguntar).
 
 Na PRIMEIRA vez que você usar o formulário, uma janela do Chrome vai abrir
 pedindo login da conta Google da SED — faça o login manualmente uma vez; a

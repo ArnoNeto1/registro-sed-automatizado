@@ -12,10 +12,12 @@ Os 4 fluxos que a página "Tipo de registro" oferece estão automatizados:
 (preencher_formacao_reuniao) — todos confirmados ao vivo, direto no
 formulário.
 
-IMPORTANTE: por padrão o script SEMPRE para na última página (antes do botão
-"Enviar") e espera confirmação no terminal — ele nunca envia um registro para
-a SED sem você revisar e digitar "s". Use --auto-submit por sua conta e risco
-se quiser pular essa confirmação.
+IMPORTANTE: este módulo nunca clica em "Enviar" sozinho — ele só preenche o
+formulário e para na última página, antes do botão. Quem decide QUANDO
+mandar de verdade é sempre quem chama: a interface gráfica (app.py) mostra
+um resumo na tela e só manda depois que você clica em "Enviar para a SED";
+o script de linha de comando (main.py) pergunta pelo terminal, "s"/"N", a
+não ser que rode com --auto-submit.
 """
 
 from __future__ import annotations

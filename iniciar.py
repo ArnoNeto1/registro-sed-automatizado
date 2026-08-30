@@ -185,18 +185,16 @@ def _garantir_configuracao() -> bool:
 
 def _falha_passageira_no_tcl(exc: BaseException) -> bool:
     """
-    "Can't find a usable init.tcl" logo na abertura — visto ao vivo bem
-    depois de sair da versão 1.5.1, sempre num processo RECÉM aberto
-    sozinho (depois de cadastrar/editar um professor, ou depois de uma
-    atualização automática).
-
-    A causa mais provável é a mesma já documentada em `atualizador.
-    reiniciar()` para o navegador: alguma coisa (antivírus examinando o
-    .exe recém-criado, por exemplo) segura por um instante os arquivos
-    que o PyInstaller acabou de extrair para a pasta temporária — e
-    tentar criar a janela bem nesse instante encontra a extração pela
-    metade. Passageiro: tentar de novo alguns segundos depois resolve
-    sozinho.
+    "Can't find a usable init.tcl" logo na abertura — visto ao vivo pela
+    primeira vez na versão 1.5.1, numa época em que o programa se reabria
+    sozinho logo depois de cadastrar/editar um professor ou de uma
+    atualização automática (isso mudou na v1.7.7: hoje ele pede para
+    fechar e abrir na mão em vez de se reabrir sozinho). Mas a causa não
+    está presa a isso — qualquer abertura a frio pode pegar a extração do
+    PyInstaller pela metade: antivírus examinando o .exe, disco cheio,
+    pasta temporária suja de uma queda anterior, duas cópias abertas ao
+    mesmo tempo. Passageiro: tentar de novo alguns segundos depois
+    resolve sozinho.
     """
     return "init.tcl" in str(exc)
 

@@ -383,10 +383,13 @@ DISCIPLINA_PARA_COMPONENTE = {
 }
 
 # Disciplinas do site de agendamento que NÃO são "Atividade/Aula com
-# estudantes" (são reservas internas de formação/reunião/limpeza) — o script
-# pula essas automaticamente, pois pertencem a outro fluxo do formulário
-# ("Formação/Reunião") que ainda não foi mapeado (ver README, seção
-# "Próximos passos").
+# estudantes" (são reservas internas de formação/reunião/limpeza) — o
+# script pula essas automaticamente na leitura da agenda. Não é porque
+# esse fluxo falta implementar: "Formação/Reunião" já é um dos tipos de
+# registro automatizados (ver sed_form_filler.preencher_formacao_reuniao)
+# — só que ele tem aba própria no programa e não depende de agenda
+# nenhuma, então não tem por que tentar adivinhar a partir dessas
+# reservas.
 DISCIPLINAS_IGNORADAS = {
     "Organização interna na Sala de Tecnologias\\Formação",
 }
