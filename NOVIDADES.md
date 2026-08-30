@@ -10,6 +10,20 @@ seção `## <número>` com o que mudou. O resto acontece sozinho.
 
 ---
 
+## 1.7.5
+
+- **Nova opção: registrar uma aula sem agendamento.** Às vezes o
+  laboratório (ou tablet/projetor) é usado sem reserva na agenda do
+  NTE — agora dá pra registrar do mesmo jeito. Um link novo aparece
+  embaixo da lista de aulas: "Não achou a sua aula na lista acima?
+  Registrar aula sem agendamento".
+- Corrigido: as colunas da tabela de aulas ("Dia e horário",
+  "Professor(a)"...) ficavam sem nenhuma linha separando uma da outra.
+- Corrigido: passar o mouse sobre o campo "Conteúdo aplicado" e tentar
+  rolar a tela, com pouco texto ali dentro, não fazia nada.
+- Ajustes para o programa respeitar melhor a escala de tela do Windows
+  (125%/150%).
+
 ## 1.7.4
 
 - Corrigido: às vezes, depois de uma atualização automática, o programa

@@ -104,6 +104,39 @@ def _avisar(texto: str) -> None:
         print(texto)
 
 
+def _declarar_dpi_awareness() -> None:
+    """
+    Avisa o Windows que o programa sabe lidar com escala de tela (125%,
+    150%...) por conta própria — sem isto, o Windows finge que a tela é
+    100% e depois ESTICA o desenho inteiro do programa como se fosse uma
+    imagem, pixel a pixel. A maioria das telas fica só um pouco borrada,
+    mas alguns detalhes do Tk saem visivelmente errados nesse esticar —
+    é assim que a barra de rolagem da lista de aulas sumia sozinha até a
+    pessoa arrastar a borda de uma coluna, o que força o Windows a
+    redesenhar aquele pedaço direito na hora (visto ao vivo, com print de
+    tela, numa tela em 125%).
+
+    Precisa ser chamado ANTES de qualquer janela existir — inclusive a de
+    configuração/cadastro, que pode abrir logo abaixo, em
+    `_garantir_configuracao()`. Por isso fica aqui, não em `app.py` (que
+    só é importado bem depois).
+    """
+    try:
+        import ctypes
+
+        # PROCESS_SYSTEM_DPI_AWARE — o suficiente pra corrigir o
+        # esticamento; não tenta acompanhar o monitor se a janela for
+        # arrastada para outro com escala diferente (PER_MONITOR_AWARE),
+        # o que o Tk não lida bem sozinho de qualquer forma.
+        ctypes.windll.shcore.SetProcessDpiAwareness(1)
+    except Exception:
+        try:
+            ctypes.windll.user32.SetProcessDPIAware()
+        except Exception:
+            pass  # Windows mais antigo sem esta API, ou algo bloqueou —
+            # o programa continua funcionando, só sem a correção
+
+
 def _env_utilizavel() -> bool:
     """
     O .env do formato antigo está preenchido a ponto de servir?
@@ -169,6 +202,7 @@ def _falha_passageira_no_tcl(exc: BaseException) -> bool:
 
 
 def main() -> None:
+    _declarar_dpi_awareness()
     app = None
     # 6 tentativas, esperando mais a cada uma (3s, 6s, 9s...): visto ao
     # vivo que 3 tentativas de 2s (6s no total) não bastavam sempre —
