@@ -201,6 +201,84 @@ def _falha_passageira_no_tcl(exc: BaseException) -> bool:
     return "init.tcl" in str(exc)
 
 
+# Quantas vezes o programa se reabre sozinho (como processo NOVO) antes de
+# desistir e mostrar o erro de verdade — ver _relancar_processo_novo_se_possivel.
+_LIMITE_RELANCAMENTOS = 3
+_ARQUIVO_MARCADOR_RELANCAMENTO = "_tentativas_reabrir.txt"
+
+
+def _tentativas_de_relancamento_ja_feitas() -> int:
+    """
+    Quantas vezes ESTE MESMO problema já fez o programa se reabrir
+    sozinho, guardado num arquivo de texto pequeno na pasta de dados
+    (mesmo esquema do marcador de reinício pós-atualização, em
+    atualizador.py — repetido aqui, não importado, porque este arquivo
+    não pode depender de mais nada do programa).
+
+    Um marcador com mais de 2 minutos não conta — é de um problema
+    ANTIGO, já resolvido (a pessoa fechou e abriu na mão, por exemplo),
+    não desta sequência de tentativas.
+    """
+    caminho = os.path.join(_pasta_de_dados(), _ARQUIVO_MARCADOR_RELANCAMENTO)
+    try:
+        with open(caminho, encoding="utf-8") as f:
+            quando_texto, numero_texto = f.read().strip().split("|")
+        if time.time() - float(quando_texto) > 120:
+            return 0
+        return int(numero_texto)
+    except Exception:
+        return 0
+
+
+def _registrar_tentativa_de_relancamento(numero: int) -> None:
+    caminho = os.path.join(_pasta_de_dados(), _ARQUIVO_MARCADOR_RELANCAMENTO)
+    try:
+        with open(caminho, "w", encoding="utf-8") as f:
+            f.write(f"{time.time()}|{numero}")
+    except Exception:
+        pass  # sem o marcador, só perde a contagem — não impede reabrir
+
+
+def _limpar_marcador_de_relancamento() -> None:
+    try:
+        os.remove(os.path.join(_pasta_de_dados(), _ARQUIVO_MARCADOR_RELANCAMENTO))
+    except OSError:
+        pass
+
+
+def _relancar_processo_novo_se_possivel() -> bool:
+    """
+    Quando o "init.tcl" resiste às 6 tentativas dentro do MESMO processo
+    (ver main()), o motivo mais provável é que a extração do .exe onefile
+    — feita pelo Windows/PyInstaller UMA VEZ SÓ, antes até deste arquivo
+    começar a rodar — saiu incompleta por inteiro. Tentar de nova AQUI
+    DENTRO não adianta nada: é a mesma pasta quebrada de novo, porque a
+    extração não se repete dentro do mesmo processo. Só abrir um processo
+    NOVO (que ganha uma pasta de extração NOVA) resolve de verdade — foi
+    exatamente isso que sempre "consertava" quando a pessoa fechava o
+    erro e abria o programa na mão de novo.
+
+    Limitado a poucas vezes (_LIMITE_RELANCAMENTOS) pra não virar um
+    abre-fecha infinito se o problema for outro, persistente de verdade
+    (disco cheio, antivírus bloqueando pra sempre, instalação
+    corrompida) — nesses casos é melhor mostrar o erro logo.
+
+    Devolve True se relançou (quem chamou deve sair sem mostrar nada);
+    False se já tentou demais e é hora de mostrar o erro de verdade.
+    """
+    if not getattr(sys, "frozen", False):
+        return False  # rodando do código-fonte: não tem .exe pra reabrir
+    ja_tentado = _tentativas_de_relancamento_ja_feitas()
+    if ja_tentado >= _LIMITE_RELANCAMENTOS:
+        return False
+    _registrar_tentativa_de_relancamento(ja_tentado + 1)
+    try:
+        os.startfile(sys.executable, cwd=_pasta_do_programa())
+    except Exception:
+        return False
+    return True
+
+
 def main() -> None:
     _declarar_dpi_awareness()
     app = None
@@ -220,6 +298,7 @@ def main() -> None:
 
             app = modulo
             app.main()
+            _limpar_marcador_de_relancamento()  # deu certo — zera a contagem
             return
         except SystemExit:
             raise            # reabrir o programa não é erro
@@ -227,6 +306,13 @@ def main() -> None:
             if tentativa < tentativas and _falha_passageira_no_tcl(exc):
                 time.sleep(3 * tentativa)
                 continue
+            # As 6 tentativas ACIMA rodam dentro do MESMO processo — inúteis
+            # contra uma extração do .exe onefile que nasceu incompleta
+            # (isso só acontece uma vez, antes deste arquivo sequer
+            # começar a rodar). Só um processo novo tem uma extração nova
+            # — ver _relancar_processo_novo_se_possivel.
+            if _falha_passageira_no_tcl(exc) and _relancar_processo_novo_se_possivel():
+                return
             arquivo = _guardar(traceback.format_exc())
             # o próprio programa já avisa dos erros que ele consegue tratar;
             # avisar de novo só deixaria duas caixinhas na tela dizendo o mesmo

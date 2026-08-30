@@ -10,6 +10,15 @@ seção `## <número>` com o que mudou. O resto acontece sozinho.
 
 ---
 
+## 1.7.6
+
+- Corrigido: às vezes, depois de reabrir sozinho (atualização
+  automática, ou salvar em "Meus dados"), o programa mostrava uma tela
+  de erro técnico ("Can't find a usable init.tcl") e não voltava —
+  precisava abrir na mão de novo. Agora, quando isso acontece, o próprio
+  programa se reabre sozinho de verdade (não só tenta de novo por
+  dentro) — que era exatamente o que já resolvia na mão.
+
 ## 1.7.5
 
 - **Nova opção: registrar uma aula sem agendamento.** Às vezes o
