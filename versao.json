@@ -1,7 +1,7 @@
 {
-  "versao": "1.7.6",
-  "exe": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v1.7.6/Registro-SED.exe",
-  "instalador": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v1.7.6/Registro-SED-Instalador.exe",
+  "versao": "1.7.7",
+  "exe": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v1.7.7/Registro-SED.exe",
+  "instalador": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v1.7.7/Registro-SED-Instalador.exe",
   "zip": "https://github.com/ArnoNeto1/registro-sed-automatizado/archive/refs/heads/main.zip",
-  "notas": "- Corrigido: às vezes, depois de reabrir sozinho (atualização\n  automática, ou salvar em \"Meus dados\"), o programa mostrava uma tela\n  de erro técnico (\"Can't find a usable init.tcl\") e não voltava —\n  precisava abrir na mão de novo. Agora, quando isso acontece, o próprio\n  programa se reabre sozinho de verdade (não só tenta de novo por\n  dentro) — que era exatamente o que já resolvia na mão."
+  "notas": "- **Mudança: o programa não tenta mais se reabrir sozinho** depois de\n  atualizar ou de salvar em \"Meus dados\" — agora ele pede pra você\n  fechar e abrir de novo na mão. Dá um clique a mais, mas é bem mais\n  confiável: reabrir rápido demais era a causa de telas de erro\n  técnico (\"Security validation failure\", \"Can't find a usable\n  init.tcl\", \"Failed to start embedded python interpreter\") que só\n  sumiam reabrindo na mão mesmo — agora o programa já pede isso direto,\n  sem passar pela tela de erro no meio."
 }
