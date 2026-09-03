@@ -1,7 +1,7 @@
 {
-  "versao": "1.7.8",
-  "exe": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v1.7.8/Registro-SED.exe",
-  "instalador": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v1.7.8/Registro-SED-Instalador.exe",
+  "versao": "1.8.0",
+  "exe": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v1.8.0/Registro-SED.exe",
+  "instalador": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v1.8.0/Registro-SED-Instalador.exe",
   "zip": "https://github.com/ArnoNeto1/registro-sed-automatizado/archive/refs/heads/main.zip",
-  "notas": "- Ajuste interno para o Windows confiar mais no programa: o `.exe`\n  deixou de vir comprimido de um jeito que fazia alguns antivírus\n  desconfiarem à toa (a mesma técnica de compressão é usada por vírus\n  para se esconder), e agora mostra corretamente o nome, a empresa e a\n  versão do programa nas propriedades do arquivo do Windows. Nenhuma\n  mudança visível na tela do programa."
+  "notas": "- **Nova opção: registrar suporte a outros espaços sem agendamento.**\n  Até agora, \"Suporte do professor orientador a outros espaços\" (instalar\n  ou configurar um equipamento levado para outra sala) só podia ser\n  registrado quando isso já estava marcado na agenda do laboratório.\n  Agora tem um botão próprio, \"Suporte a outros espaços\", ao lado de\n  \"Manutenção\" e \"Formação/Reunião\" — sempre disponível, sem precisar de\n  reserva nenhuma.\n- Corrigido: em escolas com só um recurso (a maioria — só laboratório),\n  clicar em \"Manutenção\" ou \"Formação/Reunião\" podia deixar sem nenhum\n  jeito de voltar para a lista de aulas, a não ser fechando e abrindo o\n  programa de novo."
 }
