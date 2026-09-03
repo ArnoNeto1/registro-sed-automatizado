@@ -17,11 +17,11 @@ copiar os dados da agenda para o formulário, aula por aula.
 
 Cobre os 4 tipos de registro que o formulário oferece: Atividade/Aula com
 estudantes, Suporte a outros espaços (instalar/configurar equipamento),
-Manutenção de equipamentos e Formação/Reunião — os dois últimos nem
-precisam de aula marcada na agenda. E se o laboratório (ou tablet/
-projetor) foi usado sem reserva na agenda do NTE, também dá para
-registrar: é só usar o link "Registrar aula sem agendamento" embaixo da
-lista de aulas.
+Manutenção de equipamentos e Formação/Reunião — os três últimos nem
+precisam de aula marcada na agenda: têm botão próprio, sempre disponível.
+E se o laboratório (ou tablet/projetor) foi usado sem reserva na agenda
+do NTE, também dá para registrar: é só usar o link "Registrar aula sem
+agendamento" embaixo da lista de aulas.
 
 **Ele nunca envia nada sozinho.** Sempre para antes do envio, mostra um
 resumo de tudo que vai para a SED, e só manda depois que você clicar em

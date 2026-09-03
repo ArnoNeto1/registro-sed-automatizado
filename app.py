@@ -153,12 +153,24 @@ def _categoria_da_atividade(g) -> str:
 
 CATEGORIAS_RECURSO_EM_ORDEM = ("Laboratório", "Tablets/Celular", "Projetores")
 
-# Duas abas que NÃO vêm de agendamento nenhum — "Manutenção de
-# equipamentos" e "Formação/Reunião" no formulário da SED não têm hora
-# marcada na agenda do NTE, então ficam sempre visíveis (diferente das
-# de cima, que só aparecem se a agenda de verdade trouxer aula daquele
-# recurso). Ver _atualizar_abas_recurso e _atualizar_area_dados_registro.
-CATEGORIAS_INDEPENDENTES = ("Manutenção", "Formação/Reunião")
+# Três abas que NÃO vêm de agendamento nenhum — "Suporte a outros
+# espaços", "Manutenção de equipamentos" e "Formação/Reunião" no
+# formulário da SED não têm hora marcada na agenda do NTE, então ficam
+# sempre visíveis (diferente das de cima, que só aparecem se a agenda
+# de verdade trouxer aula daquele recurso). Ver _atualizar_abas_recurso
+# e _atualizar_area_dados_registro.
+#
+# "Suporte a outros espaços" também é preenchível vindo da agenda (uma
+# aula de Projetor/Tablets pode ser marcada como suporte em vez de aula
+# — ver cartao_suporte, var_tipo_suporte), mas ATÉ aqui só existia esse
+# caminho: um suporte que não veio de reserva nenhuma na agenda não
+# tinha como ser registrado. Esta aba é pra esse caso — mesmo
+# mecanismo de preenchimento (preencher_suporte_outros_espacos), só
+# sem precisar de uma aula selecionada primeiro (ver
+# _coletar_dados_suporte_avulso). A ordem aqui é a ordem visual da
+# esquerda pra direita (ver o pack() em _atualizar_abas_recurso) — bate
+# com a ordem das opções no formulário da SED.
+CATEGORIAS_INDEPENDENTES = ("Suporte a outros espaços", "Manutenção", "Formação/Reunião")
 
 
 class _RegistroSemAgenda:
@@ -1591,6 +1603,56 @@ class Janela(tk.Tk):
         )
         self.campo_aulas_suporte.bind("<Return>", lambda _e: self._preencher())
 
+        # --- suporte a outros espaços (aba independente, sem agenda) ---
+        # Mesmos 3 campos do cartao_suporte acima (o vindo da agenda) — mas
+        # com widgets PRÓPRIOS, não reaproveitados: os dois ficam visíveis
+        # em momentos diferentes (nunca ao mesmo tempo), só que se
+        # compartilhassem variável, "Ver no navegador" correria o risco de
+        # reler o suporte errado — a mesma classe de bug já encontrada e
+        # corrigida para "Aula sem agendamento" (ver _dados_aula_avulsa).
+        cartao_suporte_avulso = ttk.Frame(self.conteudo, style="Cartao.TFrame", padding=14)
+        self.cartao_suporte_avulso = cartao_suporte_avulso
+
+        ttk.Label(
+            cartao_suporte_avulso, text="Suporte a outros espaços", style="Secao.TLabel"
+        ).grid(row=0, column=0, columnspan=2, sticky="w")
+        ttk.Label(
+            cartao_suporte_avulso,
+            text="Qual foi o atendimento/suporte realizado?",
+            style="Cartao.TLabel",
+        ).grid(row=1, column=0, columnspan=2, sticky="w", pady=(8, 4))
+        self.var_suporte_avulso_tipo = tk.StringVar(value="")
+        for i, texto in enumerate(TIPOS_DE_SUPORTE):
+            ttk.Radiobutton(
+                cartao_suporte_avulso, text=texto, value=texto,
+                variable=self.var_suporte_avulso_tipo,
+            ).grid(row=2 + i, column=0, columnspan=2, sticky="w", pady=1)
+        linha_base_s = 2 + len(TIPOS_DE_SUPORTE)
+
+        ttk.Label(
+            cartao_suporte_avulso,
+            text="Breve descrição da atividade (quem, onde e para quê):",
+            style="Cartao.TLabel",
+        ).grid(row=linha_base_s, column=0, columnspan=2, sticky="w", pady=(12, 4))
+        self.campo_suporte_avulso_descricao = ttk.Entry(
+            cartao_suporte_avulso, width=70, font=("Segoe UI", 10)
+        )
+        self.campo_suporte_avulso_descricao.grid(
+            row=linha_base_s + 1, column=0, columnspan=2, sticky="ew"
+        )
+        cartao_suporte_avulso.columnconfigure(1, weight=1)
+
+        ttk.Label(
+            cartao_suporte_avulso, text="Quantidade de aulas:", style="Cartao.TLabel"
+        ).grid(row=linha_base_s + 2, column=0, sticky="w", pady=(12, 0))
+        self.campo_suporte_avulso_aulas = ttk.Entry(
+            cartao_suporte_avulso, width=8, font=("Segoe UI", 11)
+        )
+        self.campo_suporte_avulso_aulas.grid(
+            row=linha_base_s + 2, column=1, sticky="w", padx=(8, 0), pady=(12, 0)
+        )
+        self.campo_suporte_avulso_aulas.bind("<Return>", lambda _e: self._preencher())
+
         # --- manutenção de equipamentos (aba independente, sem agenda) ---
         cartao_manutencao = ttk.Frame(self.conteudo, style="Cartao.TFrame", padding=14)
         self.cartao_manutencao = cartao_manutencao
@@ -2503,6 +2565,14 @@ class Janela(tk.Tk):
         Uma aba que não é a selecionada, mas tem uma "sugerida agora" dela
         mesma, ganha destaque de aviso (cor de "SubAviso") — é o sinal de
         que tem aula acontecendo ali que a pessoa ainda não olhou.
+
+        EXCEÇÃO IMPORTANTE: numa escola de só um recurso (o caso comum,
+        onde as abas de cima ficam sempre escondidas), clicar em
+        "Manutenção"/"Formação/Reunião" não pode ser um beco sem saída —
+        sem NENHUM botão de recurso visível, não havia como voltar pra
+        "Laboratório" a não ser fechando e abrindo o programa de novo.
+        Por isso, estando numa categoria independente, a aba do recurso
+        único aparece mesmo sozinha, só como porta de saída.
         """
         presentes = {"Laboratório"} | {_categoria_da_atividade(g) for g in self.grupos}
         sugeridas = self._sugerida_por_categoria()
@@ -2513,7 +2583,7 @@ class Janela(tk.Tk):
         # ficava fora de ordem em relação às outras.
         for botao in self.botoes_categoria.values():
             botao.pack_forget()
-        if len(presentes) > 1:
+        if len(presentes) > 1 or self.categoria_atual in CATEGORIAS_INDEPENDENTES:
             for cat in CATEGORIAS_RECURSO_EM_ORDEM:
                 if cat not in presentes:
                     continue
@@ -2774,9 +2844,9 @@ class Janela(tk.Tk):
         - Projetores/Tablets-Celular: pergunta o tipo de registro (aula com
           estudantes ou suporte/instalação, ver
           preencher_suporte_outros_espacos em sed_form_filler.py).
-        - Manutenção / Formação-Reunião (CATEGORIAS_INDEPENDENTES): não
-          dependem de aula nenhuma selecionada — mostram direto o cartão
-          daquele tipo.
+        - Suporte a outros espaços / Manutenção / Formação-Reunião
+          (CATEGORIAS_INDEPENDENTES): não dependem de aula nenhuma
+          selecionada — mostram direto o cartão daquele tipo.
 
         Esconde todos primeiro e reempacota só o que faz sentido, NA ORDEM
         CERTA: pack() sem "before"/"after" reaparece no FIM de quem já
@@ -2786,9 +2856,14 @@ class Janela(tk.Tk):
         self.cartao_tipo_registro.pack_forget()
         self.cartao_dados.pack_forget()
         self.cartao_suporte.pack_forget()
+        self.cartao_suporte_avulso.pack_forget()
         self.cartao_manutencao.pack_forget()
         self.cartao_formacao.pack_forget()
 
+        if self.categoria_atual == "Suporte a outros espaços":
+            self.cartao_suporte_avulso.pack(fill="x", padx=20, pady=(0, 8))
+            self._cartao_ativo = self.cartao_suporte_avulso
+            return
         if self.categoria_atual == "Manutenção":
             self.cartao_manutencao.pack(fill="x", padx=20, pady=(0, 8))
             self._cartao_ativo = self.cartao_manutencao
@@ -3226,9 +3301,10 @@ class Janela(tk.Tk):
         os dois preenchem os MESMOS dados, só muda se a janela do Chrome
         aparece ou não.
 
-        "Manutenção" e "Formação/Reunião" não têm `grupo` nenhum (não vêm
-        de agendamento) — desvia pros coletores próprios deles, que montam
-        um _RegistroSemAgenda do zero.
+        "Suporte a outros espaços", "Manutenção" e "Formação/Reunião" não
+        têm `grupo` nenhum (não vêm de agendamento) — desvia pros
+        coletores próprios deles, que montam um _RegistroSemAgenda do
+        zero.
 
         "Aula sem agendamento" (ver _abrir_aula_sem_agendamento) também
         desvia — mas por IDENTIDADE do grupo, não por self.categoria_atual
@@ -3246,6 +3322,8 @@ class Janela(tk.Tk):
                 d["conteudo"], self.orientador["nome"], self.orientador["tipo"],
                 self.orientador.get("escola", ""), d["subetapa"], d["curso"], mostrar,
             )
+        if self.categoria_atual == "Suporte a outros espaços":
+            return self._coletar_dados_suporte_avulso(mostrar)
         if self.categoria_atual == "Manutenção":
             return self._coletar_dados_manutencao(mostrar)
         if self.categoria_atual == "Formação/Reunião":
@@ -3351,6 +3429,49 @@ class Janela(tk.Tk):
             "preencher", "aula", grupo, int(bruto), recursos, etapa, conteudo,
             self.orientador["nome"], self.orientador["tipo"], self.orientador.get("escola", ""),
             subetapa, curso, mostrar,
+        )
+
+    def _coletar_dados_suporte_avulso(self, mostrar: bool):
+        """
+        Lê e valida os campos do cartão "Suporte a outros espaços" (aba
+        independente, sem agenda) — chamado por _coletar_dados_para_preencher
+        quando essa é a aba atual. Devolve o comando pronto, ou None se
+        faltar algo (já tendo avisado a pessoa).
+
+        Mesmo formato de comando que o suporte vindo da agenda (ver o
+        ramo "suporte" logo abaixo) — o NavegadorWorker não faz distinção
+        nenhuma entre os dois, só usa `grupo` como identificador.
+        """
+        tipo_atendimento = self.var_suporte_avulso_tipo.get().strip()
+        if not tipo_atendimento:
+            messagebox.showinfo(
+                "Qual foi o atendimento/suporte realizado?",
+                "Escolha uma das opções antes de preencher.",
+            )
+            return None
+        descricao = self.campo_suporte_avulso_descricao.get().strip()
+        if not descricao:
+            messagebox.showinfo(
+                "Breve descrição da atividade",
+                "Descreva rapidamente quem, onde e para quê — esse texto "
+                "vai para o formulário da SED.",
+            )
+            self.campo_suporte_avulso_descricao.focus_set()
+            return None
+        bruto = self.campo_suporte_avulso_aulas.get().strip()
+        if not bruto.isdigit() or int(bruto) <= 0:
+            messagebox.showinfo(
+                "Quantidade de aulas",
+                "Digite quantas aulas (blocos de 45 min) você levou para "
+                "o suporte/instalação — só números.",
+            )
+            self.campo_suporte_avulso_aulas.focus_set()
+            return None
+        grupo = _RegistroSemAgenda("Suporte a outros espaços")
+        return (
+            "preencher", "suporte", grupo, tipo_atendimento, descricao, int(bruto),
+            self.orientador["nome"], self.orientador["tipo"], self.orientador.get("escola", ""),
+            mostrar,
         )
 
     def _coletar_dados_manutencao(self, mostrar: bool):
@@ -3847,6 +3968,9 @@ class Janela(tk.Tk):
             self.var_tipo_suporte.set("")
             self.campo_descricao_suporte.delete(0, "end")
             self.campo_aulas_suporte.delete(0, "end")
+            self.var_suporte_avulso_tipo.set("")
+            self.campo_suporte_avulso_descricao.delete(0, "end")
+            self.campo_suporte_avulso_aulas.delete(0, "end")
             for var in self.vars_manutencao.values():
                 var.set(False)
             self.campo_manutencao_outro.delete(0, "end")

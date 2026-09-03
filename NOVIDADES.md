@@ -10,6 +10,20 @@ seção `## <número>` com o que mudou. O resto acontece sozinho.
 
 ---
 
+## 1.8.0
+
+- **Nova opção: registrar suporte a outros espaços sem agendamento.**
+  Até agora, "Suporte do professor orientador a outros espaços" (instalar
+  ou configurar um equipamento levado para outra sala) só podia ser
+  registrado quando isso já estava marcado na agenda do laboratório.
+  Agora tem um botão próprio, "Suporte a outros espaços", ao lado de
+  "Manutenção" e "Formação/Reunião" — sempre disponível, sem precisar de
+  reserva nenhuma.
+- Corrigido: em escolas com só um recurso (a maioria — só laboratório),
+  clicar em "Manutenção" ou "Formação/Reunião" podia deixar sem nenhum
+  jeito de voltar para a lista de aulas, a não ser fechando e abrindo o
+  programa de novo.
+
 ## 1.7.8
 
 - Ajuste interno para o Windows confiar mais no programa: o `.exe`
