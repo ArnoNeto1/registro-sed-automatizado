@@ -10,6 +10,22 @@ seção `## <número>` com o que mudou. O resto acontece sozinho.
 
 ---
 
+## 1.9.0
+
+- **Disciplina, professor(a) e nº de aulas agora são editáveis.** Antes,
+  o que vinha da agenda ia direto pro formulário da SED, mesmo quando
+  estava errado ou sem correspondência (por exemplo, "_OUTROS" no lugar
+  do nome real da disciplina). Agora dá pra corrigir esses três campos
+  na hora de registrar, numa barra só ao lado de "Nº de estudantes" e
+  "Etapa" — a correção vale só para aquele envio à SED, não muda a
+  agenda do NTE.
+- **O programa agora abre maximizado**, e a tela ficou mais compacta
+  (botões menores, "Recursos utilizados" espalhados em mais colunas) —
+  em telas menores, ainda dá pra rolar se precisar, mas na maioria das
+  vezes tudo já aparece de uma vez, sem precisar usar o scroll do mouse.
+- "Atualizar agenda" e "Registrando como [seu nome]" mudaram de lugar:
+  foram para o rodapé, perto dos outros botões de conta.
+
 ## 1.8.0
 
 - **Nova opção: registrar suporte a outros espaços sem agendamento.**
