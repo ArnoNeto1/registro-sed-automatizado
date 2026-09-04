@@ -85,15 +85,17 @@ RECURSOS_DISPONIVEIS = [
     "Computadores/notebooks (software/programa) no laboratório",
     "Computadores/notebooks (edição de imagens/vídeos) no laboratório",
     "Computadores/notebooks (sites educacionais) no laboratório",
-    # "Notebooks" antes de "Tablets"/"Celulares" (e não depois): a grade
+    # "Notebooks" antes de "Celulares"/"Tablets" (e não depois): a grade
     # de checkboxes da tela (ver app.py, self.vars_recursos) preenche 2
-    # por coluna na ORDEM desta lista — com "Celulares" aqui, a coluna
-    # ficava com um nome longo em cima e um curto embaixo (e a vizinha,
-    # o contrário), em vez de parear os dois nomes longos numa coluna e
-    # os dois curtos na outra. Pedido estético do professor, com print.
+    # por coluna na ORDEM desta lista — assim a coluna fica com os dois
+    # nomes longos ("Computadores/notebooks..." + "Notebooks...") e a
+    # vizinha com os dois curtos, em vez de misturar um longo com um
+    # curto em cada uma. E "Celulares" antes de "Tablets" (não o
+    # contrário): pedido estético do professor, com print, pra ordem
+    # de cima pra baixo nessa coluna curta.
     "Notebooks (recurso móvel para sala de aula)",
-    "Tablets",
     "Celulares",
+    "Tablets",
     # existe no formulário e faltava aqui — conferido na estrutura da SED
     "Outros recursos",
 ]
