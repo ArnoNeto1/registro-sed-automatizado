@@ -1545,9 +1545,11 @@ class Janela(tk.Tk):
         self.campo_disciplina.pack(side="left", padx=(6, 14))
 
         ttk.Label(linha_disciplina, text="Professor(a):", style="Cartao.TLabel").pack(side="left")
-        # Mesmo motivo: nomes completos ("Cristhine Fabiola De Ramos",
-        # "Edina Silvia Netto Wilhelm") passavam de 23 e cortavam.
-        self.campo_professor = ttk.Entry(linha_disciplina, width=30, font=("Segoe UI", 10))
+        # 30 ainda cortava — "MARIA LUIZA DELLAJUSTINA DALCANALE" (35
+        # letras, TUDO MAIÚSCULO, como a agenda manda) passa disso.
+        # MAIÚSCULO reduz de vez qualquer economia de largura por
+        # letra minúscula estreita, então a margem tem que ser generosa.
+        self.campo_professor = ttk.Entry(linha_disciplina, width=40, font=("Segoe UI", 10))
         self.campo_professor.pack(side="left", padx=(6, 14))
 
         ttk.Label(linha_disciplina, text="Nº de aulas:", style="Cartao.TLabel").pack(side="left")
