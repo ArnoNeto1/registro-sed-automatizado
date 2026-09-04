@@ -780,31 +780,40 @@ class NavegadorWorker(threading.Thread):
 
                     elif acao == "preencher":
                         (_, _, grupo, n_estudantes, recursos, etapa, conteudos,
-                         prof_nome, prof_tipo, prof_escola, subetapa, curso, mostrar) = comando
+                         prof_nome, prof_tipo, prof_escola, subetapa, curso,
+                         disciplina, professor, numero_aulas, mostrar) = comando
+                        # Nunca grupo.disciplina/professor/numero_aulas direto
+                        # daqui pra baixo: os três vêm dos campos editáveis da
+                        # tela (ver Janela._coletar_dados_para_preencher) —
+                        # pré-preenchidos com os valores da agenda, mas podem
+                        # ter sido corrigidos (ex.: a agenda trouxe disciplina
+                        # "_OUTROS", sem correspondência conhecida). O que vale
+                        # pra SED é o que está escrito ali, não o valor cru da
+                        # agenda — que nunca é alterada.
                         page = self._garantir_navegador(p, visivel=bool(mostrar), escola=prof_escola)
                         iniciar_conferencia()
                         self._status("Abrindo o formulário e preenchendo...")
                         preencher_dados_fixos(page, prof_nome, prof_tipo, prof_escola)
-                        # "Turma" e "professor" ficam vazios numa aula sem
-                        # agendamento (ver Janela._abrir_aula_sem_agendamento
-                        # — de propósito NÃO preenche grupo.professor: quem
-                        # está registrando já aparece na página 1 do
-                        # formulário, repetir aqui é redundante e confunde
-                        # se um dia outra pessoa reenviar por essa mesma
-                        # máquina) — sem estes dois "if", o resumo saía com
-                        # um "()" pendurado ou um "Prof(a). " sem nome.
+                        # "Turma" fica vazia numa aula sem agendamento (ver
+                        # Janela._abrir_aula_sem_agendamento); "professor"
+                        # também pode ficar vazio ali de propósito — quem está
+                        # registrando já aparece na página 1 do formulário,
+                        # repetir aqui é redundante e confunde se um dia outra
+                        # pessoa reenviar por essa mesma máquina — sem estes
+                        # dois "if", o resumo saía com um "()" pendurado ou um
+                        # "Prof(a). " sem nome.
                         turma_texto = f" ({grupo.turma})" if grupo.turma else ""
-                        professor_texto = f"Prof(a). {grupo.professor} - " if grupo.professor else ""
+                        professor_texto = f"Prof(a). {professor} - " if professor else ""
                         resumo = (
-                            f"{grupo.disciplina}{turma_texto} - "
+                            f"{disciplina}{turma_texto} - "
                             f"{professor_texto}{grupo.inicio}-{grupo.fim}"
                         )
                         preencher_atividade_com_estudantes(
                             page,
-                            disciplina_agendamento=grupo.disciplina,
+                            disciplina_agendamento=disciplina,
                             etapa=etapa,
                             resumo_projeto=resumo,
-                            numero_aulas=grupo.numero_aulas,
+                            numero_aulas=numero_aulas,
                             numero_estudantes=n_estudantes,
                             conteudos_abordados=conteudos,
                             recursos_utilizados=recursos,
@@ -813,13 +822,13 @@ class NavegadorWorker(threading.Thread):
                             curso=curso,
                         )
                         if etapa == ETAPA_PROFISSIONAL:
-                            componente = ("CURSO", f"{curso} · {grupo.disciplina}")
+                            componente = ("CURSO", f"{curso} · {disciplina}")
                         elif etapa == ETAPA_AEE:
                             componente = ("AEE", subetapa)
                         else:
-                            componente = resolver_componente(grupo.disciplina, etapa)
+                            componente = resolver_componente(disciplina, etapa)
                             if componente is None:
-                                componente = ("OUTRO", grupo.disciplina)
+                                componente = ("OUTRO", disciplina)
                         self.eventos.put(
                             (
                                 "preenchido",
@@ -829,8 +838,9 @@ class NavegadorWorker(threading.Thread):
                                     "etapa": etapa,
                                     "subetapa": subetapa,
                                     "componente": componente,
+                                    "disciplina": disciplina,
                                     "resumo": resumo,
-                                    "aulas": grupo.numero_aulas,
+                                    "aulas": numero_aulas,
                                     "estudantes": n_estudantes,
                                     "conteudos": conteudos,
                                     "recursos": recursos,
@@ -1474,24 +1484,62 @@ class Janela(tk.Tk):
         )
         self.rotulo_aula.grid(row=1, column=0, columnspan=4, sticky="w", pady=(4, 10))
 
-        ttk.Label(cartao_dados, text="Nº de estudantes:", style="Cartao.TLabel").grid(
-            row=2, column=0, sticky="w"
-        )
-        self.campo_estudantes = ttk.Entry(cartao_dados, width=8, font=("Segoe UI", 11))
-        self.campo_estudantes.grid(row=2, column=1, sticky="w", padx=(8, 24))
+        # Disciplina, professor(a), nº de aulas, nº de estudantes e etapa —
+        # tudo numa barra só, lado a lado (não uma linha embaixo da outra).
+        # Os três primeiros vêm da agenda (grupo.*), mas editáveis: quando
+        # a agenda traz algo errado ou sem correspondência (ex.: disciplina
+        # "_OUTROS"), esse texto ia LITERALMENTE assim pro formulário da
+        # SED. Mesma filosofia do "Conteúdo aplicado" logo abaixo —
+        # pré-preenchido, editável, e o que vale pra SED é o que está
+        # escrito aqui, não o valor cru da agenda (que nunca é alterada
+        # por isto — ver resposta ao professor sobre esse pedido).
+        ttk.Label(
+            cartao_dados,
+            text=(
+                "Disciplina, professor(a), nº de aulas, nº de estudantes e etapa "
+                "(os 3 primeiros vêm da agenda — edite se precisar corrigir):"
+            ),
+            style="Cartao.TLabel",
+        ).grid(row=2, column=0, columnspan=4, sticky="w", pady=(0, 4))
+        linha_disciplina = ttk.Frame(cartao_dados, style="Cartao.TFrame")
+        linha_disciplina.grid(row=3, column=0, columnspan=4, sticky="ew")
+
+        ttk.Label(linha_disciplina, text="Disciplina:", style="Cartao.TLabel").pack(side="left")
+        self.campo_disciplina = ttk.Entry(linha_disciplina, width=20, font=("Segoe UI", 10))
+        self.campo_disciplina.pack(side="left", padx=(6, 14))
+
+        ttk.Label(linha_disciplina, text="Professor(a):", style="Cartao.TLabel").pack(side="left")
+        self.campo_professor = ttk.Entry(linha_disciplina, width=23, font=("Segoe UI", 10))
+        self.campo_professor.pack(side="left", padx=(6, 14))
+
+        ttk.Label(linha_disciplina, text="Nº de aulas:", style="Cartao.TLabel").pack(side="left")
+        self.campo_numero_aulas = ttk.Entry(linha_disciplina, width=4, font=("Segoe UI", 10))
+        self.campo_numero_aulas.pack(side="left", padx=(6, 14))
+
+        ttk.Label(linha_disciplina, text="Nº de estudantes:", style="Cartao.TLabel").pack(side="left")
+        self.campo_estudantes = ttk.Entry(linha_disciplina, width=5, font=("Segoe UI", 11))
+        self.campo_estudantes.pack(side="left", padx=(6, 14))
         self.campo_estudantes.bind("<Return>", lambda _e: self._preencher())
 
-        ttk.Label(cartao_dados, text="Etapa:", style="Cartao.TLabel").grid(row=2, column=2, sticky="w")
-        self.combo_etapa = ttk.Combobox(cartao_dados, values=ETAPAS, width=42, state="readonly")
-        self.combo_etapa.grid(row=2, column=3, sticky="w", padx=(8, 0))
+        ttk.Label(linha_disciplina, text="Etapa:", style="Cartao.TLabel").pack(side="left")
+        # width=42 (não menor): "Ensino Fundamental - Anos Iniciais" sozinho
+        # já tem 35 caracteres — um combobox mais estreito cortaria o texto.
+        self.combo_etapa = ttk.Combobox(linha_disciplina, values=ETAPAS, width=42, state="readonly")
+        self.combo_etapa.pack(side="left", padx=(6, 0))
         self.combo_etapa.bind("<<ComboboxSelected>>", lambda _e: self._ajustar_campo_extra())
+
+        ttk.Label(
+            cartao_dados,
+            text="Disciplina/professor(a)/nº de aulas não alteram a agenda do NTE — vale só para este envio à SED.",
+            style="Suave.TLabel",
+        ).grid(row=4, column=0, columnspan=4, sticky="w", pady=(3, 10))
 
         # Linha que só existe para as etapas com página própria no
         # formulário: AEE e EJA perguntam "Qual etapa?" antes de seguir, e
         # o Ensino Profissional pergunta o curso. Fica escondida no resto
         # do tempo (grid_remove) para não poluir a tela de todo dia.
         self.linha_extra = ttk.Frame(cartao_dados, style="Cartao.TFrame")
-        self.linha_extra.grid(row=3, column=0, columnspan=4, sticky="w", pady=(10, 0))
+        self.linha_extra.grid(row=6, column=0, columnspan=4, sticky="w", pady=(10, 0))
         self.rotulo_extra = ttk.Label(self.linha_extra, text="", style="Cartao.TLabel")
         self.rotulo_extra.pack(side="left")
         self.combo_extra = ttk.Combobox(self.linha_extra, values=[], width=36, state="readonly")
@@ -1503,7 +1551,7 @@ class Janela(tk.Tk):
             cartao_dados,
             text="Conteúdo aplicado (é o que vai no campo de conteúdos da SED):",
             style="Cartao.TLabel",
-        ).grid(row=4, column=0, columnspan=4, sticky="w", pady=(12, 4))
+        ).grid(row=7, column=0, columnspan=4, sticky="w", pady=(12, 4))
         self.campo_conteudo = tk.Text(
             cartao_dados,
             height=2,
@@ -1515,19 +1563,19 @@ class Janela(tk.Tk):
             foreground=COR_TEXTO,
             insertbackground=COR_TEXTO,
         )
-        self.campo_conteudo.grid(row=5, column=0, columnspan=4, sticky="ew")
+        self.campo_conteudo.grid(row=8, column=0, columnspan=4, sticky="ew")
         cartao_dados.columnconfigure(3, weight=1)
         ttk.Label(
             cartao_dados,
             text="Vem preenchido com o assunto lançado na agenda — edite à vontade.",
             style="Suave.TLabel",
-        ).grid(row=6, column=0, columnspan=4, sticky="w", pady=(3, 0))
+        ).grid(row=9, column=0, columnspan=4, sticky="w", pady=(3, 0))
 
         ttk.Label(cartao_dados, text="Recursos utilizados:", style="Cartao.TLabel").grid(
-            row=7, column=0, columnspan=4, sticky="w", pady=(12, 4)
+            row=10, column=0, columnspan=4, sticky="w", pady=(12, 4)
         )
         caixa_recursos = ttk.Frame(cartao_dados, style="Cartao.TFrame")
-        caixa_recursos.grid(row=8, column=0, columnspan=4, sticky="w")
+        caixa_recursos.grid(row=11, column=0, columnspan=4, sticky="w")
         self.vars_recursos: dict = {}
         # Duas colunas preenchidas de cima para baixo (e não em ziguezague):
         # assim os quatro nomes longos de "Computadores/notebooks" ficam
@@ -2773,6 +2821,12 @@ class Janela(tk.Tk):
         )
         self.rotulo_aula.configure(text=texto_aula)
         self.rotulo_aula_suporte.configure(text=texto_aula)
+        self.campo_disciplina.delete(0, "end")
+        self.campo_disciplina.insert(0, grupo.disciplina)
+        self.campo_professor.delete(0, "end")
+        self.campo_professor.insert(0, grupo.professor)
+        self.campo_numero_aulas.delete(0, "end")
+        self.campo_numero_aulas.insert(0, str(grupo.numero_aulas))
         etapa = etapa_para_turma(grupo.turma)
         self.combo_etapa.set(etapa or "")
         self._ajustar_campo_extra(sugerir_de=grupo.turma)
@@ -2828,6 +2882,9 @@ class Janela(tk.Tk):
         estar.
         """
         self.rotulo_aula.configure(text="Nenhuma aula selecionada.")
+        self.campo_disciplina.delete(0, "end")
+        self.campo_professor.delete(0, "end")
+        self.campo_numero_aulas.delete(0, "end")
         self.campo_estudantes.delete(0, "end")
         self.combo_etapa.set("")
         self._ajustar_campo_extra()
@@ -3314,13 +3371,29 @@ class Janela(tk.Tk):
         campos da TELA PRINCIPAL — que não têm nada a ver com aquele
         registro, já digitado e destruído junto com o diálogo (achado em
         revisão adversarial, antes de ir pro professor testar).
+
+        Para "aula", disciplina/professor(a)/nº de aulas que vão pro
+        NavegadorWorker são os de `self.campo_disciplina` /
+        `self.campo_professor` / `self.campo_numero_aulas` (pré-preenchidos
+        com grupo.disciplina/professor/numero_aulas, mas editáveis — ver
+        _montar) — NUNCA os atributos de `grupo` direto, porque um valor
+        errado ou sem correspondência conhecida na agenda (ex.: disciplina
+        "_OUTROS") iria assim mesmo pro formulário da SED sem essa
+        correção. A agenda do NTE em si nunca é alterada por isso — é só
+        o que este envio específico manda pra SED.
         """
         if self._dados_aula_avulsa is not None and grupo is self._dados_aula_avulsa["grupo"]:
             d = self._dados_aula_avulsa
+            # "Aula sem agendamento" já tem os próprios campos de
+            # disciplina/professor/nº de aulas naquele diálogo (não passa
+            # pela barra de "Dados do registro") — grupo.disciplina e
+            # grupo.numero_aulas já são o que a pessoa digitou lá, e
+            # grupo.professor fica vazio de propósito (ver NavegadorWorker).
             return (
                 "preencher", "aula", grupo, d["n_estudantes"], d["recursos"], d["etapa"],
                 d["conteudo"], self.orientador["nome"], self.orientador["tipo"],
-                self.orientador.get("escola", ""), d["subetapa"], d["curso"], mostrar,
+                self.orientador.get("escola", ""), d["subetapa"], d["curso"],
+                grupo.disciplina, grupo.professor, grupo.numero_aulas, mostrar,
             )
         if self.categoria_atual == "Suporte a outros espaços":
             return self._coletar_dados_suporte_avulso(mostrar)
@@ -3412,6 +3485,27 @@ class Janela(tk.Tk):
                 self.campo_curso.focus_set()
                 return None
 
+        disciplina = self.campo_disciplina.get().strip()
+        if not disciplina:
+            messagebox.showinfo(
+                "Disciplina/Componente curricular",
+                "Escreva a disciplina ou componente curricular — esse texto "
+                "decide o campo \"Componente curricular\" no formulário da SED.",
+            )
+            self.campo_disciplina.focus_set()
+            return None
+        # Professor(a) pode ficar em branco de propósito (mesma regra de
+        # "Aula sem agendamento" — ver comentário em NavegadorWorker) —
+        # por isso sem messagebox aqui, só lê e segue.
+        professor = self.campo_professor.get().strip()
+        bruto_aulas = self.campo_numero_aulas.get().strip()
+        if not bruto_aulas.isdigit() or int(bruto_aulas) <= 0:
+            messagebox.showinfo(
+                "Nº de aulas",
+                "Digite quantas aulas (blocos de 45 min) — só números.",
+            )
+            self.campo_numero_aulas.focus_set()
+            return None
         recursos = [r for r, v in self.vars_recursos.items() if v.get()]
         if not recursos:
             messagebox.showinfo("Recursos", "Marque pelo menos um recurso utilizado.")
@@ -3428,7 +3522,7 @@ class Janela(tk.Tk):
         return (
             "preencher", "aula", grupo, int(bruto), recursos, etapa, conteudo,
             self.orientador["nome"], self.orientador["tipo"], self.orientador.get("escola", ""),
-            subetapa, curso, mostrar,
+            subetapa, curso, disciplina, professor, int(bruto_aulas), mostrar,
         )
 
     def _coletar_dados_suporte_avulso(self, mostrar: bool):
@@ -3673,14 +3767,21 @@ class Janela(tk.Tk):
         # hora do preenchimento — ver _abrir_aula_sem_agendamento), mas
         # pode não ter turma (campo opcional) — daí as duas partes serem
         # somadas em vez de uma string só fixa, sem linha vazia sobrando.
+        # resumo['disciplina'] (o texto que foi de verdade pro formulário —
+        # ver o "preenchido" que guarda este resumo), não grupo.disciplina
+        # direto: se a pessoa corrigiu o campo (ex.: agenda trouxe
+        # "_OUTROS"), a confirmação tem que mostrar o que foi corrigido,
+        # senão parece que a correção não valeu — mesma lógica do
+        # 'estudantes' logo acima.
+        disciplina_confirmacao = resumo.get("disciplina", grupo.disciplina)
         if grupo.turma or grupo.inicio:
-            partes = [grupo.disciplina]
+            partes = [disciplina_confirmacao]
             if grupo.turma:
                 partes.append(grupo.turma)
             partes.append(f"{grupo.inicio}-{grupo.fim} · {detalhe}")
             linha_aula = "\n".join(partes)
         else:
-            linha_aula = f"{grupo.disciplina}\n{detalhe}"
+            linha_aula = f"{disciplina_confirmacao}\n{detalhe}"
         if not messagebox.askyesno(
             "Confirmar envio",
             f"Enviar este registro para a SED?\n\n"
@@ -3756,6 +3857,9 @@ class Janela(tk.Tk):
         self.botao_enviar.configure(state="disabled")
         self.botao_ver_no_navegador.configure(state="disabled")
         self.botao_preencher.configure(state="normal")
+        self.campo_disciplina.delete(0, "end")
+        self.campo_professor.delete(0, "end")
+        self.campo_numero_aulas.delete(0, "end")
         self.campo_estudantes.delete(0, "end")
         for var in self.vars_recursos.values():
             var.set(False)
@@ -3964,6 +4068,9 @@ class Janela(tk.Tk):
             self.botao_enviar.configure(state="disabled")
             self.botao_ver_no_navegador.configure(state="disabled")
             self.botao_preencher.configure(state="normal")
+            self.campo_disciplina.delete(0, "end")
+            self.campo_professor.delete(0, "end")
+            self.campo_numero_aulas.delete(0, "end")
             self.campo_estudantes.delete(0, "end")
             self.var_tipo_suporte.set("")
             self.campo_descricao_suporte.delete(0, "end")
