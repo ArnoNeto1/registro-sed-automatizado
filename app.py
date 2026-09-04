@@ -1079,6 +1079,18 @@ class Janela(tk.Tk):
 
         self._montar()
         self._dimensionar()
+        # Uma segunda medição, um instante depois de a janela já estar de
+        # verdade na tela: com a grade de recursos em 5 colunas, o texto
+        # do último grupo ("Notebooks (recurso móvel..." / "Outros
+        # recursos") saía cortado, mesmo com as 3 passadas de
+        # update_idletasks() dentro de _dimensionar() — a largura real de
+        # alguns widgets ttk só fica certa depois que a janela é
+        # efetivamente desenhada na tela (mapeada), o que só acontece
+        # quando o laço de eventos de verdade roda, não antes. Achado
+        # testando a mudança pra 5 colunas — com 2 ou 3 colunas o erro
+        # era pequeno o bastante (a folga de _dimensionar) pra não cortar
+        # nada, por isso nunca tinha aparecido antes.
+        self._after_ids["dimensionar_de_novo"] = self.after(150, self._dimensionar)
         self._after_ids["ler_eventos"] = self.after(100, self._ler_eventos)
         self.protocol("WM_DELETE_WINDOW", self._fechar)
 
@@ -1590,24 +1602,21 @@ class Janela(tk.Tk):
         caixa_recursos = ttk.Frame(cartao_dados, style="Cartao.TFrame")
         caixa_recursos.grid(row=11, column=0, columnspan=4, sticky="w")
         self.vars_recursos: dict = {}
-        # Três colunas preenchidas de cima para baixo (e não em ziguezague):
-        # assim os quatro nomes longos de "Computadores/notebooks" ficam
-        # juntos numa coluna só, e as outras duas ficam com os curtos — em
-        # ziguezague, uma segunda coluna herdaria um nome longo e estragaria
-        # o alinhamento.
+        # Colunas preenchidas de cima para baixo, DUAS linhas cada (e não
+        # em ziguezague): pedido do professor pra ocupar toda a largura
+        # que sobrava à direita das três colunas de antes — com só 2 por
+        # coluna, 9 recursos viram 5 colunas em vez de 3, esticando o
+        # grupo pela tela toda. A última coluna fica com um item sozinho
+        # (9 não é múltiplo de 2) — é esperado, não um bug de contagem.
         # Nome COMPLETO na tela, igual ao do formulário da SED — nunca
         # encurtado. "no laboratório" e "recurso móvel para sala de aula"
         # são justamente o que distingue um recurso do outro na hora de
         # marcar; um "Notebooks — software" abreviado já foi tentado e o
         # professor sentiu falta dessa informação.
-        # Antigamente eram só DUAS colunas (o texto da direita saía
-        # cortado com três, numa janela de largura fixa) — mas a largura
-        # da janela é calculada a partir do que teria de caber dentro dela
-        # (ver _dimensionar), não o contrário: com três colunas
-        # ela simplesmente fica mais larga, sem cortar nada, aproveitando o
-        # espaço vazio que sobrava à direita.
-        colunas_recursos = 3
-        por_coluna = -(-len(RECURSOS_DISPONIVEIS) // colunas_recursos)
+        # A largura da janela é calculada a partir do que precisa caber
+        # dentro dela (ver _dimensionar), não o contrário — então mais
+        # colunas só fazem a janela ficar mais larga, sem cortar nada.
+        por_coluna = 2
         for i, recurso in enumerate(RECURSOS_DISPONIVEIS):
             # Nenhum vem pré-marcado: quem registra escolhe cada vez, na
             # mão, o que realmente foi usado naquela aula (RECURSOS_PADRAO
@@ -3218,9 +3227,9 @@ class Janela(tk.Tk):
         caixa_recursos = ttk.Frame(cartao, style="Cartao.TFrame")
         caixa_recursos.grid(row=9, column=0, columnspan=4, sticky="w")
         vars_recursos: dict = {}
-        # Mesmas três colunas do formulário principal — ver o comentário
-        # em _montar, na criação de self.vars_recursos, para o porquê.
-        por_coluna = -(-len(RECURSOS_DISPONIVEIS) // 3)
+        # Mesmo layout do formulário principal (2 por coluna) — ver o
+        # comentário em _montar, na criação de self.vars_recursos.
+        por_coluna = 2
         for i, recurso in enumerate(RECURSOS_DISPONIVEIS):
             var = tk.BooleanVar(value=False)
             vars_recursos[recurso] = var
