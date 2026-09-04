@@ -1370,9 +1370,11 @@ class Janela(tk.Tk):
         cartao_lista = ttk.Frame(self.conteudo, style="Cartao.TFrame", padding=14)
         cartao_lista.pack(fill="x", expand=False, padx=20, pady=(8, 8))
 
-        cabecalho = ttk.Frame(cartao_lista, style="Cartao.TFrame")
-        cabecalho.pack(fill="x")
-        ttk.Label(cabecalho, text="Aulas da semana", style="Secao.TLabel").pack(side="left")
+        # "Aulas da semana" (o título) desceu pro rodapé do cartão, no
+        # lugar de "Não achou a sua aula na lista acima?" — ver
+        # self.rodape_aula_avulsa, mais abaixo. Teste visual pedido pelo
+        # professor, com print; se não ficar bom, é só devolver estas 3
+        # linhas removidas aqui.
 
         # Abas por recurso (Laboratório / Projetores / Tablets-Celular) —
         # só a maioria das escolas tem só o laboratório mesmo, então essa
@@ -1453,17 +1455,20 @@ class Janela(tk.Tk):
         # já existe o próprio jeito de registrar sem agenda.
         self.rodape_aula_avulsa = ttk.Frame(cartao_lista, style="Cartao.TFrame")
         self.rodape_aula_avulsa.pack(fill="x", pady=(8, 0))
+        # "Aulas da semana" — mesmo título e estilo que tinha lá em cima,
+        # só mudou de lugar (ver comentário perto de _linha_abas_recurso).
         ttk.Label(
-            self.rodape_aula_avulsa,
-            text="Não achou a sua aula na lista acima?",
-            style="Suave.TLabel",
+            self.rodape_aula_avulsa, text="Aulas da semana", style="Secao.TLabel"
         ).pack(side="left")
+        # "Registrar aula sem agendamento" foi pra ponta DIREITA da linha
+        # (antes ficava colado no "Não achou...", que saiu de aqui) —
+        # mesmo teste visual do professor.
         ttk.Button(
             self.rodape_aula_avulsa,
             text="Registrar aula sem agendamento",
             style="Link.TButton",
             command=self._abrir_aula_sem_agendamento,
-        ).pack(side="left", padx=(6, 0))
+        ).pack(side="right")
 
         # --- tipo de registro (só aparece para Projetores/Tablets-Celular) ---
         # Um agendamento de Laboratório sempre foi só uma coisa: aula com
@@ -2708,6 +2713,9 @@ class Janela(tk.Tk):
         # _preencher_tabela, depois que self.grupo_atual está resolvido).
         if self.categoria_atual in CATEGORIAS_INDEPENDENTES:
             self.corpo_lista.pack_forget()
+            # Some o título "Aulas da semana" também, já que ele mora
+            # dentro de rodape_aula_avulsa agora (teste visual) — nessas
+            # abas não tem semana nenhuma pra mostrar mesmo.
             self.rodape_aula_avulsa.pack_forget()
         else:
             self.corpo_lista.pack(fill="both", expand=True, pady=(10, 0))
