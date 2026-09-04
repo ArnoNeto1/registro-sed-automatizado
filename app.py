@@ -1163,8 +1163,13 @@ class Janela(tk.Tk):
         # formulário, as próprias abas...) ficava no cinza-claro padrão do
         # tema "clam" com letra preta — um retângulo claro em cima da tela
         # escura, e o "Principal" nem se destacava direito no claro.
+        # Fonte/padding reduzidos (10->9 / 8->6, e 11->10 / 10->7 no
+        # Principal, embaixo): pedido do professor pra tudo caber na tela
+        # sem precisar rolar — "TButton" é a base de TODO botão do app
+        # (comentário acima), então baixar aqui baixa em todo lugar de
+        # uma vez só, sem precisar caçar botão por botão.
         estilo.configure(
-            "TButton", font=("Segoe UI", 10), padding=8, background=COR_CARTAO, foreground=COR_TEXTO
+            "TButton", font=("Segoe UI", 9), padding=6, background=COR_CARTAO, foreground=COR_TEXTO
         )
         estilo.map(
             "TButton",
@@ -1173,8 +1178,8 @@ class Janela(tk.Tk):
         )
         estilo.configure(
             "Principal.TButton",
-            font=("Segoe UI", 11, "bold"),
-            padding=10,
+            font=("Segoe UI", 10, "bold"),
+            padding=7,
             background=COR_DESTAQUE,
             foreground="#ffffff",
         )
