@@ -3792,7 +3792,11 @@ class Janela(tk.Tk):
             "Confirmar envio",
             f"Enviar este registro para a SED?\n\n"
             f"{linha_aula}\n\n"
-            f"Registrando como: {self.orientador['nome']}",
+            # Mesma linha "escola · nome · cargo" do cabeçalho (ver
+            # subtitulo em _montar) — só o nome sozinho não bastava pra
+            # quem dá aula em mais de uma escola confirmar qual delas.
+            f"Registrando: {self.orientador.get('escola') or ESCOLA} · "
+            f"{self.orientador['nome']} · Tecnologias Educacionais",
         ):
             return
         self.botao_enviar.configure(state="disabled")
