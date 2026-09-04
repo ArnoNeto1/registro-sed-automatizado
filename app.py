@@ -1513,8 +1513,13 @@ class Janela(tk.Tk):
         # com print (o quadro vermelho mostrava as duas linhas juntas).
         linha_titulo_dados = ttk.Frame(cartao_dados, style="Cartao.TFrame")
         linha_titulo_dados.grid(row=0, column=0, columnspan=4, sticky="w", pady=(0, 10))
+        # anchor="s" nos dois: o título é 11 bold e o resumo é 10 normal —
+        # tamanhos diferentes de fonte, então o pack() (que por padrão
+        # centraliza cada widget na altura da linha) descia o texto menor
+        # mais que o maior e ficava visivelmente torto. Alinhando os dois
+        # pela base (como o texto realmente assenta), fica reto.
         ttk.Label(linha_titulo_dados, text="Dados do registro:", style="Secao.TLabel").pack(
-            side="left"
+            side="left", anchor="s"
         )
         self.rotulo_aula = ttk.Label(
             linha_titulo_dados, text="Nenhuma aula selecionada.", style="Suave.TLabel"
@@ -1522,7 +1527,7 @@ class Janela(tk.Tk):
         # padx (não espaço embutido no texto) pra separar do título: assim
         # continua certo em QUALQUER texto que _ao_selecionar/_limpar_dados
         # colocarem aqui depois, sem cada um ter que lembrar do espaço.
-        self.rotulo_aula.pack(side="left", padx=(6, 0))
+        self.rotulo_aula.pack(side="left", padx=(6, 0), anchor="s")
 
         # Disciplina, professor(a), nº de aulas, nº de estudantes e etapa —
         # tudo numa barra só, lado a lado (não uma linha embaixo da outra).
