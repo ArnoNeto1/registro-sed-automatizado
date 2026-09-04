@@ -1345,7 +1345,6 @@ class Janela(tk.Tk):
         cabecalho = ttk.Frame(cartao_lista, style="Cartao.TFrame")
         cabecalho.pack(fill="x")
         ttk.Label(cabecalho, text="Aulas da semana", style="Secao.TLabel").pack(side="left")
-        ttk.Button(cabecalho, text="Atualizar agenda", command=self._recarregar).pack(side="right")
 
         # Abas por recurso (Laboratório / Projetores / Tablets-Celular) —
         # só a maioria das escolas tem só o laboratório mesmo, então essa
@@ -1890,6 +1889,13 @@ class Janela(tk.Tk):
         ttk.Button(
             rodape, text="Conta Google da escola", style="Rodape.TButton",
             command=self._conferir_conta_google,
+        ).pack(side="right", padx=(0, 10))
+        # Testando ao lado de "Conta Google da escola" — outra opção de
+        # lugar pra "Atualizar agenda" (já esteve no cabeçalho da lista de
+        # aulas, depois do lado de "Formação/Reunião").
+        ttk.Button(
+            rodape, text="Atualizar agenda", style="Rodape.TButton",
+            command=self._recarregar,
         ).pack(side="right", padx=(0, 10))
 
         # Barra de conta no rodapé, e não no alto: ali ela não disputa
@@ -2604,11 +2610,11 @@ class Janela(tk.Tk):
         a grande maioria das escolas só tem o laboratório, e 3 abas para
         escolher entre uma coisa só seria só confusão.
 
-        "Manutenção" e "Formação/Reunião" não seguem essa regra: elas não
-        vêm de agendamento nenhum (ver CATEGORIAS_INDEPENDENTES), então
-        ficam SEMPRE visíveis — mas encostadas na ponta DIREITA da linha
-        (embaixo de "Atualizar agenda"), separadas das de cima, que ficam
-        à esquerda.
+        "Suporte a outros espaços", "Manutenção" e "Formação/Reunião" não
+        seguem essa regra: elas não vêm de agendamento nenhum (ver
+        CATEGORIAS_INDEPENDENTES), então ficam SEMPRE visíveis — mas
+        encostadas na ponta DIREITA da linha, separadas das de cima, que
+        ficam à esquerda.
 
         Uma aba que não é a selecionada, mas tem uma "sugerida agora" dela
         mesma, ganha destaque de aviso (cor de "SubAviso") — é o sinal de
