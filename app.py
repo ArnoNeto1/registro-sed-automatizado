@@ -1584,22 +1584,23 @@ class Janela(tk.Tk):
         caixa_recursos = ttk.Frame(cartao_dados, style="Cartao.TFrame")
         caixa_recursos.grid(row=11, column=0, columnspan=4, sticky="w")
         self.vars_recursos: dict = {}
-        # Duas colunas preenchidas de cima para baixo (e não em ziguezague):
+        # Três colunas preenchidas de cima para baixo (e não em ziguezague):
         # assim os quatro nomes longos de "Computadores/notebooks" ficam
-        # juntos na primeira coluna e a segunda não estoura a largura da
-        # janela. Antes o texto da direita saía cortado ("...no laborató"),
-        # e a barra de rolagem da área de cima ainda comia alguns pixels.
-        # Nome COMPLETO na tela, igual ao do formulário da SED. Cheguei a
-        # encurtar ("Notebooks — software") para caber em três colunas, e
-        # o professor sentiu falta da informação: "no laboratório" e
-        # "recurso móvel para sala de aula" são justamente o que distingue
-        # um recurso do outro na hora de marcar.
-        #
-        # Cabe assim porque as colunas são preenchidas de cima para baixo:
-        # os quatro nomes longos de "Computadores/notebooks" ficam todos na
-        # primeira coluna, e a segunda fica com os curtos. Em ziguezague, a
-        # segunda coluna herdaria um nome longo e estouraria a largura.
-        colunas_recursos = 2
+        # juntos numa coluna só, e as outras duas ficam com os curtos — em
+        # ziguezague, uma segunda coluna herdaria um nome longo e estragaria
+        # o alinhamento.
+        # Nome COMPLETO na tela, igual ao do formulário da SED — nunca
+        # encurtado. "no laboratório" e "recurso móvel para sala de aula"
+        # são justamente o que distingue um recurso do outro na hora de
+        # marcar; um "Notebooks — software" abreviado já foi tentado e o
+        # professor sentiu falta dessa informação.
+        # Antigamente eram só DUAS colunas (o texto da direita saía
+        # cortado com três, numa janela de largura fixa) — mas a largura
+        # da janela é calculada a partir do que teria de caber dentro dela
+        # (ver _dimensionar), não o contrário: com três colunas
+        # ela simplesmente fica mais larga, sem cortar nada, aproveitando o
+        # espaço vazio que sobrava à direita.
+        colunas_recursos = 3
         por_coluna = -(-len(RECURSOS_DISPONIVEIS) // colunas_recursos)
         for i, recurso in enumerate(RECURSOS_DISPONIVEIS):
             # Nenhum vem pré-marcado: quem registra escolhe cada vez, na
@@ -3211,7 +3212,9 @@ class Janela(tk.Tk):
         caixa_recursos = ttk.Frame(cartao, style="Cartao.TFrame")
         caixa_recursos.grid(row=9, column=0, columnspan=4, sticky="w")
         vars_recursos: dict = {}
-        por_coluna = -(-len(RECURSOS_DISPONIVEIS) // 2)
+        # Mesmas três colunas do formulário principal — ver o comentário
+        # em _montar, na criação de self.vars_recursos, para o porquê.
+        por_coluna = -(-len(RECURSOS_DISPONIVEIS) // 3)
         for i, recurso in enumerate(RECURSOS_DISPONIVEIS):
             var = tk.BooleanVar(value=False)
             vars_recursos[recurso] = var
