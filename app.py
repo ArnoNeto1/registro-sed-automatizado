@@ -1079,6 +1079,14 @@ class Janela(tk.Tk):
 
         self._montar()
         self._dimensionar()
+        # Abre maximizada — pedido do professor. "zoomed" é o estado do
+        # Windows (mantém a barra de título com minimizar/fechar, não é
+        # um fullscreen sem moldura); mesmo maximizada, _dimensionar()
+        # continua valendo por baixo — se algum dia a pessoa restaurar
+        # a janela (clicar no meio-quadrado do título), ela volta pro
+        # tamanho calculado a partir do conteúdo, não pra um tamanho
+        # cravado no código.
+        self.state("zoomed")
         # Uma segunda medição, um instante depois de a janela já estar de
         # verdade na tela: com a grade de recursos em 5 colunas, o texto
         # do último grupo ("Notebooks (recurso móvel..." / "Outros
@@ -2026,6 +2034,12 @@ class Janela(tk.Tk):
             self.update_idletasks()
             self._ajustar_area()
         self.update_idletasks()
+        # Maximizada (self.state("zoomed") no __init__, chamado ANTES da
+        # segunda passada agendada por after() — ver ali) um geometry()
+        # aqui tiraria a janela do maximizado. As _ajustar_area() de cima
+        # já bastam pra acertar a área rolável/barra por dentro dela.
+        if self.state() == "zoomed":
+            return
         # Reserva a largura da barra de rolagem mesmo quando ela ainda não
         # apareceu: com a janela aberta no tamanho da tela ela quase sempre
         # aparece, e aí comeria justamente o fim do texto dos recursos.
