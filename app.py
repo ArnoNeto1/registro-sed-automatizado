@@ -1263,26 +1263,34 @@ class Janela(tk.Tk):
         topo = ttk.Frame(self, padding=(20, 8, 20, 4))
         topo.pack(fill="x")
         ttk.Label(topo, text="Registro de Atividades — SED-SC", style="Titulo.TLabel").pack(anchor="w")
-        # Escola e nome vêm da configuração, não fixos no código: assim,
-        # quem receber uma cópia do programa vê os PRÓPRIOS dados aqui — e,
-        # se esquecer de configurar, percebe na hora, porque vai aparecer o
-        # nome de outra pessoa logo no alto da janela.
+        # Escola e nome vêm da configuração, não fixos no código — mas essa
+        # linha morou aqui embaixo do título só até este ponto: pedido do
+        # próprio professor foi mover pro RODAPÉ ("Registrando como: ..."),
+        # junto da barra de conta (Sair da conta/Meus dados), que é onde já
+        # se olha pra conferir quem está logado. Ver mais abaixo, perto do
+        # rodapé, onde self._identidade_rodape é de fato exibida.
         # ESCOLA é mostrada exatamente como está configurada, sem .title():
         # os nomes do formulário da SED são cheios de siglas (EEB, EEF,
         # CEDUP, CEJA) e o .title() as estragava — "EEB" virava "Eeb".
         #
-        # E, enquanto faltar configuração, o cabeçalho mostra uma frase
-        # que diz O QUE FAZER. Antes ele exibia o texto interno de aviso
-        # ("!! PREENCHA ORIENTADOR_NOME NO .env !!"), que parecia defeito
-        # do programa em vez de instrução para a pessoa.
+        # A ÚNICA coisa que continua aqui no topo é o aviso de configuração
+        # pendente — esse precisa saltar aos olhos na hora que a janela
+        # abre, não esperar a pessoa rolar até o rodapé. Antes ele exibia o
+        # texto interno de aviso ("!! PREENCHA ORIENTADOR_NOME NO .env !!"),
+        # que parecia defeito do programa em vez de instrução para a pessoa.
+        self._identidade_rodape = None
         if configuracao_incompleta():
-            subtitulo = "Configuração pendente — abra o arquivo .env e preencha seus dados"
-            estilo_sub = "SubAviso.TLabel"
+            ttk.Label(
+                topo,
+                text="Configuração pendente — abra o arquivo .env e preencha seus dados",
+                style="SubAviso.TLabel",
+            ).pack(anchor="w", pady=(0, 0))
         else:
             escola_exibida = self.orientador.get("escola") or ESCOLA
-            subtitulo = f"{escola_exibida} · {self.orientador.get('nome', ORIENTADOR_NOME)} · Tecnologias Educacionais"
-            estilo_sub = "Sub.TLabel"
-        ttk.Label(topo, text=subtitulo, style=estilo_sub).pack(anchor="w", pady=(0, 0))
+            self._identidade_rodape = (
+                f"Registrando como: {escola_exibida} · "
+                f"{self.orientador.get('nome', ORIENTADOR_NOME)} · Tecnologias Educacionais"
+            )
 
         # Seletor de professor — só aparece quando a escola tem mais de um
         # orientador configurado. Com um professor só, um seletor de uma
@@ -1902,12 +1910,18 @@ class Janela(tk.Tk):
         # altura com a lista de aulas e com os campos do registro, que é
         # o que a pessoa precisa ver numa tela pequena. E fica ao lado da
         # versão, que é o outro dado "sobre o programa", não sobre a aula.
-        if not SENHAS_SALVAS:
+        #
+        # "Registrando como: escola · nome · cargo" (self._identidade_rodape,
+        # calculada lá no topo) mora aqui agora — antes ficava embaixo do
+        # título "Registro de Atividades", pedido do próprio professor pra
+        # descer pro rodapé, junto de Sair da conta/Meus dados.
+        if self._identidade_rodape:
             ttk.Label(
                 rodape,
-                text=f"registrando como {self.orientador['nome']}",
+                text=self._identidade_rodape,
                 style="Rodape.TLabel",
             ).pack(side="left")
+        if not SENHAS_SALVAS:
             ttk.Button(
                 rodape, text="Sair da conta", style="Rodape.TButton",
                 command=self._sair_da_conta,
@@ -3792,11 +3806,7 @@ class Janela(tk.Tk):
             "Confirmar envio",
             f"Enviar este registro para a SED?\n\n"
             f"{linha_aula}\n\n"
-            # Mesma linha "escola · nome · cargo" do cabeçalho (ver
-            # subtitulo em _montar) — só o nome sozinho não bastava pra
-            # quem dá aula em mais de uma escola confirmar qual delas.
-            f"Registrando: {self.orientador.get('escola') or ESCOLA} · "
-            f"{self.orientador['nome']} · Tecnologias Educacionais",
+            f"Registrando como: {self.orientador['nome']}",
         ):
             return
         self.botao_enviar.configure(state="disabled")
