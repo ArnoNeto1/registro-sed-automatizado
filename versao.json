@@ -1,7 +1,7 @@
 {
-  "versao": "1.8.0",
-  "exe": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v1.8.0/Registro-SED.exe",
-  "instalador": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v1.8.0/Registro-SED-Instalador.exe",
+  "versao": "1.9.0",
+  "exe": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v1.9.0/Registro-SED.exe",
+  "instalador": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v1.9.0/Registro-SED-Instalador.exe",
   "zip": "https://github.com/ArnoNeto1/registro-sed-automatizado/archive/refs/heads/main.zip",
-  "notas": "- **Nova opção: registrar suporte a outros espaços sem agendamento.**\n  Até agora, \"Suporte do professor orientador a outros espaços\" (instalar\n  ou configurar um equipamento levado para outra sala) só podia ser\n  registrado quando isso já estava marcado na agenda do laboratório.\n  Agora tem um botão próprio, \"Suporte a outros espaços\", ao lado de\n  \"Manutenção\" e \"Formação/Reunião\" — sempre disponível, sem precisar de\n  reserva nenhuma.\n- Corrigido: em escolas com só um recurso (a maioria — só laboratório),\n  clicar em \"Manutenção\" ou \"Formação/Reunião\" podia deixar sem nenhum\n  jeito de voltar para a lista de aulas, a não ser fechando e abrindo o\n  programa de novo."
+  "notas": "- **Disciplina, professor(a) e nº de aulas agora são editáveis.** Antes,\n  o que vinha da agenda ia direto pro formulário da SED, mesmo quando\n  estava errado ou sem correspondência (por exemplo, \"_OUTROS\" no lugar\n  do nome real da disciplina). Agora dá pra corrigir esses três campos\n  na hora de registrar, numa barra só ao lado de \"Nº de estudantes\" e\n  \"Etapa\" — a correção vale só para aquele envio à SED, não muda a\n  agenda do NTE.\n- **O programa agora abre maximizado**, e a tela ficou mais compacta\n  (botões menores, \"Recursos utilizados\" espalhados em mais colunas) —\n  em telas menores, ainda dá pra rolar se precisar, mas na maioria das\n  vezes tudo já aparece de uma vez, sem precisar usar o scroll do mouse.\n- \"Atualizar agenda\" e \"Registrando como [seu nome]\" mudaram de lugar:\n  foram para o rodapé, perto dos outros botões de conta."
 }
