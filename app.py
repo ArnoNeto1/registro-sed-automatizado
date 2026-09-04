@@ -1512,11 +1512,17 @@ class Janela(tk.Tk):
         linha_disciplina.grid(row=3, column=0, columnspan=4, sticky="ew")
 
         ttk.Label(linha_disciplina, text="Disciplina:", style="Cartao.TLabel").pack(side="left")
-        self.campo_disciplina = ttk.Entry(linha_disciplina, width=20, font=("Segoe UI", 10))
+        # width=20 cortava nomes reais da agenda ("Língua Estrangeira -
+        # Inglês" virava "Língua Estrangeira - Ing", relatado com print) —
+        # a janela larga o que precisar pra caber (ver _dimensionar), então
+        # não tem por que economizar largura aqui.
+        self.campo_disciplina = ttk.Entry(linha_disciplina, width=32, font=("Segoe UI", 10))
         self.campo_disciplina.pack(side="left", padx=(6, 14))
 
         ttk.Label(linha_disciplina, text="Professor(a):", style="Cartao.TLabel").pack(side="left")
-        self.campo_professor = ttk.Entry(linha_disciplina, width=23, font=("Segoe UI", 10))
+        # Mesmo motivo: nomes completos ("Cristhine Fabiola De Ramos",
+        # "Edina Silvia Netto Wilhelm") passavam de 23 e cortavam.
+        self.campo_professor = ttk.Entry(linha_disciplina, width=30, font=("Segoe UI", 10))
         self.campo_professor.pack(side="left", padx=(6, 14))
 
         ttk.Label(linha_disciplina, text="Nº de aulas:", style="Cartao.TLabel").pack(side="left")
