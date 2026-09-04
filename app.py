@@ -1508,13 +1508,21 @@ class Janela(tk.Tk):
         self.cartao_dados = cartao_dados
         self._cartao_ativo = None
 
-        ttk.Label(cartao_dados, text="Dados do registro", style="Secao.TLabel").grid(
-            row=0, column=0, columnspan=4, sticky="w"
+        # Título e resumo numa linha só ("Dados do registro: 04/09/2026 ·
+        # ...") em vez de duas linhas separadas — pedido do professor,
+        # com print (o quadro vermelho mostrava as duas linhas juntas).
+        linha_titulo_dados = ttk.Frame(cartao_dados, style="Cartao.TFrame")
+        linha_titulo_dados.grid(row=0, column=0, columnspan=4, sticky="w", pady=(0, 10))
+        ttk.Label(linha_titulo_dados, text="Dados do registro:", style="Secao.TLabel").pack(
+            side="left"
         )
         self.rotulo_aula = ttk.Label(
-            cartao_dados, text="Nenhuma aula selecionada.", style="Suave.TLabel"
+            linha_titulo_dados, text="Nenhuma aula selecionada.", style="Suave.TLabel"
         )
-        self.rotulo_aula.grid(row=1, column=0, columnspan=4, sticky="w", pady=(4, 10))
+        # padx (não espaço embutido no texto) pra separar do título: assim
+        # continua certo em QUALQUER texto que _ao_selecionar/_limpar_dados
+        # colocarem aqui depois, sem cada um ter que lembrar do espaço.
+        self.rotulo_aula.pack(side="left", padx=(6, 0))
 
         # Disciplina, professor(a), nº de aulas, nº de estudantes e etapa —
         # tudo numa barra só, lado a lado (não uma linha embaixo da outra).
