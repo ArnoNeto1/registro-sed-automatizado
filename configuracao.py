@@ -721,91 +721,50 @@ class TelaDeEntrada(_Dialogo):
     def _montar(self) -> None:
         j = self.janela
 
-        # --- selo "Registro SED" com um anel de tracinhos girando ---
-        # Ideia de um site de referência que o professor mandou (anel
-        # girando devagar atrás do título, com um trecho mais aceso
-        # "correndo" pela borda) — refeita do zero aqui em Canvas +
-        # after(), na cor de destaque do próprio app: Tkinter não tem
-        # CSS nem animação pronta, então isto é geometria (seno/cosseno)
-        # redesenhada a cada quadro, não um recurso built-in.
-        topo = ttk.Frame(j, padding=(24, 20, 24, 0))
-        topo.pack(fill="x")
+        # --- anel de tracinhos girando em volta da tela de login TODA ---
+        # Pedido do professor, com print: não é mais só atrás de um selo
+        # pequeno — o anel precisa envolver o cartão inteiro (título,
+        # campos, botão). Isso muda a estrutura: em vez de empilhar
+        # [anel] em cima e [cartão] embaixo (como na primeira versão),
+        # os dois agora ficam SOBREPOSTOS e concêntricos — o Canvas do
+        # anel embaixo, o cartão por cima (via place(), que é o único
+        # jeito do Tk empilhar dois widgets ocupando o MESMO espaço).
+        #
+        # Isso exige montar o cartão PRIMEIRO (sem exibir ainda) só pra
+        # medir de quanto espaço ele precisa, e SÓ DEPOIS desenhar um
+        # anel com raio grande o bastante pra cercar essa medida (o
+        # raio de um círculo que envolve um retângulo é metade da
+        # diagonal dele, com uma margem).
+        moldura = tk.Frame(j, bg=COR_FUNDO)
+        moldura.pack(fill="both", expand=True)
 
-        TAM_ANEL = 200
-        CENTRO_ANEL = TAM_ANEL / 2
-        RAIO_ANEL = 84
-        N_TRACOS_ANEL = 40
-        COMPRIMENTO_TRACO_ANEL = 13
+        # LARGURA_CARTAO fixa a largura pela CAIXA DE SENHA (mais abaixo)
+        # e pelo wraplength dos textos — não no frame do cartão em si:
+        # um pack_propagate(False) aqui travaria a ALTURA também (viraria
+        # 1px, o padrão do Tk, em vez de crescer para caber os campos),
+        # e é justamente essa altura que a conta do raio do anel, logo
+        # adiante, precisa medir de verdade. Achado testando: a janela
+        # abria pequena demais e cortava o anel.
+        LARGURA_CARTAO = 320
+        cartao = tk.Frame(moldura, bg=COR_FUNDO)
 
-        self._anel_entrada = tk.Canvas(
-            topo, width=TAM_ANEL, height=TAM_ANEL, bg=COR_FUNDO, highlightthickness=0,
-        )
-        self._anel_entrada.pack()
-
-        def _cor_esmaecida_anel(fracao: float) -> str:
-            """fracao 0..1 -> mistura entre o fundo (traço "apagado") e a
-            cor de destaque (traço "aceso", na cabeça do giro)."""
-            r1, g1, b1 = int(COR_FUNDO[1:3], 16), int(COR_FUNDO[3:5], 16), int(COR_FUNDO[5:7], 16)
-            r2, g2, b2 = int(COR_DESTAQUE[1:3], 16), int(COR_DESTAQUE[3:5], 16), int(COR_DESTAQUE[5:7], 16)
-            r = int(r1 + (r2 - r1) * fracao)
-            g = int(g1 + (g2 - g1) * fracao)
-            b = int(b1 + (b2 - b1) * fracao)
-            return f"#{r:02x}{g:02x}{b:02x}"
-
-        self._angulo_anel_entrada = 0.0
-
-        def _desenhar_anel_entrada() -> None:
-            self._anel_entrada.delete("traco")
-            for i in range(N_TRACOS_ANEL):
-                ang = self._angulo_anel_entrada + (360 / N_TRACOS_ANEL) * i
-                rad = math.radians(ang)
-                # a "cauda" mais apagada e a "cabeça" (últimos ~45%) mais
-                # acesa, andando junto com a rotação — dá sensação de giro
-                # contínuo em vez de um anel estático só girando de bloco.
-                posicao_na_cauda = i / N_TRACOS_ANEL
-                fracao = max(0.0, (posicao_na_cauda - 0.55) / 0.45)
-                cor = _cor_esmaecida_anel(fracao)
-                largura = 3 + round(2 * fracao)
-                x1 = CENTRO_ANEL + RAIO_ANEL * math.cos(rad)
-                y1 = CENTRO_ANEL + RAIO_ANEL * math.sin(rad)
-                x2 = CENTRO_ANEL + (RAIO_ANEL - COMPRIMENTO_TRACO_ANEL) * math.cos(rad)
-                y2 = CENTRO_ANEL + (RAIO_ANEL - COMPRIMENTO_TRACO_ANEL) * math.sin(rad)
-                self._anel_entrada.create_line(
-                    x1, y1, x2, y2, fill=cor, width=largura, capstyle="round", tags="traco"
-                )
-
-        def _girar_anel_entrada() -> None:
-            if not j.winfo_exists():
-                return
-            self._angulo_anel_entrada = (self._angulo_anel_entrada + 3) % 360
-            _desenhar_anel_entrada()
-            self._id_anel_entrada = j.after(35, _girar_anel_entrada)
-
-        self._anel_entrada.create_text(
-            CENTRO_ANEL, CENTRO_ANEL - 9, text="Registro", fill=COR_TEXTO,
-            font=("Segoe UI", 13, "bold"),
-        )
-        self._anel_entrada.create_text(
-            CENTRO_ANEL, CENTRO_ANEL + 14, text="SED", fill=COR_DESTAQUE,
-            font=("Segoe UI", 19, "bold"),
-        )
-
-        ttk.Label(topo, text="Quem está registrando?", style="Sub.TLabel").pack(pady=(10, 0))
+        ttk.Label(
+            cartao, text="Quem está registrando?", style="Titulo.TLabel", background=COR_FUNDO,
+        ).pack(pady=(0, 4))
         if self.aviso:
-            ttk.Label(topo, text=self.aviso, style="Sub.TLabel").pack(pady=(4, 0))
+            ttk.Label(
+                cartao, text=self.aviso, style="Sub.TLabel", wraplength=LARGURA_CARTAO,
+                justify="center",
+            ).pack(pady=(0, 6))
 
-        # --- cartão ---
-        cartao = ttk.Frame(j, style="Cartao.TFrame", padding=20)
-        cartao.pack(fill="x", padx=26, pady=20)
-
-        ttk.Label(cartao, text="Professor(a)", style="Suave.TLabel").pack(anchor="w")
+        ttk.Label(cartao, text="Professor(a)", style="Sub.TLabel").pack(anchor="w", pady=(10, 0))
         nomes = [p.get("nome", "") for p in self.professores]
         self.combo_nome = ttk.Combobox(
             cartao, values=nomes, state="readonly", font=("Segoe UI", 10, "bold")
         )
         escolhido = self.sugerido if self.sugerido in nomes else (nomes[0] if nomes else "")
         self.combo_nome.set(escolhido)
-        self.combo_nome.pack(fill="x", pady=(4, 18))
+        self.combo_nome.pack(fill="x", pady=(4, 16))
 
         # --- senha, com rótulo "flutuante" ---
         # A ideia (rótulo começa centralizado dentro do campo vazio, feito
@@ -816,7 +775,9 @@ class TelaDeEntrada(_Dialogo):
         # widgets ocupam o MESMO espaço, empilhados (.lift() decide quem
         # fica visível por cima) — nada de CSS, é só geometria e eventos.
         ALTURA_CAIXA_SENHA = 48
-        caixa_senha = tk.Frame(cartao, bg=COR_CAMPO, height=ALTURA_CAIXA_SENHA)
+        caixa_senha = tk.Frame(
+            cartao, bg=COR_CAMPO, width=LARGURA_CARTAO, height=ALTURA_CAIXA_SENHA,
+        )
         caixa_senha.pack(fill="x")
         caixa_senha.pack_propagate(False)
 
@@ -879,16 +840,14 @@ class TelaDeEntrada(_Dialogo):
             ),
             style="Suave.TLabel",
             justify="left",
+            wraplength=LARGURA_CARTAO,
         )
-        texto_ajuda_senha.pack(anchor="w", pady=(12, 0))
+        texto_ajuda_senha.pack(anchor="w", pady=(10, 0))
 
-        # --- ações ---
-        acoes = ttk.Frame(j, padding=(26, 0, 26, 20))
-        acoes.pack(fill="x")
-        ttk.Button(acoes, text="Entrar", style="Principal.TButton", command=self._entrar).pack(
-            fill="x"
+        ttk.Button(cartao, text="Entrar", style="Principal.TButton", command=self._entrar).pack(
+            fill="x", pady=(16, 0)
         )
-        linha_secundaria = ttk.Frame(acoes)
+        linha_secundaria = ttk.Frame(cartao)
         linha_secundaria.pack(fill="x", pady=(8, 0))
         ttk.Button(
             linha_secundaria, text="Cadastrar outro(a) professor(a)", style="Fantasma.TButton",
@@ -901,6 +860,75 @@ class TelaDeEntrada(_Dialogo):
         ttk.Button(linha_secundaria, text="Remover professor(a)", command=self._remover).pack(
             side="right"
         )
+
+        # --- mede o cartão pronto, desenha um anel grande o bastante
+        # pra envolver ele todo, e sobrepõe os dois, concêntricos ---
+        cartao.update_idletasks()
+        altura_cartao = cartao.winfo_reqheight()
+        raio_anel = math.hypot(LARGURA_CARTAO, altura_cartao) / 2 + 30
+        tam_anel = int(raio_anel * 2) + 36
+        centro_anel = tam_anel / 2
+        n_tracos_anel = 56
+        comprimento_traco_anel = 15
+
+        moldura.configure(width=tam_anel, height=tam_anel)
+        # moldura só tem filhos via place() (canvas do anel + o cartão) —
+        # sem filho nenhum em pack()/grid(), o Tk não propaga esse
+        # tamanho pra janela sozinho (o auto-ajuste de janela depende de
+        # geometria pack/grid, não de place()). Sem isto, a janela ficava
+        # menor que o anel e cortava tudo — achado testando de verdade.
+        j.update_idletasks()
+        j.geometry(f"{tam_anel}x{tam_anel}")
+
+        self._anel_entrada = tk.Canvas(
+            moldura, width=tam_anel, height=tam_anel, bg=COR_FUNDO, highlightthickness=0,
+        )
+        self._anel_entrada.place(x=0, y=0)
+
+        def _cor_esmaecida_anel(fracao: float) -> str:
+            """fracao 0..1 -> mistura entre o fundo (traço "apagado") e a
+            cor de destaque (traço "aceso", na cabeça do giro)."""
+            r1, g1, b1 = int(COR_FUNDO[1:3], 16), int(COR_FUNDO[3:5], 16), int(COR_FUNDO[5:7], 16)
+            r2, g2, b2 = int(COR_DESTAQUE[1:3], 16), int(COR_DESTAQUE[3:5], 16), int(COR_DESTAQUE[5:7], 16)
+            r = int(r1 + (r2 - r1) * fracao)
+            g = int(g1 + (g2 - g1) * fracao)
+            b = int(b1 + (b2 - b1) * fracao)
+            return f"#{r:02x}{g:02x}{b:02x}"
+
+        self._angulo_anel_entrada = 0.0
+
+        def _desenhar_anel_entrada() -> None:
+            self._anel_entrada.delete("traco")
+            for i in range(n_tracos_anel):
+                ang = self._angulo_anel_entrada + (360 / n_tracos_anel) * i
+                rad = math.radians(ang)
+                # Gradiente contínuo em volta do círculo INTEIRO (nunca
+                # apaga de vez) — só a "cabeça" fica bem mais acesa,
+                # andando junto com a rotação. Com um anel deste tamanho
+                # (cercando o cartão todo, não só um selo pequeno), apagar
+                # a maior parte dele deixava a imagem parada com metade
+                # do anel sumida — só fazia sentido girando ao vivo.
+                posicao_na_cauda = i / n_tracos_anel
+                fracao = 0.16 + 0.84 * posicao_na_cauda
+                cor = _cor_esmaecida_anel(fracao)
+                largura = 3 + round(2 * fracao)
+                x1 = centro_anel + raio_anel * math.cos(rad)
+                y1 = centro_anel + raio_anel * math.sin(rad)
+                x2 = centro_anel + (raio_anel - comprimento_traco_anel) * math.cos(rad)
+                y2 = centro_anel + (raio_anel - comprimento_traco_anel) * math.sin(rad)
+                self._anel_entrada.create_line(
+                    x1, y1, x2, y2, fill=cor, width=largura, capstyle="round", tags="traco"
+                )
+
+        def _girar_anel_entrada() -> None:
+            if not j.winfo_exists():
+                return
+            self._angulo_anel_entrada = (self._angulo_anel_entrada + 3) % 360
+            _desenhar_anel_entrada()
+            self._id_anel_entrada = j.after(35, _girar_anel_entrada)
+
+        cartao.place(relx=0.5, rely=0.5, anchor="center")
+        cartao.lift()
         self.campo_senha.focus_set()
 
         # Cancela os dois relógios (anel girando + checagem de Caps
