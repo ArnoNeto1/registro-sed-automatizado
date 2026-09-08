@@ -757,14 +757,14 @@ class TelaDeEntrada(_Dialogo):
                 justify="center",
             ).pack(pady=(0, 4))
 
-        ttk.Label(cartao, text="Professor(a)", style="Sub.TLabel").pack(anchor="w", pady=(6, 0))
+        ttk.Label(cartao, text="Professor(a)", style="Sub.TLabel").pack(anchor="w", pady=(4, 0))
         nomes = [p.get("nome", "") for p in self.professores]
         self.combo_nome = ttk.Combobox(
             cartao, values=nomes, state="readonly", font=("Segoe UI", 10, "bold")
         )
         escolhido = self.sugerido if self.sugerido in nomes else (nomes[0] if nomes else "")
         self.combo_nome.set(escolhido)
-        self.combo_nome.pack(fill="x", pady=(4, 10))
+        self.combo_nome.pack(fill="x", pady=(3, 8))
 
         # --- senha, com rótulo "flutuante" ---
         # A ideia (rótulo começa centralizado dentro do campo vazio, feito
@@ -849,13 +849,13 @@ class TelaDeEntrada(_Dialogo):
             justify="left",
             wraplength=LARGURA_CARTAO,
         )
-        texto_ajuda_senha.pack(anchor="w", pady=(6, 0))
+        texto_ajuda_senha.pack(anchor="w", pady=(4, 0))
 
         ttk.Button(cartao, text="Entrar", style="Principal.TButton", command=self._entrar).pack(
-            fill="x", pady=(12, 0)
+            fill="x", pady=(10, 0)
         )
         linha_secundaria = ttk.Frame(cartao)
-        linha_secundaria.pack(fill="x", pady=(6, 0))
+        linha_secundaria.pack(fill="x", pady=(5, 0))
         ttk.Button(
             linha_secundaria, text="Cadastrar outro(a) professor(a)", style="Fantasma.TButton",
             command=self._cadastrar,
@@ -872,16 +872,15 @@ class TelaDeEntrada(_Dialogo):
         # pra envolver ele todo, e sobrepõe os dois, concêntricos ---
         cartao.update_idletasks()
         altura_cartao = cartao.winfo_reqheight()
-        # Margem menor (16, não 30) e uma segunda faixa de tracinhos mais
-        # pra dentro — dois anéis concêntricos e mais cheios (menos vão
-        # entre um traço e outro), não só um. Pedido do professor.
         raio_anel = math.hypot(LARGURA_CARTAO, altura_cartao) / 2 + 16
         tam_anel = int(raio_anel * 2) + 20
         centro_anel = tam_anel / 2
+        # Voltou a ser um anel só (não dois) — pedido do professor. Mais
+        # tracinhos e cada um mais comprido (14->17) do que a versão de
+        # um anel só original, pra sobrar bem menos vão entre eles.
         FAIXAS_ANEL = (
             # (raio, quantos tracinhos, comprimento de cada um)
-            (raio_anel, 80, 13),
-            (raio_anel - 22, 64, 10),
+            (raio_anel, 90, 17),
         )
 
         moldura.configure(width=tam_anel, height=tam_anel)
