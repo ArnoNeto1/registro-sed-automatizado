@@ -750,21 +750,21 @@ class TelaDeEntrada(_Dialogo):
 
         ttk.Label(
             cartao, text="Quem está registrando?", style="Titulo.TLabel", background=COR_FUNDO,
-        ).pack(pady=(0, 4))
+        ).pack(pady=(0, 2))
         if self.aviso:
             ttk.Label(
                 cartao, text=self.aviso, style="Sub.TLabel", wraplength=LARGURA_CARTAO,
                 justify="center",
-            ).pack(pady=(0, 6))
+            ).pack(pady=(0, 4))
 
-        ttk.Label(cartao, text="Professor(a)", style="Sub.TLabel").pack(anchor="w", pady=(10, 0))
+        ttk.Label(cartao, text="Professor(a)", style="Sub.TLabel").pack(anchor="w", pady=(6, 0))
         nomes = [p.get("nome", "") for p in self.professores]
         self.combo_nome = ttk.Combobox(
             cartao, values=nomes, state="readonly", font=("Segoe UI", 10, "bold")
         )
         escolhido = self.sugerido if self.sugerido in nomes else (nomes[0] if nomes else "")
         self.combo_nome.set(escolhido)
-        self.combo_nome.pack(fill="x", pady=(4, 16))
+        self.combo_nome.pack(fill="x", pady=(4, 10))
 
         # --- senha, com rótulo "flutuante" ---
         # A ideia (rótulo começa centralizado dentro do campo vazio, feito
@@ -785,7 +785,7 @@ class TelaDeEntrada(_Dialogo):
             caixa_senha, show="•", bg=COR_CAMPO, fg=COR_TEXTO, insertbackground=COR_TEXTO,
             relief="flat", font=("Segoe UI", 11), borderwidth=0,
         )
-        self.campo_senha.place(x=14, y=0, relwidth=1.0, width=-66, relheight=1.0)
+        self.campo_senha.place(x=14, y=0, relwidth=1.0, width=-56, relheight=1.0)
         self.campo_senha.bind("<Return>", lambda _e: self._entrar())
 
         rotulo_senha = tk.Label(
@@ -808,18 +808,25 @@ class TelaDeEntrada(_Dialogo):
         self.campo_senha.bind("<KeyRelease>", _posicionar_rotulo_senha)
         _posicionar_rotulo_senha()
 
-        def _alternar_visibilidade_senha() -> None:
-            if self.campo_senha.cget("show") == "•":
-                self.campo_senha.configure(show="")
-                botao_olho.configure(text="Ocultar")
-            else:
+        # Texto pequeno em vez de botão — mostrar/ocultar senha é uma
+        # ação secundária, não precisa de uma caixa chamativa competindo
+        # com o campo em si. Cursor de "mão" avisa que é clicável.
+        def _alternar_visibilidade_senha(_evento=None) -> None:
+            if campo_senha_visivel[0]:
                 self.campo_senha.configure(show="•")
-                botao_olho.configure(text="Mostrar")
+                rotulo_olho.configure(text="mostrar")
+            else:
+                self.campo_senha.configure(show="")
+                rotulo_olho.configure(text="ocultar")
+            campo_senha_visivel[0] = not campo_senha_visivel[0]
 
-        botao_olho = ttk.Button(
-            caixa_senha, text="Mostrar", command=_alternar_visibilidade_senha,
+        campo_senha_visivel = [False]
+        rotulo_olho = tk.Label(
+            caixa_senha, text="mostrar", bg=COR_CAMPO, fg=COR_SUAVE, font=("Segoe UI", 8),
+            cursor="hand2",
         )
-        botao_olho.place(relx=1.0, x=-4, rely=0.5, anchor="e")
+        rotulo_olho.place(relx=1.0, x=-10, rely=0.5, anchor="e")
+        rotulo_olho.bind("<Button-1>", _alternar_visibilidade_senha)
 
         # Aviso de Caps Lock — a senha vem escondida (show="•"), então é
         # o único jeito de perceber que vai sair tudo em maiúscula antes
@@ -842,13 +849,13 @@ class TelaDeEntrada(_Dialogo):
             justify="left",
             wraplength=LARGURA_CARTAO,
         )
-        texto_ajuda_senha.pack(anchor="w", pady=(10, 0))
+        texto_ajuda_senha.pack(anchor="w", pady=(6, 0))
 
         ttk.Button(cartao, text="Entrar", style="Principal.TButton", command=self._entrar).pack(
-            fill="x", pady=(16, 0)
+            fill="x", pady=(12, 0)
         )
         linha_secundaria = ttk.Frame(cartao)
-        linha_secundaria.pack(fill="x", pady=(8, 0))
+        linha_secundaria.pack(fill="x", pady=(6, 0))
         ttk.Button(
             linha_secundaria, text="Cadastrar outro(a) professor(a)", style="Fantasma.TButton",
             command=self._cadastrar,
@@ -865,11 +872,17 @@ class TelaDeEntrada(_Dialogo):
         # pra envolver ele todo, e sobrepõe os dois, concêntricos ---
         cartao.update_idletasks()
         altura_cartao = cartao.winfo_reqheight()
-        raio_anel = math.hypot(LARGURA_CARTAO, altura_cartao) / 2 + 30
-        tam_anel = int(raio_anel * 2) + 36
+        # Margem menor (16, não 30) e uma segunda faixa de tracinhos mais
+        # pra dentro — dois anéis concêntricos e mais cheios (menos vão
+        # entre um traço e outro), não só um. Pedido do professor.
+        raio_anel = math.hypot(LARGURA_CARTAO, altura_cartao) / 2 + 16
+        tam_anel = int(raio_anel * 2) + 20
         centro_anel = tam_anel / 2
-        n_tracos_anel = 56
-        comprimento_traco_anel = 15
+        FAIXAS_ANEL = (
+            # (raio, quantos tracinhos, comprimento de cada um)
+            (raio_anel, 80, 13),
+            (raio_anel - 22, 64, 10),
+        )
 
         moldura.configure(width=tam_anel, height=tam_anel)
         # moldura só tem filhos via place() (canvas do anel + o cartão) —
@@ -899,26 +912,34 @@ class TelaDeEntrada(_Dialogo):
 
         def _desenhar_anel_entrada() -> None:
             self._anel_entrada.delete("traco")
-            for i in range(n_tracos_anel):
-                ang = self._angulo_anel_entrada + (360 / n_tracos_anel) * i
-                rad = math.radians(ang)
-                # Gradiente contínuo em volta do círculo INTEIRO (nunca
-                # apaga de vez) — só a "cabeça" fica bem mais acesa,
-                # andando junto com a rotação. Com um anel deste tamanho
-                # (cercando o cartão todo, não só um selo pequeno), apagar
-                # a maior parte dele deixava a imagem parada com metade
-                # do anel sumida — só fazia sentido girando ao vivo.
-                posicao_na_cauda = i / n_tracos_anel
-                fracao = 0.16 + 0.84 * posicao_na_cauda
-                cor = _cor_esmaecida_anel(fracao)
-                largura = 3 + round(2 * fracao)
-                x1 = centro_anel + raio_anel * math.cos(rad)
-                y1 = centro_anel + raio_anel * math.sin(rad)
-                x2 = centro_anel + (raio_anel - comprimento_traco_anel) * math.cos(rad)
-                y2 = centro_anel + (raio_anel - comprimento_traco_anel) * math.sin(rad)
-                self._anel_entrada.create_line(
-                    x1, y1, x2, y2, fill=cor, width=largura, capstyle="round", tags="traco"
-                )
+            # Dois anéis concêntricos, girando em sentidos opostos (o de
+            # dentro um pouco mais rápido) — mais cheio visualmente que
+            # um anel só, e o contraste de sentido deixa bem claro que
+            # são duas faixas, não uma coisa confusa.
+            for indice_faixa, (raio, n_tracos, comprimento) in enumerate(FAIXAS_ANEL):
+                sentido = 1 if indice_faixa == 0 else -1
+                angulo_faixa = self._angulo_anel_entrada * sentido * (1 + 0.4 * indice_faixa)
+                for i in range(n_tracos):
+                    ang = angulo_faixa + (360 / n_tracos) * i
+                    rad = math.radians(ang)
+                    # Gradiente contínuo em volta do círculo INTEIRO (nunca
+                    # apaga de vez) — só a "cabeça" fica bem mais acesa,
+                    # andando junto com a rotação. Com um anel deste
+                    # tamanho (cercando o cartão todo, não só um selo
+                    # pequeno), apagar a maior parte dele deixava a
+                    # imagem parada com metade do anel sumida — só fazia
+                    # sentido girando ao vivo.
+                    posicao_na_cauda = i / n_tracos
+                    fracao = 0.16 + 0.84 * posicao_na_cauda
+                    cor = _cor_esmaecida_anel(fracao)
+                    largura = 3 + round(2 * fracao)
+                    x1 = centro_anel + raio * math.cos(rad)
+                    y1 = centro_anel + raio * math.sin(rad)
+                    x2 = centro_anel + (raio - comprimento) * math.cos(rad)
+                    y2 = centro_anel + (raio - comprimento) * math.sin(rad)
+                    self._anel_entrada.create_line(
+                        x1, y1, x2, y2, fill=cor, width=largura, capstyle="round", tags="traco"
+                    )
 
         def _girar_anel_entrada() -> None:
             if not j.winfo_exists():
