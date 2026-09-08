@@ -37,7 +37,6 @@ from __future__ import annotations
 
 import ctypes
 import json
-import math
 import re
 import tkinter as tk
 from tkinter import messagebox, ttk
@@ -221,15 +220,6 @@ def _estilizar(janela) -> None:
         "Aviso.TLabel", background=COR_CARTAO, foreground=COR_LARANJA,
         font=("Segoe UI", 9, "bold"),
     )
-    # Botão "fantasma": texto colorido sem caixa em volta, pra ações
-    # secundárias que não devem competir visualmente com o botão
-    # principal (ex.: "Cadastrar outro(a) professor(a)" na tela de
-    # entrar) — mesmo espírito do "Rodape.TButton" em app.py.
-    estilo.configure(
-        "Fantasma.TButton", font=("Segoe UI", 9), padding=(0, 6),
-        background=COR_FUNDO, foreground=COR_SUAVE, borderwidth=0,
-    )
-    estilo.map("Fantasma.TButton", foreground=[("active", COR_TEXTO)])
 
 
 def _caps_lock_ativo() -> bool:
@@ -720,126 +710,49 @@ class TelaDeEntrada(_Dialogo):
 
     def _montar(self) -> None:
         j = self.janela
-
-        # --- anel de tracinhos girando em volta da tela de login TODA ---
-        # Pedido do professor, com print: não é mais só atrás de um selo
-        # pequeno — o anel precisa envolver o cartão inteiro (título,
-        # campos, botão). Isso muda a estrutura: em vez de empilhar
-        # [anel] em cima e [cartão] embaixo (como na primeira versão),
-        # os dois agora ficam SOBREPOSTOS e concêntricos — o Canvas do
-        # anel embaixo, o cartão por cima (via place(), que é o único
-        # jeito do Tk empilhar dois widgets ocupando o MESMO espaço).
-        #
-        # Isso exige montar o cartão PRIMEIRO (sem exibir ainda) só pra
-        # medir de quanto espaço ele precisa, e SÓ DEPOIS desenhar um
-        # anel com raio grande o bastante pra cercar essa medida (o
-        # raio de um círculo que envolve um retângulo é metade da
-        # diagonal dele, com uma margem).
-        moldura = tk.Frame(j, bg=COR_FUNDO)
-        moldura.pack(fill="both", expand=True)
-
-        # LARGURA_CARTAO fixa a largura pela CAIXA DE SENHA (mais abaixo)
-        # e pelo wraplength dos textos — não no frame do cartão em si:
-        # um pack_propagate(False) aqui travaria a ALTURA também (viraria
-        # 1px, o padrão do Tk, em vez de crescer para caber os campos),
-        # e é justamente essa altura que a conta do raio do anel, logo
-        # adiante, precisa medir de verdade. Achado testando: a janela
-        # abria pequena demais e cortava o anel.
-        LARGURA_CARTAO = 320
-        cartao = tk.Frame(moldura, bg=COR_FUNDO)
-
-        ttk.Label(
-            cartao, text="Quem está registrando?", style="Titulo.TLabel", background=COR_FUNDO,
-        ).pack(pady=(0, 2))
+        topo = ttk.Frame(j, padding=(24, 20, 24, 6))
+        topo.pack(fill="x")
+        ttk.Label(topo, text="Quem está registrando?", style="Titulo.TLabel").pack(anchor="w")
         if self.aviso:
-            ttk.Label(
-                cartao, text=self.aviso, style="Sub.TLabel", wraplength=LARGURA_CARTAO,
-                justify="center",
-            ).pack(pady=(0, 4))
+            ttk.Label(topo, text=self.aviso, style="Sub.TLabel").pack(anchor="w", pady=(4, 0))
 
-        ttk.Label(cartao, text="Professor(a)", style="Sub.TLabel").pack(anchor="w", pady=(6, 0))
+        cartao = ttk.Frame(j, style="Cartao.TFrame", padding=18)
+        cartao.pack(fill="both", expand=True, padx=24, pady=12)
+        cartao.columnconfigure(1, weight=1)
+
         nomes = [p.get("nome", "") for p in self.professores]
+        ttk.Label(cartao, text="Professor(a):", style="Cartao.TLabel").grid(
+            row=0, column=0, sticky="w", pady=(0, 10)
+        )
         self.combo_nome = ttk.Combobox(
-            cartao, values=nomes, state="readonly", font=("Segoe UI", 10, "bold")
+            cartao, values=nomes, width=38, state="readonly", font=("Segoe UI", 10, "bold")
         )
         escolhido = self.sugerido if self.sugerido in nomes else (nomes[0] if nomes else "")
         self.combo_nome.set(escolhido)
-        self.combo_nome.pack(fill="x", pady=(4, 10))
+        self.combo_nome.grid(row=0, column=1, sticky="w", padx=(10, 0), pady=(0, 10))
 
-        # --- senha, com rótulo "flutuante" ---
-        # A ideia (rótulo começa centralizado dentro do campo vazio, feito
-        # de placeholder, e sobe/encolhe assim que a pessoa clica ou
-        # digita algo) é a mesma do site de referência — refeita do zero
-        # aqui com place()/eventos de foco, já que Tkinter não tem um
-        # equivalente do seletor CSS ":focus ~ label". Truque: os dois
-        # widgets ocupam o MESMO espaço, empilhados (.lift() decide quem
-        # fica visível por cima) — nada de CSS, é só geometria e eventos.
-        ALTURA_CAIXA_SENHA = 48
-        caixa_senha = tk.Frame(
-            cartao, bg=COR_CAMPO, width=LARGURA_CARTAO, height=ALTURA_CAIXA_SENHA,
+        ttk.Label(cartao, text="Senha da agenda:", style="Cartao.TLabel").grid(
+            row=1, column=0, sticky="w"
         )
-        caixa_senha.pack(fill="x")
-        caixa_senha.pack_propagate(False)
-
-        self.campo_senha = tk.Entry(
-            caixa_senha, show="•", bg=COR_CAMPO, fg=COR_TEXTO, insertbackground=COR_TEXTO,
-            relief="flat", font=("Segoe UI", 11), borderwidth=0,
-        )
-        self.campo_senha.place(x=14, y=0, relwidth=1.0, width=-56, relheight=1.0)
+        self.campo_senha = ttk.Entry(cartao, width=28, show="•", font=("Segoe UI", 11))
+        self.campo_senha.grid(row=1, column=1, sticky="w", padx=(10, 0))
         self.campo_senha.bind("<Return>", lambda _e: self._entrar())
-
-        rotulo_senha = tk.Label(
-            caixa_senha, text="Senha da agenda", bg=COR_CAMPO, fg=COR_SUAVE, font=("Segoe UI", 10),
-        )
-
-        def _posicionar_rotulo_senha(*_a) -> None:
-            focado = j.focus_get() is self.campo_senha
-            ativo = bool(self.campo_senha.get()) or focado
-            if ativo:
-                rotulo_senha.configure(font=("Segoe UI", 8), fg=COR_DESTAQUE)
-                rotulo_senha.place(x=14, y=5, anchor="nw")
-            else:
-                rotulo_senha.configure(font=("Segoe UI", 10), fg=COR_SUAVE)
-                rotulo_senha.place(x=14, y=ALTURA_CAIXA_SENHA // 2, anchor="w")
-            rotulo_senha.lift()
-
-        self.campo_senha.bind("<FocusIn>", _posicionar_rotulo_senha)
-        self.campo_senha.bind("<FocusOut>", _posicionar_rotulo_senha)
-        self.campo_senha.bind("<KeyRelease>", _posicionar_rotulo_senha)
-        _posicionar_rotulo_senha()
-
-        # Texto pequeno em vez de botão — mostrar/ocultar senha é uma
-        # ação secundária, não precisa de uma caixa chamativa competindo
-        # com o campo em si. Cursor de "mão" avisa que é clicável.
-        def _alternar_visibilidade_senha(_evento=None) -> None:
-            if campo_senha_visivel[0]:
-                self.campo_senha.configure(show="•")
-                rotulo_olho.configure(text="mostrar")
-            else:
-                self.campo_senha.configure(show="")
-                rotulo_olho.configure(text="ocultar")
-            campo_senha_visivel[0] = not campo_senha_visivel[0]
-
-        campo_senha_visivel = [False]
-        rotulo_olho = tk.Label(
-            caixa_senha, text="mostrar", bg=COR_CAMPO, fg=COR_SUAVE, font=("Segoe UI", 8),
-            cursor="hand2",
-        )
-        rotulo_olho.place(relx=1.0, x=-10, rely=0.5, anchor="e")
-        rotulo_olho.bind("<Button-1>", _alternar_visibilidade_senha)
 
         # Aviso de Caps Lock — a senha vem escondida (show="•"), então é
         # o único jeito de perceber que vai sair tudo em maiúscula antes
         # de tentar entrar e levar um "senha incorreta" sem entender por
         # quê. Escondido por padrão; _checar_caps_lock (chamada no fim
         # deste método) decide se mostra, e continua conferindo sozinha
-        # enquanto esta tela estiver aberta. "before=" garante que ele
-        # sempre aparece ENTRE o campo de senha e o texto de ajuda,
-        # mesmo depois de escondido/mostrado várias vezes (pack() não
-        # lembra posição sozinho do jeito que grid() lembrava antes).
-        self.aviso_caps = ttk.Label(cartao, text="⚠ Caps Lock ativado", style="Aviso.TLabel")
+        # enquanto esta tela estiver aberta.
+        self.aviso_caps = ttk.Label(
+            cartao,
+            text="⚠ Caps Lock ativado",
+            style="Aviso.TLabel",
+        )
+        self.aviso_caps.grid(row=2, column=1, sticky="w", padx=(10, 0), pady=(4, 0))
+        self.aviso_caps.grid_remove()
 
-        texto_ajuda_senha = ttk.Label(
+        ttk.Label(
             cartao,
             text=(
                 "A mesma senha que você usa no site da agenda do NTE.\n"
@@ -847,138 +760,43 @@ class TelaDeEntrada(_Dialogo):
             ),
             style="Suave.TLabel",
             justify="left",
-            wraplength=LARGURA_CARTAO,
+        ).grid(row=3, column=1, sticky="w", padx=(10, 0), pady=(8, 0))
+
+        rodape = ttk.Frame(j, padding=(24, 0, 24, 18))
+        rodape.pack(fill="x")
+        ttk.Button(rodape, text="Entrar", style="Principal.TButton", command=self._entrar).pack(
+            side="left"
         )
-        texto_ajuda_senha.pack(anchor="w", pady=(6, 0))
-
-        ttk.Button(cartao, text="Entrar", style="Principal.TButton", command=self._entrar).pack(
-            fill="x", pady=(12, 0)
+        ttk.Button(rodape, text="Cadastrar outro(a) professor(a)", command=self._cadastrar).pack(
+            side="left", padx=(10, 0)
         )
-        linha_secundaria = ttk.Frame(cartao)
-        linha_secundaria.pack(fill="x", pady=(6, 0))
-        ttk.Button(
-            linha_secundaria, text="Cadastrar outro(a) professor(a)", style="Fantasma.TButton",
-            command=self._cadastrar,
-        ).pack(side="left")
-        # À direita, separado do resto de propósito, e num botão "de
-        # verdade" (não fantasma) — é uma ação destrutiva (tira o
-        # professor da lista deste computador), não algo pra clicar sem
-        # querer no meio do fluxo de sempre.
-        ttk.Button(linha_secundaria, text="Remover professor(a)", command=self._remover).pack(
-            side="right"
-        )
-
-        # --- mede o cartão pronto, desenha um anel grande o bastante
-        # pra envolver ele todo, e sobrepõe os dois, concêntricos ---
-        cartao.update_idletasks()
-        altura_cartao = cartao.winfo_reqheight()
-        # Margem menor (16, não 30) e uma segunda faixa de tracinhos mais
-        # pra dentro — dois anéis concêntricos e mais cheios (menos vão
-        # entre um traço e outro), não só um. Pedido do professor.
-        raio_anel = math.hypot(LARGURA_CARTAO, altura_cartao) / 2 + 16
-        tam_anel = int(raio_anel * 2) + 20
-        centro_anel = tam_anel / 2
-        FAIXAS_ANEL = (
-            # (raio, quantos tracinhos, comprimento de cada um)
-            (raio_anel, 80, 13),
-            (raio_anel - 22, 64, 10),
-        )
-
-        moldura.configure(width=tam_anel, height=tam_anel)
-        # moldura só tem filhos via place() (canvas do anel + o cartão) —
-        # sem filho nenhum em pack()/grid(), o Tk não propaga esse
-        # tamanho pra janela sozinho (o auto-ajuste de janela depende de
-        # geometria pack/grid, não de place()). Sem isto, a janela ficava
-        # menor que o anel e cortava tudo — achado testando de verdade.
-        j.update_idletasks()
-        j.geometry(f"{tam_anel}x{tam_anel}")
-
-        self._anel_entrada = tk.Canvas(
-            moldura, width=tam_anel, height=tam_anel, bg=COR_FUNDO, highlightthickness=0,
-        )
-        self._anel_entrada.place(x=0, y=0)
-
-        def _cor_esmaecida_anel(fracao: float) -> str:
-            """fracao 0..1 -> mistura entre o fundo (traço "apagado") e a
-            cor de destaque (traço "aceso", na cabeça do giro)."""
-            r1, g1, b1 = int(COR_FUNDO[1:3], 16), int(COR_FUNDO[3:5], 16), int(COR_FUNDO[5:7], 16)
-            r2, g2, b2 = int(COR_DESTAQUE[1:3], 16), int(COR_DESTAQUE[3:5], 16), int(COR_DESTAQUE[5:7], 16)
-            r = int(r1 + (r2 - r1) * fracao)
-            g = int(g1 + (g2 - g1) * fracao)
-            b = int(b1 + (b2 - b1) * fracao)
-            return f"#{r:02x}{g:02x}{b:02x}"
-
-        self._angulo_anel_entrada = 0.0
-
-        def _desenhar_anel_entrada() -> None:
-            self._anel_entrada.delete("traco")
-            # Dois anéis concêntricos, girando em sentidos opostos (o de
-            # dentro um pouco mais rápido) — mais cheio visualmente que
-            # um anel só, e o contraste de sentido deixa bem claro que
-            # são duas faixas, não uma coisa confusa.
-            for indice_faixa, (raio, n_tracos, comprimento) in enumerate(FAIXAS_ANEL):
-                sentido = 1 if indice_faixa == 0 else -1
-                angulo_faixa = self._angulo_anel_entrada * sentido * (1 + 0.4 * indice_faixa)
-                for i in range(n_tracos):
-                    ang = angulo_faixa + (360 / n_tracos) * i
-                    rad = math.radians(ang)
-                    # Gradiente contínuo em volta do círculo INTEIRO (nunca
-                    # apaga de vez) — só a "cabeça" fica bem mais acesa,
-                    # andando junto com a rotação. Com um anel deste
-                    # tamanho (cercando o cartão todo, não só um selo
-                    # pequeno), apagar a maior parte dele deixava a
-                    # imagem parada com metade do anel sumida — só fazia
-                    # sentido girando ao vivo.
-                    posicao_na_cauda = i / n_tracos
-                    fracao = 0.16 + 0.84 * posicao_na_cauda
-                    cor = _cor_esmaecida_anel(fracao)
-                    largura = 3 + round(2 * fracao)
-                    x1 = centro_anel + raio * math.cos(rad)
-                    y1 = centro_anel + raio * math.sin(rad)
-                    x2 = centro_anel + (raio - comprimento) * math.cos(rad)
-                    y2 = centro_anel + (raio - comprimento) * math.sin(rad)
-                    self._anel_entrada.create_line(
-                        x1, y1, x2, y2, fill=cor, width=largura, capstyle="round", tags="traco"
-                    )
-
-        def _girar_anel_entrada() -> None:
-            if not j.winfo_exists():
-                return
-            self._angulo_anel_entrada = (self._angulo_anel_entrada + 3) % 360
-            _desenhar_anel_entrada()
-            self._id_anel_entrada = j.after(35, _girar_anel_entrada)
-
-        cartao.place(relx=0.5, rely=0.5, anchor="center")
-        cartao.lift()
+        # À direita, separado dos botões principais de propósito — é uma
+        # ação destrutiva (tira o professor da lista deste computador),
+        # não algo pra clicar sem querer no meio do fluxo de sempre.
+        ttk.Button(rodape, text="Remover professor(a)", command=self._remover).pack(side="right")
         self.campo_senha.focus_set()
 
-        # Cancela os dois relógios (anel girando + checagem de Caps
-        # Lock) assim que a tela fecha — de QUALQUER jeito que ela feche
-        # (Entrar, Cancelar, Cadastrar outro professor, fechar pelo X).
-        # Sem isto, achado testando de verdade: o after() já agendado
-        # tenta rodar depois que a janela (e o interpretador Tcl
-        # inteiro, se for a raiz) já foi destruída, e dá "invalid
-        # command name" — um erro que nem passa pelo try/except de
-        # dentro do relógio, porque o Tcl nem chega a achar o comando
-        # pra chamar.
-        self._id_anel_entrada = None
+        # Cancela a checagem de Caps Lock pendente assim que a tela
+        # fecha — de QUALQUER jeito que ela feche (Entrar, Cancelar,
+        # Cadastrar outro professor, fechar pelo X). Sem isto, achado
+        # testando de verdade: o after() já agendado tenta rodar depois
+        # que a janela (e o interpretador Tcl inteiro, se for a raiz)
+        # já foi destruída, e dá "invalid command name" — um erro que
+        # nem passa pelo try/except de dentro de _checar_caps_lock,
+        # porque o Tcl nem chega a achar o comando pra chamar.
         self._id_caps_lock = None
-        self._texto_ajuda_senha_widget = texto_ajuda_senha
-        self.janela.bind("<Destroy>", self._parar_relogios_entrada, add="+")
-        _girar_anel_entrada()
+        self.janela.bind("<Destroy>", self._parar_checagem_caps_lock, add="+")
         self._checar_caps_lock()
 
-    def _parar_relogios_entrada(self, evento) -> None:
+    def _parar_checagem_caps_lock(self, evento) -> None:
         if evento.widget is not self.janela:
             return  # <Destroy> também dispara pra cada widget filho
-        for atributo in ("_id_anel_entrada", "_id_caps_lock"):
-            id_job = getattr(self, atributo, None)
-            if id_job is not None:
-                try:
-                    self.janela.after_cancel(id_job)
-                except Exception:
-                    pass
-                setattr(self, atributo, None)
+        if self._id_caps_lock is not None:
+            try:
+                self.janela.after_cancel(self._id_caps_lock)
+            except Exception:
+                pass
+            self._id_caps_lock = None
 
     def _checar_caps_lock(self) -> None:
         """
@@ -988,20 +806,16 @@ class TelaDeEntrada(_Dialogo):
         (não só quando aperta uma tecla dentro do campo de senha).
 
         Para sozinha quando a tela fecha — winfo_exists() cobre o caso
-        comum, e _parar_relogios_entrada (ligada no <Destroy>) cobre a
+        comum, e _parar_checagem_caps_lock (ligada no <Destroy>) cobre a
         corrida de uma checagem que já tinha sido agendada bem na hora
         do fechamento.
         """
         if not self.janela.winfo_exists():
             return
         if _caps_lock_ativo():
-            # before= garante a posição certa (entre o campo de senha e
-            # o texto de ajuda) mesmo depois de escondido/mostrado várias
-            # vezes — pack() não guarda lugar sozinho do jeito que
-            # grid()/grid_remove() guardavam antes.
-            self.aviso_caps.pack(anchor="w", pady=(6, 0), before=self._texto_ajuda_senha_widget)
+            self.aviso_caps.grid()
         else:
-            self.aviso_caps.pack_forget()
+            self.aviso_caps.grid_remove()
         self._id_caps_lock = self.janela.after(250, self._checar_caps_lock)
 
     def _remover(self) -> None:
