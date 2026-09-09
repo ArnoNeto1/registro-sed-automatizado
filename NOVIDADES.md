@@ -10,6 +10,16 @@ seção `## <número>` com o que mudou. O resto acontece sozinho.
 
 ---
 
+## 1.9.1
+
+- **Corrigido: "Aula sem agendamento" dava erro ao clicar em "Preencher
+  formulário".** Quem tentasse registrar uma aula sem reserva na agenda
+  (o link "Registrar aula sem agendamento", embaixo da lista de aulas)
+  via a tela travar com uma mensagem de erro assim que clicava em
+  "Preencher formulário" — ficou pra trás na versão anterior, quando
+  Disciplina/Professor(a)/Nº de aulas viraram editáveis. Já era pra
+  funcionar de novo.
+
 ## 1.9.0
 
 - **Disciplina, professor(a) e nº de aulas agora são editáveis.** Antes,
