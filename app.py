@@ -503,7 +503,8 @@ class NavegadorWorker(threading.Thread):
     Comandos aceitos (colocados em comandos):
         ("carregar", quieto, cpf, senha, escola)
         ("preencher", "aula", grupo, n_estudantes, recursos, etapa, conteudos,
-         prof_nome, prof_tipo, prof_escola, subetapa, curso, mostrar)
+         prof_nome, prof_tipo, prof_escola, subetapa, curso,
+         disciplina, professor, numero_aulas, mostrar)
         ("preencher", "suporte", grupo, tipo_atendimento, descricao,
          quantidade_aulas, prof_nome, prof_tipo, prof_escola, mostrar)
         ("conta_google", escola)
@@ -3400,10 +3401,18 @@ class Janela(tk.Tk):
                 "subetapa": subetapa,
                 "curso": curso,
             }
+            # disciplina/professor/numero_aulas: mesma posição usada pelo
+            # resto do programa (ver _coletar_dados_para_preencher) — sem
+            # isto o comando ficava com 13 valores em vez de 16, e o
+            # NavegadorWorker quebrava com "not enough values to unpack"
+            # ao tentar desempacotar (bug relatado com print, real, em
+            # produção). grupo.professor fica "" de propósito (ver
+            # comentário logo abaixo, no ramo que usa self._dados_aula_avulsa).
             comando = (
                 "preencher", "aula", grupo, int(bruto_estudantes), recursos, etapa,
                 conteudo, self.orientador["nome"], self.orientador["tipo"],
                 self.orientador.get("escola", ""), subetapa, curso,
+                grupo.disciplina, grupo.professor, grupo.numero_aulas,
                 bool(self.mostrar_navegador.get()),
             )
             self.botao_preencher.configure(state="disabled")
