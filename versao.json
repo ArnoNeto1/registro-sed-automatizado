@@ -1,7 +1,7 @@
 {
-  "versao": "1.9.1",
-  "exe": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v1.9.1/Registro-SED.exe",
-  "instalador": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v1.9.1/Registro-SED-Instalador.exe",
+  "versao": "1.9.2",
+  "exe": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v1.9.2/Registro-SED.exe",
+  "instalador": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v1.9.2/Registro-SED-Instalador.exe",
   "zip": "https://github.com/ArnoNeto1/registro-sed-automatizado/archive/refs/heads/main.zip",
-  "notas": "- **Corrigido: \"Aula sem agendamento\" dava erro ao clicar em \"Preencher\n  formulário\".** Quem tentasse registrar uma aula sem reserva na agenda\n  (o link \"Registrar aula sem agendamento\", embaixo da lista de aulas)\n  via a tela travar com uma mensagem de erro assim que clicava em\n  \"Preencher formulário\" — ficou pra trás na versão anterior, quando\n  Disciplina/Professor(a)/Nº de aulas viraram editáveis. Já era pra\n  funcionar de novo."
+  "notas": "- **Agora dá para ver a senha digitada.** Na tela de entrada, ao lado\n  do campo \"Senha da agenda\", tem um \"mostrar\" — clique para revelar o\n  que você digitou (e \"ocultar\" para esconder de novo). Ajuda quem\n  estava errando a senha sem perceber, porque não dava para conferir o\n  que tinha sido digitado antes de clicar em \"Entrar\"."
 }
