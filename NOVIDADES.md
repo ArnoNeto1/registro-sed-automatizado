@@ -10,6 +10,14 @@ seção `## <número>` com o que mudou. O resto acontece sozinho.
 
 ---
 
+## 1.9.2
+
+- **Agora dá para ver a senha digitada.** Na tela de entrada, ao lado
+  do campo "Senha da agenda", tem um "mostrar" — clique para revelar o
+  que você digitou (e "ocultar" para esconder de novo). Ajuda quem
+  estava errando a senha sem perceber, porque não dava para conferir o
+  que tinha sido digitado antes de clicar em "Entrar".
+
 ## 1.9.1
 
 - **Corrigido: "Aula sem agendamento" dava erro ao clicar em "Preencher

@@ -734,9 +734,29 @@ class TelaDeEntrada(_Dialogo):
         ttk.Label(cartao, text="Senha da agenda:", style="Cartao.TLabel").grid(
             row=1, column=0, sticky="w"
         )
-        self.campo_senha = ttk.Entry(cartao, width=28, show="•", font=("Segoe UI", 11))
-        self.campo_senha.grid(row=1, column=1, sticky="w", padx=(10, 0))
+        linha_senha = ttk.Frame(cartao, style="Cartao.TFrame")
+        linha_senha.grid(row=1, column=1, sticky="w", padx=(10, 0))
+        self.campo_senha = ttk.Entry(linha_senha, width=28, show="•", font=("Segoe UI", 11))
+        self.campo_senha.pack(side="left")
         self.campo_senha.bind("<Return>", lambda _e: self._entrar())
+
+        # "mostrar/ocultar" como texto pequeno e clicável, não um botão —
+        # é uma ação secundária (professor errando a senha sem perceber
+        # que não consegue ver o que digitou), não precisa competir
+        # visualmente com o campo.
+        def _alternar_visibilidade_senha() -> None:
+            if self.campo_senha.cget("show") == "•":
+                self.campo_senha.configure(show="")
+                self.rotulo_olho.configure(text="ocultar")
+            else:
+                self.campo_senha.configure(show="•")
+                self.rotulo_olho.configure(text="mostrar")
+
+        self.rotulo_olho = ttk.Label(
+            linha_senha, text="mostrar", style="Suave.TLabel", cursor="hand2"
+        )
+        self.rotulo_olho.pack(side="left", padx=(8, 0))
+        self.rotulo_olho.bind("<Button-1>", lambda _e: _alternar_visibilidade_senha())
 
         # Aviso de Caps Lock — a senha vem escondida (show="•"), então é
         # o único jeito de perceber que vai sair tudo em maiúscula antes
