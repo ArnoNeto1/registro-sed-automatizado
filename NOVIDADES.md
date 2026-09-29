@@ -10,6 +10,18 @@ seção `## <número>` com o que mudou. O resto acontece sozinho.
 
 ---
 
+## 1.10.0
+
+- **Novo: "Escrever com IA..." para os objetos do conhecimento.** O
+  "Conteúdo aplicado" vem com o assunto da agenda, às vezes bem genérico
+  ("atividade de geografia - mercantilismo"). O botão novo, ao lado do
+  campo, abre uma conversa com uma IA que transforma isso num texto no
+  formato da SED, usando a disciplina, a turma e os recursos da aula. Dá
+  para contar detalhes ou pedir correções, e o texto só entra no campo
+  quando você clica em "Usar este texto". Opcional: precisa de uma chave
+  da API do Claude (platform.claude.com), paga por uso — uma fração de
+  centavo de dólar por texto.
+
 ## 1.9.3
 
 - **Atualização automática mais segura.** Se a internet caísse no meio
