@@ -26,6 +26,7 @@ precisasse do resto funcionando não seria rede de segurança nenhuma.
 
 import datetime
 import os
+import subprocess
 import sys
 import time
 import traceback
@@ -244,6 +245,29 @@ def _limpar_marcador_de_relancamento() -> None:
         pass
 
 
+def _ambiente_para_instancia_nova() -> dict:
+    """
+    Variáveis de ambiente para abrir o programa de novo como um processo
+    INDEPENDENTE deste.
+
+    Desde o PyInstaller 6.9, um processo aberto a partir do próprio
+    executável (sys.executable) herda variáveis de ambiente que o fazem
+    se considerar "filho" deste: em vez de extrair o programa numa pasta
+    temporária própria, ele passa a usar a MESMA pasta deste processo
+    (%TEMP%\\_MEIxxxxx) — que o PyInstaller apaga assim que este processo
+    termina. O processo novo então quebra no meio da inicialização, com
+    exatamente os erros vistos ao vivo quando o programa se reabria
+    sozinho: "Can't find a usable init.tcl" e "Failed to start embedded
+    python interpreter". Fechar e abrir na mão sempre resolvia porque o
+    atalho não herda essas variáveis.
+
+    PYINSTALLER_RESET_ENVIRONMENT=1 é o jeito documentado de dizer "este
+    é um programa novo, não um filho":
+    https://pyinstaller.org/en/stable/common-issues-and-pitfalls.html
+    """
+    return {**os.environ, "PYINSTALLER_RESET_ENVIRONMENT": "1"}
+
+
 def _relancar_processo_novo_se_possivel() -> bool:
     """
     Quando o "init.tcl" resiste às 6 tentativas dentro do MESMO processo
@@ -255,6 +279,11 @@ def _relancar_processo_novo_se_possivel() -> bool:
     NOVO (que ganha uma pasta de extração NOVA) resolve de verdade — foi
     exatamente isso que sempre "consertava" quando a pessoa fechava o
     erro e abria o programa na mão de novo.
+
+    "Processo novo" precisa ser novo de verdade — ver
+    `_ambiente_para_instancia_nova`: sem isso, o processo aberto daqui
+    reaproveitaria a pasta de extração DESTE, justamente a quebrada (e
+    que ainda por cima some quando este fecha).
 
     Limitado a poucas vezes (_LIMITE_RELANCAMENTOS) pra não virar um
     abre-fecha infinito se o problema for outro, persistente de verdade
@@ -271,7 +300,11 @@ def _relancar_processo_novo_se_possivel() -> bool:
         return False
     _registrar_tentativa_de_relancamento(ja_tentado + 1)
     try:
-        os.startfile(sys.executable, cwd=_pasta_do_programa())
+        subprocess.Popen(
+            [sys.executable],
+            cwd=_pasta_do_programa(),
+            env=_ambiente_para_instancia_nova(),
+        )
     except Exception:
         return False
     return True
