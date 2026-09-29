@@ -35,6 +35,7 @@ Antes de substituir qualquer coisa, é feita uma cópia de segurança em
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import shutil
@@ -127,8 +128,60 @@ def consultar(url_base: str) -> dict | None:
         "versao": publicada,
         "zip": dados.get("zip", ""),
         "exe": dados.get("exe", ""),
+        # Impressão digital (SHA-256) do .exe publicado — escrita pelo
+        # GitHub Actions no versao.json (ver montar-programa.yml) e
+        # conferida em _aplicar_exe antes de trocar o programa. Um
+        # versao.json de antes disso não tem essa linha: fica "" e a
+        # conferência cai só no tamanho anunciado pelo servidor.
+        "sha256": str(dados.get("sha256", "")).strip().lower(),
         "notas": str(dados.get("notas", "")).strip(),
     }
+
+
+def _baixar(url: str, destino: Path, tempo_limite: int) -> tuple:
+    """
+    Baixa `url` para o arquivo `destino` e devolve (bytes_recebidos,
+    sha256_em_hexadecimal).
+
+    CONFERE SE O ARQUIVO VEIO INTEIRO — e isso não é zelo à toa. Quando a
+    conexão fecha no meio de um download (internet de escola oscilando,
+    proxy, antivírus cortando a transferência), o urllib do Python NÃO
+    avisa: a leitura simplesmente termina, como se o arquivo tivesse
+    acabado ali (comportamento antigo do http.client, mantido de
+    propósito por compatibilidade). Sem esta conferência, um .exe cortado
+    pela metade passava por todas as outras checagens de _aplicar_exe —
+    ele começa com "MZ" e tem bem mais de 2 MB — e tomava o lugar do
+    programa, que aí não abria mais. E nem o erro.txt aparecia: com o
+    executável cortado, o Python nem chega a nascer para gravá-lo.
+
+    O servidor anuncia o tamanho do arquivo antes de mandar
+    (Content-Length); se chegou menos (ou mais) que isso, é erro — e
+    quem chama nunca troca nada.
+    """
+    requisicao = urllib.request.Request(
+        url, headers={"User-Agent": "RegistroSED-atualizador"}
+    )
+    impressao = hashlib.sha256()
+    recebidos = 0
+    with urllib.request.urlopen(requisicao, timeout=tempo_limite) as resposta:
+        anunciado = (resposta.headers.get("Content-Length") or "").strip()
+        with open(destino, "wb") as f:
+            while True:
+                bloco = resposta.read(1024 * 1024)
+                if not bloco:
+                    break
+                f.write(bloco)
+                impressao.update(bloco)
+                recebidos += len(bloco)
+    if anunciado.isdigit() and int(anunciado) != recebidos:
+        mb = 1024 * 1024
+        raise RuntimeError(
+            "O download da versão nova veio incompleto "
+            f"({recebidos / mb:.1f} de {int(anunciado) / mb:.1f} MB) — "
+            "provavelmente a internet oscilou no meio. Nada foi alterado; "
+            "tente de novo mais tarde."
+        )
+    return recebidos, impressao.hexdigest()
 
 
 def _aplicar_exe(info: dict) -> list:
@@ -143,8 +196,9 @@ def _aplicar_exe(info: dict) -> list:
     usando.
 
     A ordem importa: o novo só é baixado e conferido ANTES de mexer no
-    que já funciona. Se o download vier pela metade ou vier uma página de
-    erro no lugar do programa, nada é trocado.
+    que já funciona. Se o download vier pela metade (ver `_baixar`), vier
+    uma página de erro no lugar do programa ou não bater com a impressão
+    digital publicada no versao.json, nada é trocado.
     """
     url_exe = info.get("exe")
     if not url_exe:
@@ -157,15 +211,11 @@ def _aplicar_exe(info: dict) -> list:
     novo = atual.with_name(atual.stem + ".novo.exe")
     antigo = atual.with_name(atual.stem + ".antigo.exe")
 
-    requisicao = urllib.request.Request(
-        url_exe, headers={"User-Agent": "RegistroSED-atualizador"}
-    )
-    with urllib.request.urlopen(requisicao, timeout=TEMPO_LIMITE * 6) as resposta:
-        with open(novo, "wb") as f:
-            shutil.copyfileobj(resposta, f)
-
+    # O download fica DENTRO do try: se ele falhar no meio (internet caiu,
+    # download incompleto), o finally lá embaixo apaga o .novo.exe pela
+    # metade em vez de deixá-lo esquecido na pasta do programa.
     try:
-        tamanho = os.path.getsize(novo)
+        tamanho, impressao = _baixar(url_exe, novo, TEMPO_LIMITE * 6)
         with open(novo, "rb") as f:
             assinatura = f.read(2)
         # "MZ" é a assinatura de todo executável do Windows. Uma página de
@@ -174,6 +224,14 @@ def _aplicar_exe(info: dict) -> list:
             raise RuntimeError(
                 "O arquivo baixado não é o programa (veio com "
                 f"{tamanho // 1024} KB). Nada foi alterado."
+            )
+        esperada = (info.get("sha256") or "").strip().lower()
+        if esperada and impressao != esperada:
+            raise RuntimeError(
+                "O arquivo baixado não confere com a versão publicada (a "
+                "impressão digital SHA-256 é diferente) — pode ter vindo "
+                "corrompido no caminho. Nada foi alterado; tente de novo "
+                "mais tarde."
             )
 
         if antigo.exists():
@@ -238,14 +296,8 @@ def aplicar(info: dict) -> list:
         raise RuntimeError("A versão publicada não informou o endereço do pacote.")
 
     destino_zip = os.path.join(PASTA, "_atualizacao.zip")
-    requisicao = urllib.request.Request(
-        url_zip, headers={"User-Agent": "RegistroSED-atualizador"}
-    )
-    with urllib.request.urlopen(requisicao, timeout=TEMPO_LIMITE * 3) as resposta:
-        with open(destino_zip, "wb") as f:
-            shutil.copyfileobj(resposta, f)
-
     try:
+        _baixar(url_zip, Path(destino_zip), TEMPO_LIMITE * 3)
         arquivos = _arquivos_do_pacote(destino_zip)
 
         # Conferência de sanidade: sem estes, não é um pacote do programa.
@@ -260,16 +312,26 @@ def aplicar(info: dict) -> list:
                 + "). Nada foi alterado."
             )
 
-        os.makedirs(PASTA_BACKUP, exist_ok=True)
-        atualizados = []
+        # Lê TUDO antes de trocar QUALQUER arquivo: o zipfile só confere
+        # a integridade (CRC) de cada arquivo quando termina de lê-lo.
+        # Trocando um por um, um arquivo corrompido no meio do pacote só
+        # seria descoberto com metade da pasta já trocada — o programa
+        # ficaria com arquivos de duas versões misturados.
+        conteudos = {}
         with zipfile.ZipFile(destino_zip) as pacote:
             for nome, dentro_do_zip in arquivos.items():
-                atual = os.path.join(PASTA, nome)
-                if os.path.exists(atual):
-                    shutil.copy2(atual, os.path.join(PASTA_BACKUP, nome))
-                with pacote.open(dentro_do_zip) as origem, open(atual, "wb") as saida:
-                    shutil.copyfileobj(origem, saida)
-                atualizados.append(nome)
+                with pacote.open(dentro_do_zip) as origem:
+                    conteudos[nome] = origem.read()
+
+        os.makedirs(PASTA_BACKUP, exist_ok=True)
+        atualizados = []
+        for nome, conteudo in conteudos.items():
+            atual = os.path.join(PASTA, nome)
+            if os.path.exists(atual):
+                shutil.copy2(atual, os.path.join(PASTA_BACKUP, nome))
+            with open(atual, "wb") as saida:
+                saida.write(conteudo)
+            atualizados.append(nome)
 
         with open(ARQUIVO_VERSAO, "w", encoding="utf-8") as f:
             f.write(info["versao"])
