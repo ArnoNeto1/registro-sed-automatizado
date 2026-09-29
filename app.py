@@ -106,6 +106,7 @@ from config import (  # noqa: E402
     TODOS_TURNOS,
     turno_do_horario,
 )
+import assistente_ia  # noqa: E402
 import configuracao  # noqa: E402
 import tema  # noqa: E402
 from main import (  # noqa: E402
@@ -1177,6 +1178,10 @@ class Janela(tk.Tk):
             background=[("pressed", COR_CAMPO), ("active", COR_CAMPO)],
             foreground=[("disabled", COR_SUAVE)],
         )
+        # "Escrever com IA..." divide a linha com o rótulo do "Conteúdo
+        # aplicado": o mesmo botão comum (herda cores e fonte do TButton),
+        # só mais baixo, para não engordar a linha — a tela já é apertada.
+        estilo.configure("Compacto.TButton", padding=(8, 1))
         estilo.configure(
             "Principal.TButton",
             font=("Segoe UI", 10, "bold"),
@@ -1606,11 +1611,24 @@ class Janela(tk.Tk):
         self.dica_extra = ttk.Label(self.linha_extra, text="", style="Suave.TLabel")
         self.linha_extra.grid_remove()
 
+        # O rótulo divide a linha com o "Escrever com IA" (ver
+        # assistente_ia.py): ele abre uma conversa que escreve o texto
+        # dos objetos do conhecimento a partir da descrição do professor,
+        # e só troca o texto DESTE campo — o resto do fluxo (preencher,
+        # conferir, enviar) continua igual.
+        linha_rotulo_conteudo = ttk.Frame(cartao_dados, style="Cartao.TFrame")
+        linha_rotulo_conteudo.grid(row=7, column=0, columnspan=4, sticky="w", pady=(12, 4))
         ttk.Label(
-            cartao_dados,
+            linha_rotulo_conteudo,
             text="Conteúdo aplicado (é o que vai no campo de conteúdos da SED):",
             style="Cartao.TLabel",
-        ).grid(row=7, column=0, columnspan=4, sticky="w", pady=(12, 4))
+        ).pack(side="left")
+        ttk.Button(
+            linha_rotulo_conteudo,
+            text="Escrever com IA...",
+            style="Compacto.TButton",
+            command=self._escrever_conteudo_com_ia,
+        ).pack(side="left", padx=(10, 0))
         self.campo_conteudo = tk.Text(
             cartao_dados,
             height=2,
@@ -1626,7 +1644,10 @@ class Janela(tk.Tk):
         cartao_dados.columnconfigure(3, weight=1)
         ttk.Label(
             cartao_dados,
-            text="Vem preenchido com o assunto lançado na agenda — edite à vontade.",
+            text=(
+                "Vem preenchido com o assunto lançado na agenda — edite à vontade, "
+                "ou use \"Escrever com IA\"."
+            ),
             style="Suave.TLabel",
         ).grid(row=9, column=0, columnspan=4, sticky="w", pady=(3, 0))
 
@@ -2122,6 +2143,14 @@ class Janela(tk.Tk):
         """Roda do mouse rola a área de cima."""
         if not self._barra_visivel:
             return
+        # bind_all pega a roda do mouse de TODAS as janelas do programa —
+        # inclusive as que abrem por cima ("Escrever com IA", "aula sem
+        # agendamento"). Rolar dentro de uma delas não é com a tela de trás.
+        try:
+            if evento.widget.winfo_toplevel() is not self:
+                return
+        except Exception:
+            pass
         # Treeview tem rolagem própria — nunca rouba dela.
         if isinstance(evento.widget, ttk.Treeview):
             return
@@ -3153,6 +3182,44 @@ class Janela(tk.Tk):
             self.orientador.get("escola", ""),
         ))
 
+    def _escrever_conteudo_com_ia(self) -> None:
+        """
+        Botão "Escrever com IA..." do "Conteúdo aplicado" — o campo que vai
+        na pergunta dos objetos do conhecimento da SED. Ver assistente_ia.
+
+        Existe porque o campo vem com o assunto que o professor que agendou
+        escreveu na agenda, e ele costuma ser genérico ("atividade de
+        geografia - mercantilismo") — copiado ao pé da letra, o registro
+        na SED fica pobre. A IA desenvolve esse texto (e aceita correções
+        na conversa); o que ela escreve só entra no campo quando a pessoa
+        clica em "Usar este texto", e dali segue o fluxo de sempre.
+
+        Os dados da aula vão como contexto, para a IA não errar a
+        disciplina — lidos dos campos da tela (que podem ter sido
+        corrigidos), e nunca com nome de professor.
+        """
+        grupo = self.grupo_atual
+        contexto = {
+            "disciplina": self.campo_disciplina.get().strip(),
+            "turma": getattr(grupo, "turma", "") or "",
+            "etapa": self.combo_etapa.get().strip(),
+            "numero_aulas": self.campo_numero_aulas.get().strip(),
+            "recursos": [r for r, v in self.vars_recursos.items() if v.get()],
+            "assunto": getattr(grupo, "conteudo", "") or "",
+        }
+
+        def _usar(texto: str) -> None:
+            self.campo_conteudo.delete("1.0", "end")
+            self.campo_conteudo.insert("1.0", texto)
+            self._definir_status(
+                "Texto da IA colocado em \"Conteúdo aplicado\" — confira e clique em "
+                "\"Preencher formulário\"."
+            )
+
+        assistente_ia.abrir(
+            self, contexto, self.campo_conteudo.get("1.0", "end").strip(), _PALETA, _usar
+        )
+
     def _abrir_aula_sem_agendamento(self) -> None:
         """
         Janela separada para registrar uma aula que aconteceu SEM
@@ -3253,8 +3320,10 @@ class Janela(tk.Tk):
 
         combo_etapa.bind("<<ComboboxSelected>>", _ajustar_extra)
 
-        ttk.Label(cartao, text="Conteúdo aplicado:", style="Cartao.TLabel").grid(
-            row=6, column=0, columnspan=4, sticky="w", pady=(14, 4)
+        linha_rotulo_conteudo = ttk.Frame(cartao, style="Cartao.TFrame")
+        linha_rotulo_conteudo.grid(row=6, column=0, columnspan=4, sticky="w", pady=(14, 4))
+        ttk.Label(linha_rotulo_conteudo, text="Conteúdo aplicado:", style="Cartao.TLabel").pack(
+            side="left"
         )
         campo_conteudo = tk.Text(
             cartao, height=2, width=60, wrap="word", font=("Segoe UI", 10),
@@ -3263,6 +3332,31 @@ class Janela(tk.Tk):
         )
         campo_conteudo.grid(row=7, column=0, columnspan=4, sticky="ew")
         cartao.columnconfigure(3, weight=1)
+
+        def _escrever_com_ia() -> None:
+            # Mesmo assistente da tela principal (ver
+            # _escrever_conteudo_com_ia), com os dados digitados AQUI —
+            # sem agenda por trás, não há "assunto" original.
+            contexto = {
+                "disciplina": campo_disciplina.get().strip(),
+                "turma": campo_turma.get().strip(),
+                "etapa": combo_etapa.get().strip(),
+                "numero_aulas": campo_aulas.get().strip(),
+                "recursos": [r for r, v in vars_recursos.items() if v.get()],
+            }
+
+            def _usar(texto: str) -> None:
+                campo_conteudo.delete("1.0", "end")
+                campo_conteudo.insert("1.0", texto)
+
+            assistente_ia.abrir(
+                dlg, contexto, campo_conteudo.get("1.0", "end").strip(), _PALETA, _usar
+            )
+
+        ttk.Button(
+            linha_rotulo_conteudo, text="Escrever com IA...", style="Compacto.TButton",
+            command=_escrever_com_ia,
+        ).pack(side="left", padx=(10, 0))
 
         ttk.Label(cartao, text="Recursos utilizados:", style="Cartao.TLabel").grid(
             row=8, column=0, columnspan=4, sticky="w", pady=(14, 4)

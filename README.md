@@ -61,6 +61,22 @@ suporte/instalação de equipamento, manutenção, ou uma formação/reunião,
 use as outras abas em cima da lista de aulas — os campos do formulário se
 ajustam sozinhos para o tipo escolhido.
 
+### Objetos do conhecimento com IA (opcional)
+
+O "Conteúdo aplicado" vem com o assunto que o professor escreveu na
+agenda — muitas vezes genérico ("atividade de geografia - mercantilismo").
+O botão **"Escrever com IA..."**, ao lado do campo, abre uma conversa que
+transforma isso num texto de objetos do conhecimento no formato da SED
+("Foram abordados conteúdos de... Também foram desenvolvidas habilidades
+de..."). Dá para contar mais detalhes ou pedir correções na conversa, e o
+texto só entra no campo quando você clica em **"Usar este texto"**.
+
+Usa a API do Claude (Anthropic) com uma chave sua, criada em
+[platform.claude.com](https://platform.claude.com/settings/keys) — separada
+da assinatura do Claude e cobrada por uso (uma fração de centavo de dólar
+por texto). A chave fica guardada só no seu usuário do Windows. Sem chave,
+o resto do programa funciona exatamente igual.
+
 Os dois formatos de instalação (portátil e instalador) se atualizam
 sozinhos quando sai versão nova, e compartilham os mesmos dados — dá para
 trocar de um para o outro sem perder nada. O arquivo
@@ -94,6 +110,12 @@ python app.py   # abre a interface gráfica e cadastra pela tela
 Também dá para rodar por linha de comando (`python main.py --dry-run`,
 sem preencher nada de verdade) — veja `python main.py --help`.
 
+Testes (só biblioteca padrão, sem navegador nem internet):
+
+```bash
+python -m unittest discover -s tests -v
+```
+
 ### Estrutura dos arquivos
 
 | Arquivo | O que é |
@@ -106,8 +128,10 @@ sem preencher nada de verdade) — veja `python main.py --help`.
 | `config.py` | Dados fixos e mapeamentos (disciplina → componente curricular etc.). |
 | `configuracao.py` | Tela de cadastro (nome, escola, CPF, turnos) — substitui a edição manual do `.env`. |
 | `caminhos.py` | Onde ficam os arquivos do programa (`.py` vs `.exe`, portátil vs instalado) e qual navegador usar. |
-| `atualizador.py` | Autoatualização: consulta `versao.json`, baixa e troca os arquivos/o `.exe`. |
+| `atualizador.py` | Autoatualização: consulta `versao.json`, baixa, confere (tamanho e SHA-256) e troca os arquivos/o `.exe`. |
+| `assistente_ia.py` | "Escrever com IA...": conversa que escreve os objetos do conhecimento (API do Claude, opcional). |
 | `escolas.py` | Lista de escolas da CRE Blumenau, como aparecem no formulário da SED. |
+| `tests/` | Testes automáticos (`python -m unittest discover -s tests`). |
 | `installer/setup.iss` | Script do instalador Windows (Inno Setup). |
 | `.github/workflows/montar-programa.yml` | Gera o `.exe` portátil e o instalador e publica a release, automaticamente. |
 
