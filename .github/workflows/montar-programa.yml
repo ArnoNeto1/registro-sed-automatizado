@@ -144,13 +144,18 @@ jobs:
         shell: bash
         run: |
           python - <<'PY'
-          import json, pathlib
+          import hashlib, json, pathlib
 
           numero = "${{ needs.decidir.outputs.numero }}"
           repo = "${{ github.repository }}"
           dados = {
               "versao": numero,
               "exe": f"https://github.com/{repo}/releases/download/v{numero}/Registro-SED.exe",
+              # Impressão digital do .exe que acabou de ser publicado: o
+              # atualizador (atualizador._aplicar_exe) confere isto antes
+              # de trocar o programa de cada professor, e recusa um
+              # download incompleto ou corrompido no caminho.
+              "sha256": hashlib.sha256(pathlib.Path("dist/Registro-SED.exe").read_bytes()).hexdigest(),
               "instalador": f"https://github.com/{repo}/releases/download/v{numero}/Registro-SED-Instalador.exe",
               "zip": f"https://github.com/{repo}/archive/refs/heads/main.zip",
               "notas": pathlib.Path("notas.txt").read_text(encoding="utf-8").strip(),
