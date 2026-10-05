@@ -71,7 +71,7 @@ class _Ambiente(unittest.TestCase):
         ambiente = mock.patch.dict(os.environ, {"APPDATA": self.pasta}, clear=False)
         ambiente.start()
         self.addCleanup(ambiente.stop)
-        for nome in ("GEMINI_API_KEY", "SERVIDOR_IA_URL", "SERVIDOR_IA_TOKEN"):
+        for nome in ("CHAVE_GEMINI", "GEMINI_API_KEY", "SERVIDOR_IA_URL", "SERVIDOR_IA_TOKEN"):
             os.environ.pop(nome, None)
         # sem um servidor_ia.json de verdade por perto
         recurso = mock.patch.object(
@@ -92,10 +92,18 @@ class ChaveDaApi(_Ambiente):
         self.assertTrue(arquivo.exists())
 
     def test_variavel_de_ambiente_como_alternativa(self):
-        os.environ["GEMINI_API_KEY"] = "chave-do-env"
+        os.environ["CHAVE_GEMINI"] = "chave-do-env"
         self.assertEqual(assistente_ia.carregar_chave(), "chave-do-env")
         assistente_ia.salvar_chave("chave-da-tela")
         self.assertEqual(assistente_ia.carregar_chave(), "chave-da-tela")
+
+    def test_nome_generico_de_outras_ferramentas_e_ignorado(self):
+        # quem tem GEMINI_API_KEY no Windows (outra ferramenta do Gemini) NÃO
+        # pode ter o programa usando essa chave em silêncio, sem passar pelo
+        # serviço da escola
+        os.environ["GEMINI_API_KEY"] = "chave-de-outra-ferramenta"
+        self.assertEqual(assistente_ia.carregar_chave(), "")
+        self.assertEqual(assistente_ia.modo_disponivel(), "")
 
     def test_apagar_chave_salva(self):
         assistente_ia.salvar_chave("chave-salva")

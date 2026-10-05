@@ -34,7 +34,10 @@ Diferente do resto dos dados — que são do computador, compartilhados
 por todo mundo que usa o laboratório (ver caminhos.pasta_de_dados) — a
 chave é pessoal. Por isso fica em %APPDATA%\\RegistroSED, que outro
 usuário do Windows não consegue ler. Também pode vir da variável
-GEMINI_API_KEY (inclusive escrita no .env), para quem preferir.
+CHAVE_GEMINI (inclusive escrita no .env), para quem preferir. O nome é
+PRÓPRIO do programa de propósito: GEMINI_API_KEY é o nome que outras
+ferramentas do Gemini usam, e quem a tem definida no Windows teria o
+programa usando essa chave em silêncio, sem passar pelo serviço da escola.
 
 O QUE É ENVIADO PARA A IA
 -------------------------
@@ -138,14 +141,16 @@ def _pasta_da_chave() -> Path:
 def carregar_chave() -> str:
     """
     A chave salva pela tela tem preferência — é a última coisa que o
-    professor fez de propósito. A variável GEMINI_API_KEY (ou a mesma
-    linha no .env) fica como alternativa.
+    professor fez de propósito. A variável CHAVE_GEMINI (ou a mesma
+    linha no .env) fica como alternativa. NÃO se lê GEMINI_API_KEY: é o
+    nome genérico de outras ferramentas e usaria a chave de outra pessoa
+    ou de outro programa sem ninguém perceber.
     """
     try:
         salva = (_pasta_da_chave() / ARQUIVO_CHAVE).read_text(encoding="utf-8").strip()
     except OSError:
         salva = ""
-    return salva or (os.environ.get("GEMINI_API_KEY") or "").strip()
+    return salva or (os.environ.get("CHAVE_GEMINI") or "").strip()
 
 
 def salvar_chave(chave: str) -> None:
@@ -538,7 +543,7 @@ class JanelaAssistente:
         if carregar_chave():
             # sobrou uma chave na variável de ambiente: o programa não a apaga
             self.status.configure(
-                text="Ainda há uma chave em GEMINI_API_KEY (variável ou .env); "
+                text="Ainda há uma chave em CHAVE_GEMINI (variável ou .env); "
                 "remova-a para usar o serviço da escola."
             )
         else:

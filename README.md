@@ -80,7 +80,9 @@ Usa o Gemini (Google) por **dois caminhos**:
    ver o README de lá), nunca o programa nem este repositório.
 2. **Chave própria** — o professor cola uma chave criada de graça no
    [Google AI Studio](https://aistudio.google.com/apikey) (ou define
-   `GEMINI_API_KEY`). Se existe chave própria, ela tem preferência sobre o
+   `CHAVE_GEMINI`, no `.env` ou no Windows — de propósito não é
+   `GEMINI_API_KEY`, o nome que outras ferramentas usam). Se existe chave
+   própria, ela tem preferência sobre o
    serviço da escola.
 
 Sem nenhum dos dois, o resto do programa funciona exatamente igual. O modelo
@@ -177,7 +179,8 @@ completo.
 - **Guilherme Dornelles** (EEB Ivo D'Aquino, Gaspar) — na v1.9.3, o
   atualizador que confere o download antes de trocar o programa (tamanho e
   SHA-256) e a correção da reabertura automática (erro `init.tcl`), ambos
-  com testes automáticos.
+  com testes automáticos; e, na v1.10.0, a ideia e a primeira versão do
+  "Escrever com IA..." (que depois ganhou o serviço da escola e o Gemini).
 
 ## Licença
 
