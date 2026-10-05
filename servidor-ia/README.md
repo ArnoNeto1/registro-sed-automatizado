@@ -31,7 +31,7 @@ região São Paulo (`gru1`). Endereço de produção:
     https://registro-sed-ia-plexe1.vercel.app/api/ia
 
 A produção é pública de propósito (quem protege é o `x-app-token`); só as
-prévias ficam atrás do login da Vercel. Enquanto faltar `GEMINI_API_KEY` ou
+prévias ficam atrás do login da Vercel. Se faltar `GEMINI_API_KEY` ou
 `APP_TOKEN`, o servidor **recusa tudo** com 503 ("ainda não está
 configurado").
 
@@ -41,24 +41,29 @@ e os hashes SHA-1 conferidos contra os arquivos desta pasta. Por isso
 de novo (mesmo envio de `api/ia.py` e `api/_ia_gemini.py`), ou ligar o
 projeto a este repositório com **Root Directory = `servidor-ia`**.
 
-## O que falta para valer de verdade
+## Como está configurado
 
-1. Na Vercel, *Settings → Environment Variables*, crie como **Sensitive**:
-   - `GEMINI_API_KEY` — a chave do Gemini. **Com faturamento ligado** é o
-     recomendado: numa chave gratuita a Google usa o conteúdo dos
-     professores para melhorar os produtos dela (e uma assinatura do
-     Gemini não muda isso).
-   - `APP_TOKEN` — um segredo longo e aleatório (40+ caracteres).
-   - `MODELO_IA` — opcional, para trocar o modelo.
-   Depois, **publique de novo** (variável nova só vale em deploy novo).
-2. No GitHub, *Settings → Secrets and variables → Actions*, crie
-   `SERVIDOR_IA_URL` (o endereço acima) e `SERVIDOR_IA_TOKEN` (o MESMO
-   valor de `APP_TOKEN`). A montagem do `.exe` os embute num
-   `servidor_ia.json` (que nunca vai para o repositório).
-3. No Google AI Studio / Cloud, ponha um **orçamento com alerta e, se der,
-   um teto de cota** no projeto da chave: é a defesa final contra abuso.
-4. Gire o `APP_TOKEN` se suspeitar de vazamento (e publique uma versão
-   nova do programa com o segredo novo).
+- **Vercel** (*Settings → Environment Variables*, tipo Secret, só
+  Production): `GEMINI_API_KEY` (a chave do Gemini) e `APP_TOKEN` (segredo
+  longo e aleatório). `MODELO_IA` é opcional. Variável nova só vale em
+  deploy novo.
+- **GitHub** (*Settings → Secrets and variables → Actions*):
+  `SERVIDOR_IA_URL` (o endereço acima) e `SERVIDOR_IA_TOKEN` (o MESMO
+  valor de `APP_TOKEN`). A montagem do `.exe` os embute num
+  `servidor_ia.json`, que nunca vai para o repositório.
+
+## O que ainda recomendo
+
+1. **Chave com faturamento ligado.** Numa chave gratuita a Google usa o
+   conteúdo dos professores para melhorar os produtos dela e pessoas podem
+   lê-lo (uma assinatura do Gemini não muda isso; só o faturamento ligado
+   na chave). Trocar é só mudar o valor de `GEMINI_API_KEY` na Vercel e
+   publicar de novo — o programa não muda.
+2. No Google AI Studio / Cloud, um **orçamento com alerta e, se der, um
+   teto de cota** no projeto da chave: é a defesa final contra abuso.
+3. Girar o `APP_TOKEN` se houver suspeita de vazamento: novo valor na
+   Vercel e no GitHub (`SERVIDOR_IA_TOKEN`), republicar o servidor e
+   publicar uma versão nova do programa.
 
 ## Regras de defesa (ver `api/ia.py`)
 
