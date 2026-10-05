@@ -185,9 +185,7 @@ class AvisoDePrivacidade(unittest.TestCase):
 class ContextoParaEnviar(unittest.TestCase):
     def test_so_os_campos_combinados(self):
         limpo = assistente_ia.contexto_para_enviar(CONTEXTO)
-        self.assertEqual(
-            sorted(limpo), ["assunto", "disciplina", "etapa", "numero_aulas", "recursos", "turma"]
-        )
+        self.assertEqual(sorted(limpo), ["assunto", "disciplina", "etapa", "numero_aulas", "turma"])
         self.assertNotIn("professor", limpo)
 
     def test_campo_com_dado_pessoal_fica_de_fora_em_vez_de_travar(self):
@@ -197,9 +195,10 @@ class ContextoParaEnviar(unittest.TestCase):
         self.assertNotIn("assunto", limpo)
         self.assertEqual(limpo["disciplina"], "Geografia")
 
-    def test_recurso_com_dado_pessoal_tambem(self):
-        limpo = assistente_ia.contexto_para_enviar(dict(CONTEXTO, recursos=["Lousa", "a@b.com"]))
-        self.assertNotIn("recursos", limpo)
+    def test_recursos_marcados_nao_saem_do_computador(self):
+        # a IA deixou de receber os recursos (já vão em outro campo do formulário)
+        self.assertIn("recursos", CONTEXTO)
+        self.assertNotIn("recursos", assistente_ia.contexto_para_enviar(CONTEXTO))
 
     def test_contexto_vazio(self):
         self.assertEqual(assistente_ia.contexto_para_enviar(None), {})
@@ -234,7 +233,7 @@ class ClienteDoServidor(_Ambiente):
         self.assertEqual(pedido["corpo"]["conversa"], CONVERSA)
         self.assertEqual(
             sorted(pedido["corpo"]["contexto"]),
-            ["assunto", "disciplina", "etapa", "numero_aulas", "recursos", "turma"],
+            ["assunto", "disciplina", "etapa", "numero_aulas", "turma"],
         )
 
     def test_nome_de_professor_nunca_sai_do_computador(self):

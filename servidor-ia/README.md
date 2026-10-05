@@ -45,12 +45,28 @@ projeto a este repositório com **Root Directory = `servidor-ia`**.
 
 - **Vercel** (*Settings → Environment Variables*, tipo Secret, só
   Production): `GEMINI_API_KEY` (a chave do Gemini) e `APP_TOKEN` (segredo
-  longo e aleatório). `MODELO_IA` é opcional. Variável nova só vale em
-  deploy novo.
+  longo e aleatório). `MODELO_IA` é opcional (ver "Troca automática de
+  modelo", abaixo). Variável nova só vale em deploy novo.
 - **GitHub** (*Settings → Secrets and variables → Actions*):
   `SERVIDOR_IA_URL` (o endereço acima) e `SERVIDOR_IA_TOKEN` (o MESMO
   valor de `APP_TOKEN`). A montagem do `.exe` os embute num
   `servidor_ia.json`, que nunca vai para o repositório.
+
+## Troca automática de modelo
+
+No plano gratuito cada modelo do Gemini tem cota própria (pedidos por
+minuto e por dia). O servidor tenta os modelos de `MODELOS_PADRAO`
+(`ia_gemini.py`) na ordem: se o primeiro estiver no limite, sobrecarregado
+ou aposentado, o seguinte atende e o professor nem percebe. Só esses três
+erros trocam de modelo; chave recusada, filtro de segurança e internet fora
+do ar aparecem como antes. Cada troca vai para o registro da Vercel como
+`[ia] limite no modelo ... — tentando o próximo` (só o tipo do erro e o nome
+do modelo, nunca o conteúdo). Com `MODELO_IA=a,b,c` no painel você define a
+lista; um nome só usa esse modelo e nenhum outro. Todas as tentativas juntas
+têm teto de 55 s (`TEMPO_TOTAL`), porque o programa espera 60 s pelo
+servidor: um modelo sobrecarregado pode levar de 30 a 50 s para falhar, e
+sem esse teto o professor veria um erro de rede em vez da mensagem do
+servidor.
 
 ## O que ainda recomendo
 
@@ -59,9 +75,14 @@ projeto a este repositório com **Root Directory = `servidor-ia`**.
    lê-lo (uma assinatura do Gemini não muda isso; só o faturamento ligado
    na chave). Trocar é só mudar o valor de `GEMINI_API_KEY` na Vercel e
    publicar de novo — o programa não muda.
-2. No Google AI Studio / Cloud, um **orçamento com alerta e, se der, um
+2. **Um projeto do Google só da escola.** A cota é do PROJETO, não da
+   chave: se a chave da escola dividir o projeto com outras ferramentas,
+   qualquer rajada delas deixa os professores sem IA (o painel
+   https://ai.dev/rate-limit mostra o uso por modelo). Crie a chave da
+   escola num projeto novo no AI Studio.
+3. No Google AI Studio / Cloud, um **orçamento com alerta e, se der, um
    teto de cota** no projeto da chave: é a defesa final contra abuso.
-3. Girar o `APP_TOKEN` se houver suspeita de vazamento: novo valor na
+4. Girar o `APP_TOKEN` se houver suspeita de vazamento: novo valor na
    Vercel e no GitHub (`SERVIDOR_IA_TOKEN`), republicar o servidor e
    publicar uma versão nova do programa.
 

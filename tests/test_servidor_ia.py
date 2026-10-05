@@ -30,6 +30,9 @@ import ia  # noqa: E402  (servidor-ia/api/ia.py)
 
 GEMINI = []
 RESPOSTA_GEMINI = {"status": 200, "corpo": {}}
+# resposta de UM modelo (nome -> {"status", "corpo"}); o que não estiver
+# aqui usa RESPOSTA_GEMINI
+RESPOSTAS_GEMINI_POR_MODELO: dict = {}
 
 
 class _GeminiDeMentira(BaseHTTPRequestHandler):
@@ -37,12 +40,15 @@ class _GeminiDeMentira(BaseHTTPRequestHandler):
         tamanho = int(self.headers.get("Content-Length") or 0)
         GEMINI.append(
             {
+                "caminho": self.path,
                 "cabecalhos": {k.lower(): v for k, v in self.headers.items()},
                 "corpo": json.loads(self.rfile.read(tamanho).decode("utf-8")),
             }
         )
-        corpo = json.dumps(RESPOSTA_GEMINI["corpo"]).encode("utf-8")
-        self.send_response(RESPOSTA_GEMINI["status"])
+        modelo = self.path.rsplit("/", 1)[-1].split(":", 1)[0]
+        resposta = RESPOSTAS_GEMINI_POR_MODELO.get(modelo, RESPOSTA_GEMINI)
+        corpo = json.dumps(resposta["corpo"]).encode("utf-8")
+        self.send_response(resposta["status"])
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(corpo)))
         self.end_headers()
@@ -65,7 +71,7 @@ PEDIDO = {
         "disciplina": "Geografia",
         "turma": "8º ano",
         "numero_aulas": 2,
-        "recursos": ["Lousa Digital"],
+        "recursos": ["Lousa Digital"],  # a versão 2.0.0 ainda manda; o servidor ignora
         "assunto": "atividade de geografia - mercantilismo",
         "professor": "FULANA DE TAL DA SILVA",  # o servidor tem que ignorar
         "campo_inventado": "x",  # idem
@@ -93,6 +99,7 @@ class _Base(unittest.TestCase):
 
     def setUp(self):
         GEMINI.clear()
+        RESPOSTAS_GEMINI_POR_MODELO.clear()
         RESPOSTA_GEMINI.update(status=200, corpo=_gemini_ok("Texto da IA."))
         # o servidor chama o Gemini pela cópia do núcleo que ele carrega
         alvo = mock.patch.object(ia.ia, "URL_API", self.url_gemini)
@@ -126,9 +133,7 @@ class Validacao(unittest.TestCase):
 
     def test_so_passam_os_campos_combinados(self):
         contexto, conversa = ia.validar(PEDIDO)
-        self.assertEqual(
-            sorted(contexto), ["assunto", "disciplina", "numero_aulas", "recursos", "turma"]
-        )
+        self.assertEqual(sorted(contexto), ["assunto", "disciplina", "numero_aulas", "turma"])
         self.assertEqual(contexto["numero_aulas"], "2")  # número vira texto
         self.assertNotIn("FULANA", json.dumps(contexto))
         self.assertEqual(len(conversa), 1)
@@ -139,10 +144,18 @@ class Validacao(unittest.TestCase):
                 ia.validar(ruim)
 
     def test_contexto_mal_formado(self):
-        for ruim in ("texto", {"disciplina": ["lista"]}, {"disciplina": True},
-                     {"recursos": "uma string"}, {"recursos": [1, 2]}):
+        for ruim in ("texto", {"disciplina": ["lista"]}, {"disciplina": True}):
             with self.assertRaises(ia.PedidoInvalido, msg=str(ruim)):
                 ia.validar({"contexto": ruim, "conversa": self._conversa("oi")})
+
+    def test_cliente_antigo_que_ainda_manda_recursos_nao_quebra(self):
+        # A versão 2.0.0 do programa manda "recursos"; a IA não o recebe mais
+        # e o servidor o ignora, até se vier fora de forma (não trava o professor).
+        for recursos in (["Lousa Digital"], "uma string", [1, 2], {"a": 1}):
+            contexto, _ = ia.validar(
+                {"contexto": {"disciplina": "Arte", "recursos": recursos}, "conversa": self._conversa("oi")}
+            )
+            self.assertEqual(contexto, {"disciplina": "Arte"})
 
     def test_campo_grande_demais(self):
         with self.assertRaises(ia.PedidoInvalido):
@@ -343,6 +356,46 @@ class ErrosDoGemini(_Base):
             status, dados = ia.responder(_corpo(), "segredo-certo")
         self.assertEqual(status, 500)
         self.assertNotIn("secreto", json.dumps(dados))
+
+
+class TrocaDeModelo(_Base):
+    """Modelo principal no limite ou sobrecarregado: o servidor tenta o seguinte e o professor nem percebe."""
+
+    def _modelos_chamados(self):
+        return [g["caminho"].split("/models/")[1].split(":")[0] for g in GEMINI]
+
+    def test_primeiro_modelo_no_limite_o_professor_nem_percebe(self):
+        primeiro, segundo, _ = ia.ia.MODELOS_PADRAO
+        RESPOSTAS_GEMINI_POR_MODELO[primeiro] = {
+            "status": 429,
+            "corpo": _gemini_erro(429, "RESOURCE_EXHAUSTED", "quota SEGREDO-DO-GOOGLE"),
+        }
+        saida = io.StringIO()
+        with contextlib.redirect_stderr(saida), contextlib.redirect_stdout(saida):
+            status, dados = ia.responder(_corpo(), "segredo-certo")
+        self.assertEqual((status, dados), (200, {"texto": "Texto da IA."}))
+        self.assertEqual(self._modelos_chamados(), [primeiro, segundo])
+        registro = saida.getvalue()
+        self.assertIn(f"limite no modelo {primeiro}", registro)  # fica no registro, para quem mantém
+        self.assertNotIn("SEGREDO", registro)
+        self.assertNotIn("chave-da-escola", registro)
+
+    def test_todos_no_limite_o_professor_recebe_o_aviso_de_sempre(self):
+        RESPOSTA_GEMINI.update(status=429, corpo=_gemini_erro(429, "RESOURCE_EXHAUSTED", "quota"))
+        status, dados = ia.responder(_corpo(), "segredo-certo")
+        self.assertEqual(status, 429)
+        self.assertIn("muito ocupado", dados["erro"])
+        self.assertEqual(len(GEMINI), len(ia.ia.MODELOS_PADRAO))
+
+    def test_modelos_do_ambiente_do_servidor(self):
+        os.environ["MODELO_IA"] = "gemini-a,gemini-b"
+        RESPOSTAS_GEMINI_POR_MODELO["gemini-a"] = {
+            "status": 503,
+            "corpo": _gemini_erro(503, "UNAVAILABLE", "overloaded"),
+        }
+        status, _ = ia.responder(_corpo(), "segredo-certo")
+        self.assertEqual(status, 200)
+        self.assertEqual(self._modelos_chamados(), ["gemini-a", "gemini-b"])
 
 
 class SemVazamentos(_Base):

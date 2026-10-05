@@ -87,10 +87,14 @@ Usa o Gemini (Google) por **dois caminhos**:
    serviço da escola.
 
 Sem nenhum dos dois, o resto do programa funciona exatamente igual. O modelo
-padrão é o `gemini-3.5-flash-lite`; dá para trocar com `MODELO_IA=...`.
+principal é o `gemini-3.5-flash-lite`; se ele atingir o limite de uso ou
+estiver sobrecarregado, o programa (e o servidor) tenta sozinho o
+`gemini-3.1-flash-lite` e depois o `gemini-3.6-flash` — cada modelo tem cota
+própria, então elas se somam. Com `MODELO_IA=...` você escolhe: um nome só
+usa esse modelo e nenhum outro; vários, separados por vírgula, formam a lista.
 
 **Privacidade:** o que você escreve na conversa e os dados da aula
-(disciplina, turma, recursos, assunto da agenda) são enviados à Google
+(disciplina, turma, assunto da agenda) são enviados à Google
 para gerar o texto. Nome de professor não vai, mas o texto livre o programa
 não consegue filtrar — por isso a janela avisa para não digitar nomes de
 estudantes. Texto com CPF, e-mail ou telefone é barrado antes de sair do

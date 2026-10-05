@@ -10,6 +10,20 @@ seção `## <número>` com o que mudou. O resto acontece sozinho.
 
 ---
 
+## 2.0.1
+
+- **Corrigido: o "Escrever com IA..." devolvia quase sempre o mesmo
+  texto.** As mesmas frases apareciam no final de qualquer aula, e pedir
+  "outro texto" trazia o mesmo parágrafo com poucas palavras trocadas.
+  Agora cada texto fala do assunto da aula, e "outro texto" traz uma
+  versão realmente diferente.
+- **Os recursos marcados na aula deixaram de ir para a IA.** Eles já vão
+  no campo próprio do formulário. Se você citar um recurso na conversa
+  (por exemplo, os tablets), ele pode aparecer no texto.
+- **Mais estável.** Quando um modelo da IA atinge o limite de uso ou está
+  sobrecarregado, o programa troca sozinho para outro, sem você precisar
+  tentar de novo.
+
 ## 2.0.0
 
 - **Novo: "Escrever com IA..." para os objetos do conhecimento.** O

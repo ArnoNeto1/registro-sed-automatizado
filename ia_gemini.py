@@ -20,6 +20,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -27,12 +28,26 @@ import urllib.request
 URL_API = "https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent"
 URL_CHAVES = "https://aistudio.google.com/apikey"
 
-# O modelo estável mais barato e rápido do Gemini — de sobra para um
-# parágrafo de duas frases. Dá para trocar sem mexer no código, com a
-# linha MODELO_IA=... no .env (por exemplo, para um modelo maior).
-MODELO_PADRAO = "gemini-3.5-flash-lite"
+# Os modelos, na ordem em que são tentados. O primeiro é o mais barato e
+# rápido do Gemini, de sobra para um parágrafo de duas frases. No plano
+# gratuito CADA MODELO TEM COTA PRÓPRIA (pedidos por minuto e por dia; o
+# limite é do projeto, dividido com qualquer outra ferramenta que use as
+# chaves dele): quando o primeiro atinge o limite ou está sobrecarregado,
+# o seguinte atende, e as cotas se somam. Só entram modelos da mesma
+# família, que se comportam parecido com a instrução abaixo.
+# Dá para trocar sem mexer no código, com MODELO_IA=... (no .env do
+# programa ou no painel do servidor): um nome só usa ESSE modelo e nenhum
+# outro; vários, separados por vírgula, formam a lista.
+MODELOS_PADRAO = ("gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-3.6-flash")
+MODELO_PADRAO = MODELOS_PADRAO[0]  # o principal
 
-TEMPO_LIMITE = 60  # segundos
+TEMPO_LIMITE = 60  # segundos de espera por UM modelo
+# Teto de TODAS as tentativas juntas: o programa espera 60 s pelo servidor da
+# escola, que precisa responder (nem que seja com o erro) antes disso. Um
+# modelo sobrecarregado costuma levar de 30 a 50 s para falhar.
+TEMPO_TOTAL = 55
+# Com menos tempo que isso sobrando, nem vale começar outro modelo.
+TEMPO_MINIMO_DE_UMA_TENTATIVA = 8
 
 
 # ---------------------------------------------------------------------------
@@ -48,9 +63,9 @@ do que o professor contar sobre a aula.
 COMO ESCREVER
 - Português do Brasil, formal, objetivo, em terceira pessoa.
 - Um parágrafo de 2 frases (no máximo 3), com cerca de 25 a 60 palavras.
-- Siga o modelo: primeiro os conteúdos ("Foram abordados conteúdos de..." ou \
-"Foram trabalhados..."); depois as habilidades ("Também foram desenvolvidas \
-habilidades de...").
+- Siga o modelo: primeiro os conteúdos ("Foram abordados conteúdos de...", \
+"Foram trabalhados...", "Foram estudados..."); depois as habilidades \
+("Também foram desenvolvidas habilidades de...").
 - A disciplina da aula é a dos DADOS DA AULA. Não deduza a disciplina pelo \
 conteúdo: calcular média numa aula de Arte continua sendo uma aula de Arte. \
 Quando o conteúdo parecer de outra área, deixe claro de quem foi a iniciativa \
@@ -61,12 +76,16 @@ relacionados ao cálculo da média...").
 mercantilismo"): nesse caso, desenvolva os objetos do conhecimento que fazem \
 parte daquele tema no currículo escolar (no exemplo: metalismo, balança \
 comercial favorável, protecionismo), sem afirmar sobre a aula nada além do \
-que foi contado. Pode nomear as habilidades que decorrem diretamente do que \
-foi feito (letramento digital, pensamento computacional, pesquisa...), mas \
-não invente atividades, ferramentas, quantidades, nomes de pessoas nem \
-códigos da BNCC.
-- Os recursos utilizados (quando vierem nos dados da aula) podem aparecer no \
-texto, do jeito natural ("utilizando os computadores do laboratório").
+que foi contado. Não invente atividades, ferramentas, quantidades, nomes de \
+pessoas nem códigos da BNCC.
+- Se a descrição for só o nome da disciplina ou algo muito amplo, escolha \
+conteúdos característicos dela, na medida da etapa e da turma dos DADOS DA \
+AULA (a idade muda o que faz sentido ensinar).
+- As habilidades têm de ser as DESTE assunto: o que os estudantes aprendem a \
+fazer, comparar, construir ou interpretar ao estudá-lo. Evite rótulos vagos \
+que serviriam para qualquer aula; diga habilidades de quê, dentro do tema.
+- Se o professor citar um recurso usado na aula, você pode mencioná-lo numa \
+expressão curta. Não termine todo texto com um recurso por hábito.
 - Se o que foi contado (inclusive o assunto da agenda) citar a metodologia ou \
 a estratégia da aula (por exemplo: gamificação, rotação por estações, \
 aprendizagem baseada em projetos, aula expositiva dialogada), mencione-a numa \
@@ -79,14 +98,25 @@ Estudante Online, MakeCode, Scratch, Canva...).
 - Se o professor citar nomes de estudantes, não os repita no texto: fale em \
 "os estudantes" ou "a turma".
 
+A CONVERSA
+- Leia a conversa inteira: uma fala nova do professor pode detalhar ou \
+corrigir o que ele disse antes, e o texto novo tem de refletir isso.
+- Se ele pedir outro texto, outra versão ou "de novo", escreva uma versão \
+CLARAMENTE diferente da anterior e das que você já deu nesta conversa: abra \
+de outro jeito, destaque outros aspectos do mesmo assunto e use outras \
+palavras. Mantenha o que o professor informou. Trocar uma ou outra palavra \
+não conta como outra versão.
+- Se ele pedir uma correção ou um acréscimo, mude só o que foi pedido.
+
 FORMATO DA RESPOSTA
 - Responda SOMENTE com o texto que vai no formulário: sem título, sem \
 aspas, sem markdown (nada de asteriscos, negrito ou listas), sem comentário \
 antes ou depois.
-- Se o professor pedir uma mudança, devolva o texto inteiro já corrigido, no \
-mesmo formato.
+- Devolva sempre o texto inteiro, nunca só o trecho alterado.
 
 EXEMPLOS DO ESTILO QUE O PROFESSOR ESPERA
+Servem só de modelo de estilo e de nível de detalhe: não copie as palavras \
+deles, cada assunto pede as suas.
 
 Dados da aula: Disciplina: Arte
 Professor: Cálculo da média, acesso ao sistema Estudante Online e à \
@@ -95,30 +125,40 @@ mostrou aos alunos.
 Resposta: Foram trabalhados pelo professor de Arte conteúdos relacionados ao \
 cálculo da média e à utilização de ferramentas digitais para o acompanhamento \
 das atividades escolares. Também foram apresentados aos alunos o Estudante \
-Online e o Google Sala de Aula, utilizando o datashow como recurso tecnológico.
+Online e o Google Sala de Aula, com a projeção no datashow.
 
-Dados da aula: Disciplina: Geografia; Recursos utilizados: \
-Computadores/notebooks (pesquisa) no laboratório
+Dados da aula: Disciplina: Geografia
 Professor: atividade de geografia - mercantilismo
 Resposta: Foram abordados conteúdos de Geografia relacionados ao \
 mercantilismo, como o metalismo, a balança comercial favorável e o \
-protecionismo, e sua influência no comércio entre metrópoles e colônias. \
-Também foram desenvolvidas habilidades de pesquisa e análise de informações \
-utilizando os computadores do laboratório.
+protecionismo. Também foram desenvolvidas habilidades de interpretar como \
+essas práticas moldaram o comércio entre metrópoles e colônias.
 
 Dados da aula: Clube de robótica
 Professor: Os alunos do clube de robótica aprenderam os primeiros passos na \
 configuração e montagem da lagarta pelo site do MakeCode.
 Resposta: Foram abordados conteúdos de robótica educacional, com foco na \
 configuração e montagem inicial do robô lagarta. Também foram desenvolvidas \
-habilidades de programação e prototipagem utilizando o MakeCode."""
+habilidades de programação e prototipagem a partir do MakeCode.
 
+Dados da aula: Disciplina: ETI - Educação Digital; Turma: Anos Finais - 7º ano
+Professor: Os alunos fizeram cartazes no Canva sobre o meio ambiente.
+Resposta: Foram abordados conteúdos de Educação Digital relacionados ao \
+design gráfico no Canva, como a escolha de modelos, a combinação de cores e \
+fontes e a organização de textos e imagens no cartaz. Também foram \
+desenvolvidas habilidades de comunicar uma mensagem de forma visual e de \
+adaptar a linguagem ao público do tema ambiental."""
+
+# Os dados da aula que a IA enxerga. Os "Recursos utilizados" ficam DE FORA
+# de propósito: já vão em outro campo do formulário e, vistos pela IA, faziam
+# todo texto fechar com "utilizando os computadores do laboratório" (ou algo
+# parecido). Pedir na instrução para não repetir não bastou, em seis
+# redações testadas; sem o dado, a IA não tem o que repetir.
 _ROTULOS_DO_CONTEXTO = (
     ("Disciplina", "disciplina"),
     ("Turma", "turma"),
     ("Etapa", "etapa"),
     ("Número de aulas", "numero_aulas"),
-    ("Recursos utilizados", "recursos"),
     ("Assunto anotado na agenda", "assunto"),
 )
 # Os ÚNICOS campos da aula que podem sair do computador — de propósito,
@@ -278,16 +318,18 @@ def _explicar_erro_http(erro: urllib.error.HTTPError) -> tuple:
     return "recusado", f"O serviço da IA recusou o pedido (erro {erro.code}). {mensagem}".strip()
 
 
-def pedir_texto(chave: str, contexto: dict, conversa: list, modelo: str = "") -> str:
+def _pedir_a_um_modelo(
+    chave: str, contexto: dict, conversa: list, modelo: str, tempo_limite: float = TEMPO_LIMITE
+) -> str:
     """
-    Manda a conversa inteira (lista de {"role", "content"}, terminando
-    numa fala do professor) e devolve o texto novo, já limpo.
+    Um pedido a UM modelo: manda a conversa inteira (lista de {"role",
+    "content"}, terminando numa fala do professor) e devolve o texto novo,
+    já limpo.
 
     A conversa vai inteira a cada pedido porque a API não guarda nada
     entre um pedido e outro: é assim que "foi o professor de ARTES" faz
     sentido para ela — ela lê o texto anterior junto.
     """
-    modelo = modelo or (os.environ.get("MODELO_IA") or "").strip() or MODELO_PADRAO
     corpo = json.dumps(
         {
             "systemInstruction": {"parts": [{"text": montar_instrucoes(contexto)}]},
@@ -320,7 +362,7 @@ def pedir_texto(chave: str, contexto: dict, conversa: list, modelo: str = "") ->
         },
     )
     try:
-        with urllib.request.urlopen(requisicao, timeout=TEMPO_LIMITE) as resposta:
+        with urllib.request.urlopen(requisicao, timeout=tempo_limite) as resposta:
             dados = json.loads(resposta.read().decode("utf-8"))
     except urllib.error.HTTPError as erro:
         tipo, mensagem = _explicar_erro_http(erro)
@@ -357,3 +399,52 @@ def pedir_texto(chave: str, contexto: dict, conversa: list, modelo: str = "") ->
     if not texto:
         raise ErroDaIA("A IA respondeu em branco. Tente de novo.", "vazio")
     return texto
+
+
+# Erros que são do MODELO (cota, sobrecarga ou aposentadoria), não do pedido
+# nem da chave: só neles vale tentar o modelo seguinte. Chave recusada,
+# filtro de segurança, internet fora do ar... outro modelo não resolve.
+_TROCAM_DE_MODELO = ("limite", "indisponivel", "modelo")
+
+
+def _modelos_a_tentar(modelo: str = "") -> list:
+    """
+    Os modelos, na ordem. Um modelo escolhido (o argumento ou MODELO_IA no
+    ambiente) vale SOZINHO: quem escolheu não quer que outro responda no
+    lugar dele. Vários, separados por vírgula, formam a lista. Sem escolha,
+    vale MODELOS_PADRAO.
+    """
+    escolhido = modelo or (os.environ.get("MODELO_IA") or "")
+    lista = [nome.strip() for nome in escolhido.split(",") if nome.strip()]
+    return lista or list(MODELOS_PADRAO)
+
+
+def pedir_texto(chave: str, contexto: dict, conversa: list, modelo: str = "", registrar=None) -> str:
+    """
+    Pede o texto ao primeiro modelo da lista; se ele estiver no limite de
+    uso, sobrecarregado ou aposentado, passa ao seguinte, sem o professor
+    perceber. Se todos falharem, o erro é o do primeiro (o modelo
+    principal, que melhor descreve a situação). Todas as tentativas juntas
+    respeitam TEMPO_TOTAL. `registrar`, se vier, recebe uma frase curta a
+    cada falha: só o tipo do erro e o nome do modelo, nunca o conteúdo do
+    pedido.
+    """
+    modelos = _modelos_a_tentar(modelo)
+    inicio = time.monotonic()
+    primeiro_erro = None
+    for posicao, nome in enumerate(modelos):
+        restante = TEMPO_TOTAL - (time.monotonic() - inicio)
+        if posicao > 0 and restante < TEMPO_MINIMO_DE_UMA_TENTATIVA:
+            if registrar:
+                registrar("sem tempo para tentar outro modelo")
+            break
+        try:
+            return _pedir_a_um_modelo(chave, contexto, conversa, nome, min(TEMPO_LIMITE, restante))
+        except ErroDaIA as erro:
+            if posicao == 0 and erro.tipo not in _TROCAM_DE_MODELO:
+                raise  # chave recusada, filtro de segurança...: outro modelo não resolve
+            primeiro_erro = primeiro_erro or erro
+            if registrar:
+                proximo = " — tentando o próximo" if posicao + 1 < len(modelos) else ""
+                registrar(f"{erro.tipo} no modelo {nome}{proximo}")
+    raise primeiro_erro

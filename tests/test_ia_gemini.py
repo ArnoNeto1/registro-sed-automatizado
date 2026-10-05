@@ -14,8 +14,10 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 import threading
+import types
 import unittest
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -27,6 +29,9 @@ import ia_gemini  # noqa: E402
 
 PEDIDOS: list = []
 RESPOSTA = {"status": 200, "corpo": {}}
+# resposta de UM modelo específico (nome -> {"status", "corpo"}); o que não
+# estiver aqui usa RESPOSTA
+RESPOSTAS_POR_MODELO: dict = {}
 
 
 class _ApiDeMentira(BaseHTTPRequestHandler):
@@ -39,8 +44,10 @@ class _ApiDeMentira(BaseHTTPRequestHandler):
                 "corpo": json.loads(self.rfile.read(tamanho).decode("utf-8")),
             }
         )
-        corpo = json.dumps(RESPOSTA["corpo"]).encode("utf-8")
-        self.send_response(RESPOSTA["status"])
+        modelo = self.path.rsplit("/", 1)[-1].split(":", 1)[0]
+        resposta = RESPOSTAS_POR_MODELO.get(modelo, RESPOSTA)
+        corpo = json.dumps(resposta["corpo"]).encode("utf-8")
+        self.send_response(resposta["status"])
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(corpo)))
         self.end_headers()
@@ -93,6 +100,7 @@ class _ComServidor(unittest.TestCase):
 
     def setUp(self):
         PEDIDOS.clear()
+        RESPOSTAS_POR_MODELO.clear()
         RESPOSTA.update(status=200, corpo=_resposta_ok("Texto."))
         alvo = mock.patch.object(ia_gemini, "URL_API", self.url)
         alvo.start()
@@ -133,7 +141,9 @@ class PedidoParaAApi(_ComServidor):
         sistema = corpo["systemInstruction"]["parts"][0]["text"]
         self.assertIn("- Disciplina: Geografia", sistema)
         self.assertIn("- Assunto anotado na agenda: atividade de geografia - mercantilismo", sistema)
-        self.assertIn("Computadores/notebooks (pesquisa) no laboratório, Lousa Digital", sistema)
+        # os recursos marcados NÃO chegam à IA (ver _ROTULOS_DO_CONTEXTO)
+        self.assertNotIn("Computadores/notebooks", sistema)
+        self.assertNotIn("Lousa Digital", sistema)
 
     def test_chave_nunca_vai_no_endereco(self):
         self._pedir()
@@ -275,6 +285,152 @@ class ErrosExplicados(_ComServidor):
         self.assertEqual(caso.exception.tipo, "rede")
 
 
+class TrocaDeModelo(_ComServidor):
+    """Cada modelo do Gemini tem cota própria: se o principal não atende, o seguinte atende."""
+
+    def _modelos_chamados(self):
+        return [p["caminho"].split("/models/")[1].split(":")[0] for p in PEDIDOS]
+
+    @staticmethod
+    def _falha(status, estado, mensagem="x"):
+        return {"status": status, "corpo": _erro(status, estado, mensagem)}
+
+    def test_lista_padrao_tem_varios_modelos_sem_repetir(self):
+        self.assertGreaterEqual(len(ia_gemini.MODELOS_PADRAO), 2)
+        self.assertEqual(len(set(ia_gemini.MODELOS_PADRAO)), len(ia_gemini.MODELOS_PADRAO))
+        self.assertEqual(ia_gemini.MODELO_PADRAO, ia_gemini.MODELOS_PADRAO[0])
+
+    def test_limite_do_primeiro_passa_ao_segundo(self):
+        primeiro, segundo, _ = ia_gemini.MODELOS_PADRAO
+        RESPOSTAS_POR_MODELO[primeiro] = self._falha(429, "RESOURCE_EXHAUSTED", "quota")
+        RESPOSTA["corpo"] = _resposta_ok("Texto do segundo.")
+        self.assertEqual(self._pedir(), "Texto do segundo.")
+        self.assertEqual(self._modelos_chamados(), [primeiro, segundo])
+
+    def test_sobrecarga_e_modelo_aposentado_tambem_trocam(self):
+        for status, estado in ((503, "UNAVAILABLE"), (404, "NOT_FOUND")):
+            PEDIDOS.clear()
+            RESPOSTAS_POR_MODELO[ia_gemini.MODELO_PADRAO] = self._falha(status, estado)
+            self.assertEqual(self._pedir(), "Texto.", status)
+            self.assertEqual(len(PEDIDOS), 2, status)
+
+    def test_cai_para_o_terceiro_se_os_dois_primeiros_falham(self):
+        primeiro, segundo, terceiro = ia_gemini.MODELOS_PADRAO
+        for nome in (primeiro, segundo):
+            RESPOSTAS_POR_MODELO[nome] = self._falha(429, "RESOURCE_EXHAUSTED", "quota")
+        self.assertEqual(self._pedir(), "Texto.")
+        self.assertEqual(self._modelos_chamados(), [primeiro, segundo, terceiro])
+
+    def test_todos_falhando_o_erro_e_o_do_primeiro(self):
+        primeiro, segundo, terceiro = ia_gemini.MODELOS_PADRAO
+        RESPOSTAS_POR_MODELO[primeiro] = self._falha(429, "RESOURCE_EXHAUSTED", "quota")
+        RESPOSTAS_POR_MODELO[segundo] = self._falha(503, "UNAVAILABLE", "overloaded")
+        RESPOSTAS_POR_MODELO[terceiro] = self._falha(404, "NOT_FOUND", "model")
+        with self.assertRaises(ia_gemini.ErroDaIA) as caso:
+            self._pedir()
+        self.assertEqual(caso.exception.tipo, "limite")
+        self.assertEqual(len(PEDIDOS), 3)
+
+    def test_erro_que_outro_modelo_nao_resolve_nao_troca(self):
+        casos = (
+            (400, _erro(400, "INVALID_ARGUMENT", "API key not valid."), "chave"),
+            (403, _erro(403, "PERMISSION_DENIED", "leaked"), "permissao"),
+            (200, {"promptFeedback": {"blockReason": "SAFETY"}}, "bloqueado"),
+            (200, _resposta_ok("   "), "vazio"),
+        )
+        for status, corpo, tipo in casos:
+            PEDIDOS.clear()
+            RESPOSTA.update(status=status, corpo=corpo)
+            with self.assertRaises(ia_gemini.ErroDaIA, msg=tipo) as caso:
+                self._pedir()
+            self.assertEqual(caso.exception.tipo, tipo)
+            self.assertEqual(len(PEDIDOS), 1, tipo)
+
+    def test_internet_fora_nao_troca(self):
+        falha = ia_gemini.ErroDaIA("sem internet", "rede")
+        with mock.patch.object(ia_gemini, "_pedir_a_um_modelo", side_effect=falha) as chamada:
+            with self.assertRaises(ia_gemini.ErroDaIA) as caso:
+                self._pedir()
+        self.assertEqual(caso.exception.tipo, "rede")
+        self.assertEqual(chamada.call_count, 1)
+
+    def test_modelo_escolhido_vale_sozinho(self):
+        RESPOSTA.update(status=429, corpo=_erro(429, "RESOURCE_EXHAUSTED", "quota"))
+        conversa = [{"role": "user", "content": "oi"}]
+        with self.assertRaises(ia_gemini.ErroDaIA):
+            ia_gemini.pedir_texto("chave-de-teste", CONTEXTO, conversa, "gemini-meu")
+        self.assertEqual(self._modelos_chamados(), ["gemini-meu"])
+        PEDIDOS.clear()
+        os.environ["MODELO_IA"] = "gemini-do-ambiente"  # o mesmo vale para o ambiente
+        with self.assertRaises(ia_gemini.ErroDaIA):
+            self._pedir()
+        self.assertEqual(self._modelos_chamados(), ["gemini-do-ambiente"])
+
+    def test_lista_de_modelos_no_ambiente(self):
+        os.environ["MODELO_IA"] = " gemini-a , gemini-b "
+        RESPOSTAS_POR_MODELO["gemini-a"] = self._falha(429, "RESOURCE_EXHAUSTED", "quota")
+        self.assertEqual(self._pedir(), "Texto.")
+        self.assertEqual(self._modelos_chamados(), ["gemini-a", "gemini-b"])
+
+    def test_registra_so_o_tipo_e_o_modelo(self):
+        primeiro, segundo, terceiro = ia_gemini.MODELOS_PADRAO
+        RESPOSTAS_POR_MODELO[primeiro] = self._falha(429, "RESOURCE_EXHAUSTED", "quota SEGREDO-DO-GOOGLE")
+        RESPOSTAS_POR_MODELO[segundo] = self._falha(503, "UNAVAILABLE", "overloaded")
+        RESPOSTAS_POR_MODELO[terceiro] = self._falha(503, "UNAVAILABLE", "overloaded")
+        registros = []
+        conversa = [{"role": "user", "content": "SEGREDO-DA-AULA"}]
+        with self.assertRaises(ia_gemini.ErroDaIA):
+            ia_gemini.pedir_texto("chave-de-teste", CONTEXTO, conversa, registrar=registros.append)
+        self.assertEqual(
+            registros,
+            [
+                f"limite no modelo {primeiro} — tentando o próximo",
+                f"indisponivel no modelo {segundo} — tentando o próximo",
+                f"indisponivel no modelo {terceiro}",
+            ],
+        )
+        self.assertNotIn("SEGREDO", " ".join(registros))
+
+    def _com_relogio(self, duracoes):
+        """
+        pedir_texto com um relógio de mentira: a n-ésima tentativa "dura"
+        duracoes[n] segundos e falha com 'indisponivel'. Devolve o tempo-limite
+        que cada tentativa recebeu, o erro final e os registros.
+        """
+        agora = [0.0]
+        recebidos, registros = [], []
+
+        def tentativa(_chave, _contexto, _conversa, _nome, tempo_limite):
+            recebidos.append(tempo_limite)
+            agora[0] += duracoes[len(recebidos) - 1]
+            raise ia_gemini.ErroDaIA("sobrecarregado", "indisponivel")
+
+        relogio = types.SimpleNamespace(monotonic=lambda: agora[0])
+        with mock.patch.object(ia_gemini, "time", relogio), mock.patch.object(
+            ia_gemini, "_pedir_a_um_modelo", side_effect=tentativa
+        ):
+            with self.assertRaises(ia_gemini.ErroDaIA) as caso:
+                ia_gemini.pedir_texto(
+                    "chave-de-teste", CONTEXTO, [{"role": "user", "content": "oi"}], registrar=registros.append
+                )
+        return recebidos, caso.exception, registros
+
+    def test_o_tempo_total_e_repartido_entre_as_tentativas(self):
+        # o programa espera 60 s pelo servidor: todas as tentativas juntas cabem em TEMPO_TOTAL
+        recebidos, _, _ = self._com_relogio([10, 10, 10])
+        total, limite = ia_gemini.TEMPO_TOTAL, ia_gemini.TEMPO_LIMITE
+        self.assertEqual(recebidos, [min(limite, total), min(limite, total - 10), min(limite, total - 20)])
+        self.assertLessEqual(ia_gemini.TEMPO_TOTAL, 55)
+
+    def test_sem_tempo_nao_comeca_outro_modelo(self):
+        # sobrecarga leva de 30 a 50 s para falhar: se o primeiro modelo gastou quase tudo, para por aqui
+        gasto = ia_gemini.TEMPO_TOTAL - ia_gemini.TEMPO_MINIMO_DE_UMA_TENTATIVA + 1
+        recebidos, erro, registros = self._com_relogio([gasto, 1, 1])
+        self.assertEqual(len(recebidos), 1)
+        self.assertEqual(erro.tipo, "indisponivel")
+        self.assertIn("sem tempo para tentar outro modelo", registros)
+
+
 class DadoPessoal(unittest.TestCase):
     ACHAR = {
         "meu e-mail é fulana@escola.sc.gov.br": "e-mail",
@@ -353,10 +509,21 @@ class Instrucoes(unittest.TestCase):
         self.assertIn("Não deduza nem invente a metodologia", texto)
 
     def test_campos_vazios_ficam_de_fora(self):
-        texto = ia_gemini.montar_instrucoes({"disciplina": "Arte", "turma": "", "recursos": []})
+        texto = ia_gemini.montar_instrucoes({"disciplina": "Arte", "turma": ""})
         self.assertIn("- Disciplina: Arte", texto)
         self.assertNotIn("- Turma:", texto)
-        self.assertNotIn("- Recursos utilizados:", texto)
+
+    def test_recursos_marcados_nao_chegam_a_ia(self):
+        # Vistos pela IA, faziam todo texto fechar com "utilizando os
+        # computadores do laboratório" (ou parecido); pedir na instrução para
+        # não repetir não bastou. O recurso já vai em outro campo do formulário.
+        texto = ia_gemini.montar_instrucoes(
+            {"disciplina": "Arte", "recursos": ["Tablets", "Lousa Digital"]}
+        )
+        self.assertIn("- Disciplina: Arte", texto)
+        self.assertNotIn("Tablets", texto)
+        self.assertNotIn("Lousa Digital", texto)
+        self.assertNotIn("recursos", ia_gemini.CHAVES_DO_CONTEXTO)
 
     def test_sem_dados_da_agenda(self):
         self.assertIn("nenhum dado da agenda", ia_gemini.montar_instrucoes({}))
@@ -364,8 +531,33 @@ class Instrucoes(unittest.TestCase):
     def test_campos_permitidos_nao_incluem_pessoa(self):
         self.assertEqual(
             ia_gemini.CHAVES_DO_CONTEXTO,
-            ("disciplina", "turma", "etapa", "numero_aulas", "recursos", "assunto"),
+            ("disciplina", "turma", "etapa", "numero_aulas", "assunto"),
         )
+
+    # A IA devolvia o mesmo texto de qualquer assunto, porque a própria
+    # instrução lhe entregava as frases: citava "letramento digital,
+    # pensamento computacional" e "utilizando os computadores do laboratório"
+    # como exemplo, e os exemplos terminavam todos em "utilizando ...". Em 8
+    # textos medidos, 7 tinham as duas expressões. Estes testes seguram isso.
+    def test_nao_entrega_frases_prontas_para_a_ia_copiar(self):
+        texto = ia_gemini.INSTRUCOES.lower()
+        for frase in ("letramento digital", "pensamento computacional", "computadores do laboratório"):
+            self.assertNotIn(frase, texto)
+
+    def test_exemplos_nao_terminam_todos_do_mesmo_jeito(self):
+        respostas = re.findall(r"^Resposta: (.+)$", ia_gemini.INSTRUCOES, re.M)
+        self.assertGreaterEqual(len(respostas), 3)
+        self.assertLessEqual(sum("utilizando" in r for r in respostas), 1)
+
+    def test_outro_texto_pede_versao_claramente_diferente(self):
+        texto = ia_gemini.INSTRUCOES
+        self.assertIn("outro texto", texto)
+        self.assertIn("CLARAMENTE diferente", texto)
+
+    def test_recurso_citado_pelo_professor_nao_vira_fecho_padrao(self):
+        texto = ia_gemini.INSTRUCOES
+        self.assertIn("Se o professor citar um recurso usado na aula", texto)
+        self.assertIn("Não termine todo texto com um recurso por hábito", texto)
 
 
 if __name__ == "__main__":

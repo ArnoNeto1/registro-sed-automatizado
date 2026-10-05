@@ -42,8 +42,8 @@ programa usando essa chave em silêncio, sem passar pelo serviço da escola.
 O QUE É ENVIADO PARA A IA
 -------------------------
 Só o necessário para escrever o texto: disciplina, turma, etapa, nº de
-aulas, recursos marcados, o assunto anotado na agenda e o que o
-professor digitar na conversa. NOMES de professores não são enviados.
+aulas, o assunto anotado na agenda e o que o professor digitar na
+conversa. NOMES de professores não são enviados.
 O texto livre da conversa o programa não consegue filtrar — por isso a
 janela avisa para não digitar nomes de estudantes (alunos são menores
 de idade), e a instrução pede à IA para não repeti-los.

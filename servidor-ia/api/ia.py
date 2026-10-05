@@ -31,7 +31,9 @@ VARIÁVEIS DE AMBIENTE (configuradas no painel da Vercel, como "sensíveis"):
                   chave gratuita a Google usa o conteúdo dos professores
                   para melhorar os produtos dela;
   APP_TOKEN       segredo longo e aleatório, igual ao que vai no programa;
-  MODELO_IA       (opcional) outro modelo no lugar do padrão.
+  MODELO_IA       (opcional) outro modelo no lugar da lista padrão. Vários,
+                  separados por vírgula, são tentados na ordem; um só usa
+                  esse modelo e nenhum outro (desliga a troca automática).
 """
 
 from __future__ import annotations
@@ -49,7 +51,6 @@ LIMITE_CORPO = 24_000  # bytes do pedido inteiro
 MAX_FALAS = 20
 MAX_TEXTO_FALA = 4_000
 MAX_TEXTO_CAMPO = 600
-MAX_RECURSOS = 20
 MAX_TOTAL_CONVERSA = 12_000
 
 MSG_CONFIGURACAO = (
@@ -99,23 +100,18 @@ def validar(dados) -> tuple:
     if not isinstance(bruto, dict):
         raise PedidoInvalido("Pedido mal formado (dados da aula).")
     contexto: dict = {}
-    for chave in ia.CHAVES_DO_CONTEXTO:  # só os campos combinados; o resto é ignorado
+    # Só os campos combinados; o resto é ignorado. Isso inclui o "recursos"
+    # que a versão 2.0.0 do programa ainda manda: a IA deixou de recebê-lo.
+    for chave in ia.CHAVES_DO_CONTEXTO:
         valor = bruto.get(chave)
         if valor in (None, "", []):
             continue
-        if chave == "recursos":
-            if not isinstance(valor, list) or len(valor) > MAX_RECURSOS:
-                raise PedidoInvalido("Pedido mal formado (recursos).")
-            if not all(isinstance(r, str) and len(r) <= MAX_TEXTO_CAMPO for r in valor):
-                raise PedidoInvalido("Pedido mal formado (recursos).")
-            contexto[chave] = list(valor)
-        else:
-            if not isinstance(valor, (str, int)) or isinstance(valor, bool):
-                raise PedidoInvalido(f"Pedido mal formado ({chave}).")
-            texto = str(valor)
-            if len(texto) > MAX_TEXTO_CAMPO:
-                raise PedidoInvalido(f"O campo {chave} está grande demais.")
-            contexto[chave] = texto
+        if not isinstance(valor, (str, int)) or isinstance(valor, bool):
+            raise PedidoInvalido(f"Pedido mal formado ({chave}).")
+        texto = str(valor)
+        if len(texto) > MAX_TEXTO_CAMPO:
+            raise PedidoInvalido(f"O campo {chave} está grande demais.")
+        contexto[chave] = texto
 
     falas = dados.get("conversa")
     if not isinstance(falas, list) or not falas or len(falas) > MAX_FALAS:
@@ -181,7 +177,9 @@ def responder(corpo: bytes, token_recebido: str) -> tuple:
             return 422, {"erro": ia.aviso_de_dado_pessoal(tipo_de_dado)}
 
     try:
-        texto = ia.pedir_texto(chave, contexto, conversa)
+        # Se o modelo principal estiver no limite ou sobrecarregado, o núcleo
+        # tenta o seguinte; cada troca vai para o registro só como tipo e modelo.
+        texto = ia.pedir_texto(chave, contexto, conversa, registrar=_registrar)
     except ia.ErroDaIA as erro:
         _registrar(f"erro do Gemini: {erro.tipo}")
         status, mensagem = RESPOSTAS_DE_ERRO.get(erro.tipo, (502, MSG_FORA_DO_AR))
