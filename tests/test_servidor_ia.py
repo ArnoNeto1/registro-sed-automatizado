@@ -208,6 +208,20 @@ class Resposta(_Base):
             self.assertIn("não está configurado", dados["erro"])
         self.assertEqual(GEMINI, [])
 
+    def test_espaco_ou_quebra_de_linha_colados_no_painel_nao_atrapalham(self):
+        with mock.patch.dict(
+            os.environ, {"APP_TOKEN": "  segredo-certo\r\n", "GEMINI_API_KEY": "chave-da-escola \n"}
+        ):
+            status, dados = ia.responder(_corpo(), "segredo-certo")
+        self.assertEqual((status, dados), (200, {"texto": "Texto da IA."}))
+        # a chave chegou limpa ao Gemini (com quebra de linha seria cabeçalho inválido)
+        self.assertEqual(GEMINI[-1]["cabecalhos"]["x-goog-api-key"], "chave-da-escola")
+
+    def test_variavel_so_com_espacos_conta_como_ausente(self):
+        with mock.patch.dict(os.environ, {"APP_TOKEN": "   ", "GEMINI_API_KEY": "chave-da-escola"}):
+            status, _ = ia.responder(_corpo(), "")
+        self.assertEqual(status, 503)
+
     def test_segredo_errado_ou_ausente(self):
         for token in ("errado", "", "segredo-certo-e-mais"):
             status, dados = ia.responder(_corpo(), token)

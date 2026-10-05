@@ -142,8 +142,12 @@ def validar(dados) -> tuple:
 
 def responder(corpo: bytes, token_recebido: str) -> tuple:
     """(status HTTP, dicionário JSON) para um pedido. Sem nada de rede aqui dentro além da chamada ao Gemini."""
-    token = os.environ.get("APP_TOKEN", "")
-    chave = os.environ.get("GEMINI_API_KEY", "")
+    # strip(): um espaço ou quebra de linha invisível colado junto com o
+    # segredo no painel da Vercel faria o servidor recusar o programa para
+    # sempre (ou a chave virar um cabeçalho inválido) — e seria um erro
+    # muito difícil de enxergar.
+    token = os.environ.get("APP_TOKEN", "").strip()
+    chave = os.environ.get("GEMINI_API_KEY", "").strip()
     if not token or not chave:
         _registrar("servidor sem APP_TOKEN ou GEMINI_API_KEY configurados")
         return 503, {"erro": "O serviço de IA da escola ainda não está configurado."}
