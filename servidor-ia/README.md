@@ -23,20 +23,41 @@ Pede a chave com a digitação escondida e atende em
 `SERVIDOR_IA_URL=http://127.0.0.1:8787/api/ia` e
 `SERVIDOR_IA_TOKEN=teste-local` antes de abri-lo.
 
-## Publicar na Vercel (quando for a hora)
+## Onde está publicado
 
-1. Crie um projeto na Vercel apontando para este repositório e escolha
-   **Root Directory = `servidor-ia`** (assim só esta pasta é publicada).
-2. Em *Settings → Environment Variables*, crie como **Sensitive**:
-   - `GEMINI_API_KEY` — chave do Gemini **com faturamento ligado**. Numa
-     chave gratuita a Google usa o conteúdo dos professores para melhorar
-     os produtos dela; uma assinatura do Gemini não muda isso.
-   - `APP_TOKEN` — um segredo longo e aleatório (ex.: 40+ caracteres).
+Projeto **`registro-sed-ia`** na conta pessoal da Vercel (plano Hobby),
+região São Paulo (`gru1`). Endereço de produção:
+
+    https://registro-sed-ia-plexe1.vercel.app/api/ia
+
+A produção é pública de propósito (quem protege é o `x-app-token`); só as
+prévias ficam atrás do login da Vercel. Enquanto faltar `GEMINI_API_KEY` ou
+`APP_TOKEN`, o servidor **recusa tudo** com 503 ("ainda não está
+configurado").
+
+Foi publicado enviando os arquivos de `api/` direto (sem ligar ao GitHub),
+e os hashes SHA-1 conferidos contra os arquivos desta pasta. Por isso
+**mudar o código aqui não atualiza o servidor sozinho**: é preciso publicar
+de novo (mesmo envio de `api/ia.py` e `api/_ia_gemini.py`), ou ligar o
+projeto a este repositório com **Root Directory = `servidor-ia`**.
+
+## O que falta para valer de verdade
+
+1. Na Vercel, *Settings → Environment Variables*, crie como **Sensitive**:
+   - `GEMINI_API_KEY` — a chave do Gemini. **Com faturamento ligado** é o
+     recomendado: numa chave gratuita a Google usa o conteúdo dos
+     professores para melhorar os produtos dela (e uma assinatura do
+     Gemini não muda isso).
+   - `APP_TOKEN` — um segredo longo e aleatório (40+ caracteres).
    - `MODELO_IA` — opcional, para trocar o modelo.
-3. Faça o deploy. O endereço fica `https://<projeto>.vercel.app/api/ia`.
-4. No Google AI Studio / Cloud, ponha um **orçamento com alerta e, se der,
+   Depois, **publique de novo** (variável nova só vale em deploy novo).
+2. No GitHub, *Settings → Secrets and variables → Actions*, crie
+   `SERVIDOR_IA_URL` (o endereço acima) e `SERVIDOR_IA_TOKEN` (o MESMO
+   valor de `APP_TOKEN`). A montagem do `.exe` os embute num
+   `servidor_ia.json` (que nunca vai para o repositório).
+3. No Google AI Studio / Cloud, ponha um **orçamento com alerta e, se der,
    um teto de cota** no projeto da chave: é a defesa final contra abuso.
-5. Gire o `APP_TOKEN` se suspeitar de vazamento (e publique uma versão
+4. Gire o `APP_TOKEN` se suspeitar de vazamento (e publique uma versão
    nova do programa com o segredo novo).
 
 ## Regras de defesa (ver `api/ia.py`)

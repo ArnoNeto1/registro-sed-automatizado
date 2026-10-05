@@ -64,12 +64,35 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller
 
+      - name: Embutir o endereço do serviço de IA da escola
+        shell: bash
+        env:
+          SERVIDOR_IA_URL: ${{ secrets.SERVIDOR_IA_URL }}
+          SERVIDOR_IA_TOKEN: ${{ secrets.SERVIDOR_IA_TOKEN }}
+        run: |
+          # Sempre cria o arquivo: sem os dois segredos ele sai vazio e o
+          # programa simplesmente fica só com a chave própria (ver
+          # assistente_ia.configuracao_do_servidor). Os valores vêm dos
+          # "Secrets" do repositório e NUNCA são escritos no repositório
+          # (servidor_ia.json está no .gitignore).
+          python - <<'PY'
+          import json, os
+
+          url = os.environ.get("SERVIDOR_IA_URL", "").strip()
+          token = os.environ.get("SERVIDOR_IA_TOKEN", "").strip()
+          dados = {"url": url, "token": token} if (url and token) else {}
+          with open("servidor_ia.json", "w", encoding="utf-8") as f:
+              json.dump(dados, f)
+          print("Serviço de IA da escola embutido." if dados else "Sem serviço de IA da escola: só chave própria.")
+          PY
+
       - name: Montar o executável
         run: >
           pyinstaller --noconfirm --onefile --windowed
           --name Registro-SED
           --icon assets\icone.ico
           --add-data "VERSAO.txt;."
+          --add-data "servidor_ia.json;."
           --collect-all playwright
           --noupx
           --version-file version_info.txt
