@@ -38,7 +38,7 @@ configurado").
 Foi publicado enviando os arquivos de `api/` direto (sem ligar ao GitHub),
 e os hashes SHA-1 conferidos contra os arquivos desta pasta. Por isso
 **mudar o código aqui não atualiza o servidor sozinho**: é preciso publicar
-de novo (mesmo envio de `api/ia.py` e `api/_ia_gemini.py`), ou ligar o
+de novo (mesmo envio de `api/ia.py`, `api/_ia_gemini.py` e `api/uso.py`), ou ligar o
 projeto a este repositório com **Root Directory = `servidor-ia`**.
 
 ## Como está configurado
@@ -67,6 +67,28 @@ têm teto de 55 s (`TEMPO_TOTAL`), porque o programa espera 60 s pelo
 servidor: um modelo sobrecarregado pode levar de 30 a 50 s para falhar, e
 sem esse teto o professor veria um erro de rede em vez da mensagem do
 servidor.
+
+## Contagem de uso (`api/uso.py`)
+
+Função separada, publicada junto: o programa (a partir da 2.1.0) manda
+`POST /api/uso` com `{"id": "<32 caracteres hex>", "versao": "2.1.0"}` e o
+mesmo `x-app-token` da IA, no máximo uma vez por dia por computador. O
+`GET /api/uso` devolve os totais em JSON (público: só números); `python
+contar_usuarios.py` mostra isso em texto.
+
+- **Onde guarda:** num Redis gratuito da Upstash (plano Free: 500 mil
+  comandos por mês, sem cartão). Para ligar: Vercel → Marketplace →
+  Upstash → Redis → plano Free → ligar ao projeto `registro-sed-ia`. A
+  Vercel cria sozinha `KV_REST_API_URL` e `KV_REST_API_TOKEN` (também
+  valem `UPSTASH_REDIS_REST_URL` e `UPSTASH_REDIS_REST_TOKEN`). Variável
+  nova só vale em deploy novo.
+- **O que fica guardado:** contadores HyperLogLog (por dia, por versão e
+  no total). Eles dão a quantidade de números diferentes, com ~1% de erro,
+  mas não guardam os números: não dá para listá-los nem saber quem é
+  quem. O código não grava o IP nem registra o número, o segredo ou o
+  conteúdo; o registro só diz o motivo de uma recusa.
+- **Quem fica de fora:** o computador que tem `modo_teste.txt` na pasta de
+  dados (ver `PUBLICAR ATUALIZACAO.txt`).
 
 ## O que ainda recomendo
 

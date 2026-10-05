@@ -159,9 +159,11 @@ python -m unittest discover -s tests -v
 | `caminhos.py` | Onde ficam os arquivos do programa (`.py` vs `.exe`, portátil vs instalado) e qual navegador usar. |
 | `atualizador.py` | Autoatualização: consulta `versao.json`, baixa, confere (tamanho e SHA-256) e troca os arquivos/o `.exe`. |
 | `contar_downloads.py` | Mostra quantas vezes cada versão foi baixada (lê a contagem pública do GitHub). |
+| `contagem.py` | Contagem anônima de computadores que usam o programa: no máximo um aviso por dia, em segundo plano, só com um número aleatório e a versão. |
+| `contar_usuarios.py` | Mostra quantos computadores usaram o programa (lê os totais do servidor da escola). |
 | `assistente_ia.py` | "Escrever com IA...": a janela de conversa e a escolha entre o serviço da escola e a chave própria (opcional). |
 | `ia_gemini.py` | Núcleo da IA, sem tela: instrução, limpeza do texto e chamada ao Gemini. Compartilhado com o servidor. |
-| `servidor-ia/` | Servidor intermediário (função da Vercel) que guarda a chave do Gemini da escola. Ver o README da pasta. |
+| `servidor-ia/` | Servidor intermediário (função da Vercel) que guarda a chave do Gemini da escola e conta, de forma anônima, os computadores que usam o programa. Ver o README da pasta. |
 | `escolas.py` | Lista de escolas da CRE Blumenau, como aparecem no formulário da SED. |
 | `tests/` | Testes automáticos (`python -m unittest discover -s tests`). |
 | `installer/setup.iss` | Script do instalador Windows (Inno Setup). |
@@ -195,6 +197,25 @@ python contar_downloads.py
   por isso sobe com a quantidade de computadores que atualizaram.
 - Não são pessoas diferentes: quem baixa duas vezes conta duas, e o GitHub
   não diz quem baixou. Quem recebeu por pen drive ou e-mail não aparece.
+
+### Quantos computadores usam o programa
+
+Os downloads misturam testes com uso de verdade. Por isso, a partir da
+2.1.0 o programa avisa o servidor da escola, no máximo uma vez por dia e em
+segundo plano, que está aberto: só um número aleatório da instalação e a
+versão — nada de nome, CPF, escola ou aulas, e o servidor não guarda o IP.
+Para ver os totais:
+
+```bash
+python contar_usuarios.py
+```
+
+- São **computadores**, não pessoas exatas; só entra quem já atualizou para
+  a 2.1.0.
+- Um computador sai da contagem criando `modo_teste.txt` na pasta de dados
+  dele.
+- Detalhes em [`servidor-ia/README.md`](servidor-ia/README.md) e em
+  `PUBLICAR ATUALIZACAO.txt`.
 
 ## Agradecimentos
 

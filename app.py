@@ -108,6 +108,7 @@ from config import (  # noqa: E402
 )
 import assistente_ia  # noqa: E402
 import configuracao  # noqa: E402
+import contagem  # noqa: E402
 import tema  # noqa: E402
 from main import (  # noqa: E402
     ESTADO_FILE,  # noqa: F401  (mantido pra deixar claro de onde vem o estado)
@@ -1107,6 +1108,11 @@ class Janela(tk.Tk):
         # Procura versão nova em segundo plano. Numa thread separada
         # porque uma internet lenta não pode segurar a janela fechada.
         threading.Thread(target=self._procurar_atualizacao, daemon=True).start()
+
+        # Contagem anônima de computadores que usam o programa (ver contagem.py):
+        # em segundo plano, no máximo uma vez por dia, sem interface e sem nunca
+        # atrapalhar a abertura.
+        threading.Thread(target=self._contar_uso, daemon=True).start()
 
         # Antes de qualquer coisa: os dados obrigatórios estão
         # configurados? Se não, avisar AGORA — de nada adianta carregar a
@@ -2265,6 +2271,12 @@ class Janela(tk.Tk):
                 "aviso_atualizacao",
                 f"Você já está na versão mais nova ({atualizador.versao_atual()}).",
             ))
+
+    def _contar_uso(self) -> None:
+        try:
+            contagem.registrar_uso(assistente_ia.configuracao_do_servidor())
+        except Exception:  # noqa: BLE001 - contar nunca pode atrapalhar
+            pass
 
     def _conferir_conta_google(self) -> None:
         """

@@ -1,18 +1,34 @@
 # ---------------------------------------------------------------------
 # O que NUNCA pode subir para o GitHub
 # ---------------------------------------------------------------------
+# ATENÇÃO: comentário só em LINHA PRÓPRIA, nunca depois do nome. O Git não
+# aceita comentário no fim da linha: ".env   # CPF" vira um padrão que não
+# casa com nada, e o arquivo sobe para o repositório público sem ninguém
+# perceber. (tests/test_gitignore.py confere isso.)
 # O repositório é público. Estes arquivos são pessoais de cada professor
 # e não têm nada que fazer aqui.
 
-.env                        # CPF e senha da agenda
-configuracao.json           # escola, professores e CPFs
-browser_profile/            # login da conta Google da escola
-registros_enviados.json     # histórico do que já foi enviado à SED
+# CPF e senha da agenda
+.env
+# escola, professores e CPFs
+configuracao.json
+# login da conta Google da escola
+browser_profile/
+# histórico do que já foi enviado à SED
+registros_enviados.json
 aulas_nao_realizadas.json
 ultimo_professor.txt
+# número aleatório da contagem anônima (cada computador tem o seu)
+id_instalacao.txt
+# dia do último aviso da contagem
+ultima_contagem.txt
+# marca o computador do mantenedor: fica fora da contagem
+modo_teste.txt
 backup_versao_anterior/
-servidor_ia.json            # endereço + SEGREDO do serviço de IA da escola (só na montagem)
-.vercel/                    # ligação local com o projeto da Vercel
+# endereço + SEGREDO do serviço de IA da escola (só na montagem)
+servidor_ia.json
+# ligação local com o projeto da Vercel
+.vercel/
 
 # ---------------------------------------------------------------------
 # Sobras de quem roda o programa

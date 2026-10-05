@@ -176,3 +176,43 @@ O que não dá para saber: "pessoas diferentes". Quem baixa duas vezes
 conta duas, o GitHub não diz quem baixou, e quem recebeu o programa por
 pen drive ou e-mail não aparece. O selo "downloads" no alto da página do
 repositório mostra o total de todas as versões juntas.
+
+
+-----------------------------------------------------------------------
+QUANTOS COMPUTADORES ESTÃO USANDO O PROGRAMA? (contagem anônima)
+-----------------------------------------------------------------------
+
+Os downloads do GitHub misturam os seus testes com os dos professores.
+Por isso, a partir da versão 2.1.0 o programa avisa o servidor da escola,
+no máximo uma vez por dia e em segundo plano, que está sendo usado. Para
+ver os números, num terminal, dentro da pasta do programa:
+
+    python contar_usuarios.py
+
+(ou abra https://registro-sed-ia-plexe1.vercel.app/api/uso no navegador;
+são só números).
+
+O que o aviso leva: um número aleatório da instalação e a versão do
+programa. Nada de nome, CPF, escola, aulas ou do que se escreve na IA. O
+servidor não grava o IP e não guarda os números de um jeito que dê para
+listá-los: só conta quantos são diferentes (com cerca de 1% de erro).
+
+Como ler:
+
+    - É contagem de COMPUTADORES, não de pessoas: dois professores no
+      mesmo computador contam uma vez; quem reinstala ou apaga a pasta de
+      dados conta de novo; computadores que se restauram sozinhos ao
+      reiniciar podem contar de novo a cada dia.
+    - Só aparece quem já atualizou para a 2.1.0 ou mais nova. Nos
+      primeiros dias os números sobem conforme os professores abrem o
+      programa.
+
+Para tirar um computador da contagem (o seu, por exemplo), crie um
+arquivo chamado modo_teste.txt na pasta de dados dele (ao lado do .exe,
+ou em C:\ProgramData\RegistroSED quando instalado). Faça isso ANTES de
+abrir a versão nova nesse computador. A variável de ambiente
+REGISTRO_SED_NAO_CONTAR=1 faz o mesmo.
+
+Quem mantém precisa, uma vez, ligar o Redis gratuito da Upstash ao
+projeto da Vercel (variáveis KV_REST_API_URL e KV_REST_API_TOKEN) — ver
+o README da pasta servidor-ia/.
