@@ -21,6 +21,8 @@ seção `## <número>` com o que mudou. O resto acontece sozinho.
   programa às vezes mostrava esse erro ao abrir e tentava se reabrir
   sozinho, mas a segunda abertura falhava do mesmo jeito. Agora a
   reabertura funciona.
+- **Agradecimento:** estas duas correções foram propostas e escritas por
+  Guilherme Dornelles (EEB Ivo D'Aquino, Gaspar). Obrigado!
 
 ## 1.9.2
 

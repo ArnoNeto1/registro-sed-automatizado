@@ -124,6 +124,13 @@ portátil e o instalador, publica os dois numa Release e atualiza
 `versao.json` sozinho. Veja `PUBLICAR ATUALIZACAO.txt` para o passo a passo
 completo.
 
+## Agradecimentos
+
+- **Guilherme Dornelles** (EEB Ivo D'Aquino, Gaspar) — na v1.9.3, o
+  atualizador que confere o download antes de trocar o programa (tamanho e
+  SHA-256) e a correção da reabertura automática (erro `init.tcl`), ambos
+  com testes automáticos.
+
 ## Licença
 
 [MIT](LICENSE).
