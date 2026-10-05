@@ -206,6 +206,11 @@ class Instrucoes(unittest.TestCase):
     def test_pede_para_nao_repetir_nome_de_estudante(self):
         self.assertIn("nomes de estudantes", assistente_ia.montar_instrucoes({}))
 
+    def test_cita_metodologia_so_se_foi_dita(self):
+        texto = assistente_ia.montar_instrucoes({})
+        self.assertIn("metodologia", texto)
+        self.assertIn("Não deduza nem invente a metodologia", texto)
+
     def test_campos_vazios_ficam_de_fora(self):
         texto = assistente_ia.montar_instrucoes({"disciplina": "Arte", "turma": "", "recursos": []})
         self.assertIn("- Disciplina: Arte", texto)

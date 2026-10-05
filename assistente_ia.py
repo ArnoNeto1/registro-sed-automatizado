@@ -132,6 +132,11 @@ não invente atividades, ferramentas, quantidades, nomes de pessoas nem \
 códigos da BNCC.
 - Os recursos utilizados (quando vierem nos dados da aula) podem aparecer no \
 texto, do jeito natural ("utilizando os computadores do laboratório").
+- Se o que foi contado (inclusive o assunto da agenda) citar a metodologia ou \
+a estratégia da aula (por exemplo: gamificação, rotação por estações, \
+aprendizagem baseada em projetos, aula expositiva dialogada), mencione-a numa \
+frase curta, do jeito que foi dito. Não deduza nem invente a metodologia: se \
+ninguém falou dela, não escreva nada sobre isso.
 - O assunto anotado na agenda às vezes é só um link: você não consegue \
 abri-lo, então use-o no máximo como pista e nunca copie o link no texto.
 - Escreva nomes de plataformas do jeito certo (Google Sala de Aula, \
