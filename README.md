@@ -71,11 +71,20 @@ transforma isso num texto de objetos do conhecimento no formato da SED
 de..."). Dá para contar mais detalhes ou pedir correções na conversa, e o
 texto só entra no campo quando você clica em **"Usar este texto"**.
 
-Usa a API do Gemini (Google) com uma chave sua, criada de graça no
-[Google AI Studio](https://aistudio.google.com/apikey). A chave fica
-guardada só no seu usuário do Windows (ou na variável `GEMINI_API_KEY`).
-Sem chave, o resto do programa funciona exatamente igual. O modelo padrão é
-o `gemini-3.5-flash-lite`; dá para trocar com `MODELO_IA=...` no `.env`.
+Usa o Gemini (Google) por **dois caminhos**:
+
+1. **Serviço da escola** — quando o programa vem configurado com o endereço
+   dele (`SERVIDOR_IA_URL` e `SERVIDOR_IA_TOKEN`, ou um `servidor_ia.json`
+   embutido na montagem), o professor não precisa de nada: é só clicar. Quem
+   guarda a chave é um pequeno servidor (pasta [`servidor-ia/`](servidor-ia/),
+   ver o README de lá), nunca o programa nem este repositório.
+2. **Chave própria** — o professor cola uma chave criada de graça no
+   [Google AI Studio](https://aistudio.google.com/apikey) (ou define
+   `GEMINI_API_KEY`). Se existe chave própria, ela tem preferência sobre o
+   serviço da escola.
+
+Sem nenhum dos dois, o resto do programa funciona exatamente igual. O modelo
+padrão é o `gemini-3.5-flash-lite`; dá para trocar com `MODELO_IA=...`.
 
 **Privacidade:** o que você escreve na conversa e os dados da aula
 (disciplina, turma, recursos, assunto da agenda) são enviados à Google
@@ -84,7 +93,8 @@ não consegue filtrar — por isso a janela avisa para não digitar nomes de
 estudantes. **Atenção:** numa chave *gratuita*, a Google pode usar o
 conteúdo para melhorar os produtos dela e pessoas podem lê-lo. Uma
 assinatura do Gemini não muda isso: só uma chave com a conta de faturamento
-ligada no AI Studio (plano pago) fica de fora desse uso.
+ligada no AI Studio (plano pago) fica de fora desse uso — e é esse tipo de
+chave que o serviço da escola deve usar.
 
 Os dois formatos de instalação (portátil e instalador) se atualizam
 sozinhos quando sai versão nova, e compartilham os mesmos dados — dá para
@@ -138,7 +148,9 @@ python -m unittest discover -s tests -v
 | `configuracao.py` | Tela de cadastro (nome, escola, CPF, turnos) — substitui a edição manual do `.env`. |
 | `caminhos.py` | Onde ficam os arquivos do programa (`.py` vs `.exe`, portátil vs instalado) e qual navegador usar. |
 | `atualizador.py` | Autoatualização: consulta `versao.json`, baixa, confere (tamanho e SHA-256) e troca os arquivos/o `.exe`. |
-| `assistente_ia.py` | "Escrever com IA...": conversa que escreve os objetos do conhecimento (API do Gemini, opcional). |
+| `assistente_ia.py` | "Escrever com IA...": a janela de conversa e a escolha entre o serviço da escola e a chave própria (opcional). |
+| `ia_gemini.py` | Núcleo da IA, sem tela: instrução, limpeza do texto e chamada ao Gemini. Compartilhado com o servidor. |
+| `servidor-ia/` | Servidor intermediário (função da Vercel) que guarda a chave do Gemini da escola. Ver o README da pasta. |
 | `escolas.py` | Lista de escolas da CRE Blumenau, como aparecem no formulário da SED. |
 | `tests/` | Testes automáticos (`python -m unittest discover -s tests`). |
 | `installer/setup.iss` | Script do instalador Windows (Inno Setup). |

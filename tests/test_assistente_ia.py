@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
 """
-Testes do assistente de IA (assistente_ia.py) — só com a biblioteca
-padrão do Python, sem chamar a API de verdade:
+Testes do lado do programa (assistente_ia.py): a chave própria do
+professor, o endereço do serviço da escola, o pedido a esse serviço e a
+escolha do caminho. Só biblioteca padrão, sem internet:
 
     python -m unittest discover -s tests -v
 
-Um servidor HTTP de mentira, na própria máquina, faz o papel da API do
-Gemini: grava o pedido que chegou (para conferir endereço, cabeçalhos,
-instruções e conversa) e devolve a resposta que o teste mandar.
+O núcleo (instrução, chamada ao Gemini) é testado em test_ia_gemini.py, e
+o servidor em test_servidor_ia.py.
 """
 
 from __future__ import annotations
@@ -25,22 +25,22 @@ from unittest import mock
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import assistente_ia  # noqa: E402
+from ia_gemini import ErroDaIA  # noqa: E402
 
 PEDIDOS: list = []
-RESPOSTA = {"status": 200, "corpo": {}}
+RESPOSTA = {"status": 200, "corpo": {"texto": "Texto."}, "bruto": None}
 
 
-class _ApiDeMentira(BaseHTTPRequestHandler):
+class _ServidorDeMentira(BaseHTTPRequestHandler):
     def do_POST(self):  # noqa: N802 (nome exigido pelo http.server)
         tamanho = int(self.headers.get("Content-Length") or 0)
         PEDIDOS.append(
             {
-                "caminho": self.path,
                 "cabecalhos": {k.lower(): v for k, v in self.headers.items()},
                 "corpo": json.loads(self.rfile.read(tamanho).decode("utf-8")),
             }
         )
-        corpo = json.dumps(RESPOSTA["corpo"]).encode("utf-8")
+        corpo = RESPOSTA["bruto"] or json.dumps(RESPOSTA["corpo"]).encode("utf-8")
         self.send_response(RESPOSTA["status"])
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(corpo)))
@@ -51,245 +51,37 @@ class _ApiDeMentira(BaseHTTPRequestHandler):
         pass
 
 
-def _resposta_ok(texto: str) -> dict:
-    return {
-        "candidates": [
-            {
-                "content": {"parts": [{"text": texto}], "role": "model"},
-                "finishReason": "STOP",
-                "index": 0,
-            }
-        ]
-    }
-
-
-def _erro(codigo: int, status: str, mensagem: str) -> dict:
-    return {"error": {"code": codigo, "message": mensagem, "status": status}}
-
-
 CONTEXTO = {
     "disciplina": "Geografia",
-    "turma": "Anos Finais - 8º ano - Anos Finais",
+    "turma": "8º ano",
     "etapa": "Ensino Fundamental - Anos Finais",
     "numero_aulas": "2",
-    "recursos": ["Computadores/notebooks (pesquisa) no laboratório", "Lousa Digital"],
+    "recursos": ["Lousa Digital"],
     "assunto": "atividade de geografia - mercantilismo",
-    # não faz parte do que pode sair do computador — tem que ficar de fora
-    "professor": "FULANA DE TAL DA SILVA",
+    "professor": "FULANA DE TAL DA SILVA",  # nunca pode sair
 }
+CONVERSA = [{"role": "user", "content": "atividade de geografia - mercantilismo"}]
 
 
-class _ComServidor(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.servidor = ThreadingHTTPServer(("127.0.0.1", 0), _ApiDeMentira)
-        threading.Thread(target=cls.servidor.serve_forever, daemon=True).start()
-        porta = cls.servidor.server_address[1]
-        cls.url = f"http://127.0.0.1:{porta}/v1beta/models/" + "{modelo}:generateContent"
+class _Ambiente(unittest.TestCase):
+    """Pasta do usuário e variáveis de ambiente isoladas do computador de quem testa."""
 
-    @classmethod
-    def tearDownClass(cls):
-        cls.servidor.shutdown()
-        cls.servidor.server_close()
-
-    def setUp(self):
-        PEDIDOS.clear()
-        RESPOSTA.update(status=200, corpo=_resposta_ok("Texto."))
-        alvo = mock.patch.object(assistente_ia, "URL_API", self.url)
-        alvo.start()
-        self.addCleanup(alvo.stop)
-        ambiente = mock.patch.dict(os.environ, {}, clear=False)
-        ambiente.start()
-        self.addCleanup(ambiente.stop)
-        os.environ.pop("MODELO_IA", None)
-
-    def _pedir(self, conversa=None):
-        conversa = conversa or [{"role": "user", "content": CONTEXTO["assunto"]}]
-        return assistente_ia.pedir_texto("chave-de-teste", CONTEXTO, conversa)
-
-
-class PedidoParaAApi(_ComServidor):
-    def test_endereco_cabecalhos_e_corpo_do_pedido(self):
-        RESPOSTA["corpo"] = _resposta_ok(
-            "Foram abordados conteúdos de Geografia relacionados ao mercantilismo."
-        )
-        texto = self._pedir()
-        self.assertEqual(texto, "Foram abordados conteúdos de Geografia relacionados ao mercantilismo.")
-
-        pedido = PEDIDOS[-1]
-        self.assertEqual(
-            pedido["caminho"], f"/v1beta/models/{assistente_ia.MODELO_PADRAO}:generateContent"
-        )
-        self.assertEqual(pedido["cabecalhos"]["x-goog-api-key"], "chave-de-teste")
-        self.assertIn("application/json", pedido["cabecalhos"]["content-type"])
-
-        corpo = pedido["corpo"]
-        # sem temperature: o padrão de cada modelo é o recomendado
-        self.assertNotIn("temperature", json.dumps(corpo))
-        self.assertGreaterEqual(corpo["generationConfig"]["maxOutputTokens"], 1000)
-        self.assertEqual(
-            corpo["contents"],
-            [{"role": "user", "parts": [{"text": CONTEXTO["assunto"]}]}],
-        )
-        sistema = corpo["systemInstruction"]["parts"][0]["text"]
-        self.assertIn("- Disciplina: Geografia", sistema)
-        self.assertIn("- Assunto anotado na agenda: atividade de geografia - mercantilismo", sistema)
-        self.assertIn("Computadores/notebooks (pesquisa) no laboratório, Lousa Digital", sistema)
-
-    def test_chave_nunca_vai_no_endereco(self):
-        self._pedir()
-        self.assertNotIn("chave-de-teste", PEDIDOS[-1]["caminho"])
-        self.assertNotIn("key=", PEDIDOS[-1]["caminho"])
-
-    def test_nome_de_professor_nunca_sai_do_computador(self):
-        self._pedir()
-        tudo = json.dumps(PEDIDOS[-1]["corpo"], ensure_ascii=False)
-        self.assertNotIn("FULANA", tudo)
-
-    def test_conversa_inteira_vai_a_cada_pedido_com_papel_model(self):
-        conversa = [
-            {"role": "user", "content": "O professor de artes projetou no datashow."},
-            {"role": "assistant", "content": "Foram abordados conteúdos de Matemática..."},
-            {"role": "user", "content": "foi o professor de ARTES, não matemática"},
-        ]
-        self._pedir(conversa)
-        self.assertEqual(
-            PEDIDOS[-1]["corpo"]["contents"],
-            [
-                {"role": "user", "parts": [{"text": "O professor de artes projetou no datashow."}]},
-                {"role": "model", "parts": [{"text": "Foram abordados conteúdos de Matemática..."}]},
-                {"role": "user", "parts": [{"text": "foi o professor de ARTES, não matemática"}]},
-            ],
-        )
-
-    def test_modelo_pode_ser_trocado_pelo_env(self):
-        os.environ["MODELO_IA"] = "gemini-outro-modelo"
-        self._pedir()
-        self.assertEqual(PEDIDOS[-1]["caminho"], "/v1beta/models/gemini-outro-modelo:generateContent")
-
-    def test_modelo_com_caracteres_estranhos_nao_muda_o_endereco(self):
-        os.environ["MODELO_IA"] = "x/../../outro"
-        self._pedir()
-        self.assertNotIn("/../", PEDIDOS[-1]["caminho"])
-
-    def test_pensamento_do_modelo_fica_de_fora(self):
-        RESPOSTA["corpo"] = {
-            "candidates": [
-                {
-                    "content": {
-                        "parts": [
-                            {"text": "raciocinando em voz alta...", "thought": True},
-                            {"text": "Foram abordados conteúdos de Geografia."},
-                        ],
-                        "role": "model",
-                    }
-                }
-            ]
-        }
-        self.assertEqual(self._pedir(), "Foram abordados conteúdos de Geografia.")
-
-    def test_resposta_sai_limpa_para_o_formulario(self):
-        RESPOSTA["corpo"] = _resposta_ok(
-            '"Foram trabalhados pelo professor de **Arte** conteúdos de cálculo da média.\n'
-            'Também foram apresentados o **Google Sala de Aula**."'
-        )
-        self.assertEqual(
-            self._pedir(),
-            "Foram trabalhados pelo professor de Arte conteúdos de cálculo da média. "
-            "Também foram apresentados o Google Sala de Aula.",
-        )
-
-    def test_linha_de_apresentacao_sai(self):
-        RESPOSTA["corpo"] = _resposta_ok(
-            "Aqui está o texto:\n\nForam abordados conteúdos de Geografia.\n"
-            "Também foram desenvolvidas habilidades de pesquisa."
-        )
-        self.assertEqual(
-            self._pedir(),
-            "Foram abordados conteúdos de Geografia. "
-            "Também foram desenvolvidas habilidades de pesquisa.",
-        )
-
-
-class ErrosExplicados(_ComServidor):
-    def _erro_esperado(self, status: int, corpo: dict, trecho: str):
-        RESPOSTA.update(status=status, corpo=corpo)
-        with self.assertRaises(assistente_ia.ErroDaIA) as caso:
-            self._pedir()
-        self.assertIn(trecho, str(caso.exception))
-
-    def test_chave_recusada_o_gemini_responde_400(self):
-        self._erro_esperado(
-            400,
-            _erro(400, "INVALID_ARGUMENT", "API key not valid. Please pass a valid API key."),
-            "não foi aceita",
-        )
-
-    def test_chave_recusada_401(self):
-        self._erro_esperado(401, _erro(401, "UNAUTHENTICATED", "bad key"), "não foi aceita")
-
-    def test_chave_bloqueada(self):
-        self._erro_esperado(
-            403, _erro(403, "PERMISSION_DENIED", "Your API key was reported as leaked."), "bloqueada"
-        )
-
-    def test_modelo_inexistente(self):
-        self._erro_esperado(404, _erro(404, "NOT_FOUND", "model not found"), "MODELO_IA")
-
-    def test_limite_da_chave_gratuita(self):
-        self._erro_esperado(
-            429, _erro(429, "RESOURCE_EXHAUSTED", "quota exceeded"), "Espere um pouco"
-        )
-
-    def test_servico_sobrecarregado(self):
-        self._erro_esperado(503, _erro(503, "UNAVAILABLE", "overloaded"), "sobrecarregado")
-
-    def test_resposta_em_branco(self):
-        self._erro_esperado(200, _resposta_ok("   "), "em branco")
-
-    def test_sem_candidatos(self):
-        self._erro_esperado(200, {"candidates": []}, "em branco")
-
-    def test_bloqueado_pelo_filtro_de_seguranca(self):
-        self._erro_esperado(
-            200, {"promptFeedback": {"blockReason": "SAFETY"}}, "filtro de segurança"
-        )
-
-    def test_sem_internet(self):
-        with mock.patch.object(
-            assistente_ia, "URL_API", "http://127.0.0.1:9/v1beta/models/{modelo}:generateContent"
-        ):
-            with self.assertRaisesRegex(assistente_ia.ErroDaIA, "internet"):
-                self._pedir()
-
-
-class Instrucoes(unittest.TestCase):
-    def test_pede_para_nao_repetir_nome_de_estudante(self):
-        self.assertIn("nomes de estudantes", assistente_ia.montar_instrucoes({}))
-
-    def test_cita_metodologia_so_se_foi_dita(self):
-        texto = assistente_ia.montar_instrucoes({})
-        self.assertIn("metodologia", texto)
-        self.assertIn("Não deduza nem invente a metodologia", texto)
-
-    def test_campos_vazios_ficam_de_fora(self):
-        texto = assistente_ia.montar_instrucoes({"disciplina": "Arte", "turma": "", "recursos": []})
-        self.assertIn("- Disciplina: Arte", texto)
-        self.assertNotIn("- Turma:", texto)
-        self.assertNotIn("- Recursos utilizados:", texto)
-
-    def test_sem_dados_da_agenda(self):
-        self.assertIn("nenhum dado da agenda", assistente_ia.montar_instrucoes({}))
-
-
-class ChaveDaApi(unittest.TestCase):
     def setUp(self):
         self.pasta = tempfile.mkdtemp()
         ambiente = mock.patch.dict(os.environ, {"APPDATA": self.pasta}, clear=False)
         ambiente.start()
         self.addCleanup(ambiente.stop)
-        os.environ.pop("GEMINI_API_KEY", None)
+        for nome in ("GEMINI_API_KEY", "SERVIDOR_IA_URL", "SERVIDOR_IA_TOKEN"):
+            os.environ.pop(nome, None)
+        # sem um servidor_ia.json de verdade por perto
+        recurso = mock.patch.object(
+            assistente_ia.caminhos, "recurso", lambda nome: Path(self.pasta) / "recurso" / nome
+        )
+        recurso.start()
+        self.addCleanup(recurso.stop)
 
+
+class ChaveDaApi(_Ambiente):
     def test_sem_chave(self):
         self.assertEqual(assistente_ia.carregar_chave(), "")
 
@@ -304,6 +96,188 @@ class ChaveDaApi(unittest.TestCase):
         self.assertEqual(assistente_ia.carregar_chave(), "chave-do-env")
         assistente_ia.salvar_chave("chave-da-tela")
         self.assertEqual(assistente_ia.carregar_chave(), "chave-da-tela")
+
+    def test_apagar_chave_salva(self):
+        assistente_ia.salvar_chave("chave-salva")
+        assistente_ia.apagar_chave()
+        self.assertEqual(assistente_ia.carregar_chave(), "")
+
+    def test_apagar_sem_nada_salvo_nao_estoura(self):
+        assistente_ia.apagar_chave()
+
+
+class ConfiguracaoDoServidor(_Ambiente):
+    def _env(self, url, token="segredo"):
+        os.environ["SERVIDOR_IA_URL"] = url
+        os.environ["SERVIDOR_IA_TOKEN"] = token
+
+    def test_sem_nada_nao_ha_servidor(self):
+        self.assertIsNone(assistente_ia.configuracao_do_servidor())
+
+    def test_https_pelas_variaveis(self):
+        self._env("https://escola.vercel.app/api/ia")
+        self.assertEqual(
+            assistente_ia.configuracao_do_servidor(), ("https://escola.vercel.app/api/ia", "segredo")
+        )
+
+    def test_http_remoto_e_recusado(self):
+        # o segredo viajaria às claras pela rede da escola
+        self._env("http://escola.exemplo/api/ia")
+        self.assertIsNone(assistente_ia.configuracao_do_servidor())
+
+    def test_localhost_vale_para_testar(self):
+        self._env("http://127.0.0.1:8787/api/ia", "teste-local")
+        self.assertEqual(
+            assistente_ia.configuracao_do_servidor(), ("http://127.0.0.1:8787/api/ia", "teste-local")
+        )
+        self._env("http://localhost:8787/api/ia", "teste-local")
+        self.assertIsNotNone(assistente_ia.configuracao_do_servidor())
+
+    def test_sem_segredo_nao_conta(self):
+        self._env("https://escola.vercel.app/api/ia", token="")
+        self.assertIsNone(assistente_ia.configuracao_do_servidor())
+
+    def test_arquivo_embutido_no_exe(self):
+        pasta = Path(self.pasta) / "recurso"
+        pasta.mkdir()
+        (pasta / assistente_ia.ARQUIVO_SERVIDOR).write_text(
+            json.dumps({"url": "https://escola.vercel.app/api/ia", "token": "do-arquivo"}),
+            encoding="utf-8",
+        )
+        self.assertEqual(
+            assistente_ia.configuracao_do_servidor(),
+            ("https://escola.vercel.app/api/ia", "do-arquivo"),
+        )
+
+    def test_arquivo_quebrado_nao_estoura(self):
+        pasta = Path(self.pasta) / "recurso"
+        pasta.mkdir()
+        (pasta / assistente_ia.ARQUIVO_SERVIDOR).write_text("{ isso nao e json", encoding="utf-8")
+        self.assertIsNone(assistente_ia.configuracao_do_servidor())
+
+    def test_variaveis_tem_preferencia_sobre_o_arquivo(self):
+        pasta = Path(self.pasta) / "recurso"
+        pasta.mkdir()
+        (pasta / assistente_ia.ARQUIVO_SERVIDOR).write_text(
+            json.dumps({"url": "https://do-arquivo.exemplo/api/ia", "token": "a"}), encoding="utf-8"
+        )
+        self._env("http://127.0.0.1:8787/api/ia", "teste-local")
+        self.assertEqual(
+            assistente_ia.configuracao_do_servidor(), ("http://127.0.0.1:8787/api/ia", "teste-local")
+        )
+
+
+class ClienteDoServidor(_Ambiente):
+    @classmethod
+    def setUpClass(cls):
+        cls.servidor = ThreadingHTTPServer(("127.0.0.1", 0), _ServidorDeMentira)
+        threading.Thread(target=cls.servidor.serve_forever, daemon=True).start()
+        cls.url = f"http://127.0.0.1:{cls.servidor.server_address[1]}/api/ia"
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.servidor.shutdown()
+        cls.servidor.server_close()
+
+    def setUp(self):
+        super().setUp()
+        PEDIDOS.clear()
+        RESPOSTA.update(status=200, corpo={"texto": "Texto."}, bruto=None)
+
+    def _pedir(self):
+        return assistente_ia.pedir_ao_servidor(self.url, "segredo-do-teste", CONTEXTO, CONVERSA)
+
+    def test_pedido_leva_o_segredo_e_so_os_campos_permitidos(self):
+        RESPOSTA["corpo"] = {"texto": "Foram abordados conteúdos de Geografia."}
+        self.assertEqual(self._pedir(), "Foram abordados conteúdos de Geografia.")
+        pedido = PEDIDOS[-1]
+        self.assertEqual(pedido["cabecalhos"]["x-app-token"], "segredo-do-teste")
+        self.assertIn("application/json", pedido["cabecalhos"]["content-type"])
+        self.assertEqual(pedido["corpo"]["conversa"], CONVERSA)
+        self.assertEqual(
+            sorted(pedido["corpo"]["contexto"]),
+            ["assunto", "disciplina", "etapa", "numero_aulas", "recursos", "turma"],
+        )
+
+    def test_nome_de_professor_nunca_sai_do_computador(self):
+        self._pedir()
+        self.assertNotIn("FULANA", json.dumps(PEDIDOS[-1]["corpo"], ensure_ascii=False))
+
+    def test_resposta_sai_limpa_para_o_formulario(self):
+        RESPOSTA["corpo"] = {"texto": '"Foram **trabalhados** conteúdos.\nTambém habilidades."'}
+        self.assertEqual(self._pedir(), "Foram trabalhados conteúdos. Também habilidades.")
+
+    def test_mensagem_do_servidor_aparece_como_esta(self):
+        RESPOSTA.update(status=429, corpo={"erro": "O serviço de IA está muito ocupado agora."})
+        with self.assertRaises(ErroDaIA) as caso:
+            self._pedir()
+        self.assertEqual(str(caso.exception), "O serviço de IA está muito ocupado agora.")
+
+    def test_erro_sem_json_ganha_mensagem_generica(self):
+        RESPOSTA.update(status=500, bruto=b"<html>Internal Server Error</html>")
+        with self.assertRaisesRegex(ErroDaIA, r"erro 500"):
+            self._pedir()
+
+    def test_resposta_sem_texto(self):
+        RESPOSTA["corpo"] = {"texto": "   "}
+        with self.assertRaisesRegex(ErroDaIA, "em branco"):
+            self._pedir()
+
+    def test_resposta_que_nao_e_json(self):
+        RESPOSTA["bruto"] = b"isso nao e json"
+        with self.assertRaisesRegex(ErroDaIA, "não consegui ler"):
+            self._pedir()
+
+    def test_sem_internet(self):
+        with self.assertRaisesRegex(ErroDaIA, "internet"):
+            assistente_ia.pedir_ao_servidor(
+                "http://127.0.0.1:9/api/ia", "segredo", CONTEXTO, CONVERSA
+            )
+
+
+class EscolhaDoCaminho(_Ambiente):
+    def _servidor(self):
+        os.environ["SERVIDOR_IA_URL"] = "http://127.0.0.1:8787/api/ia"
+        os.environ["SERVIDOR_IA_TOKEN"] = "teste-local"
+
+    def test_nenhum_caminho(self):
+        self.assertEqual(assistente_ia.modo_disponivel(), "")
+        with self.assertRaises(ErroDaIA):
+            assistente_ia.pedir(CONTEXTO, CONVERSA)
+
+    def test_so_servidor(self):
+        self._servidor()
+        self.assertEqual(assistente_ia.modo_disponivel(), "servidor")
+        with mock.patch.object(assistente_ia, "pedir_ao_servidor", return_value="do servidor") as m:
+            self.assertEqual(assistente_ia.pedir(CONTEXTO, CONVERSA), "do servidor")
+        m.assert_called_once_with(
+            "http://127.0.0.1:8787/api/ia", "teste-local", CONTEXTO, CONVERSA
+        )
+
+    def test_so_chave_propria(self):
+        assistente_ia.salvar_chave("minha-chave")
+        self.assertEqual(assistente_ia.modo_disponivel(), "chave")
+        with mock.patch.object(
+            assistente_ia, "pedir_com_chave_propria", return_value="direto"
+        ) as m:
+            self.assertEqual(assistente_ia.pedir(CONTEXTO, CONVERSA), "direto")
+        m.assert_called_once_with("minha-chave", CONTEXTO, CONVERSA)
+
+    def test_chave_propria_tem_preferencia_sobre_o_servidor(self):
+        self._servidor()
+        assistente_ia.salvar_chave("minha-chave")
+        self.assertEqual(assistente_ia.modo_disponivel(), "chave")
+        with mock.patch.object(assistente_ia, "pedir_ao_servidor") as servidor, mock.patch.object(
+            assistente_ia, "pedir_com_chave_propria", return_value="direto"
+        ):
+            assistente_ia.pedir(CONTEXTO, CONVERSA)
+        servidor.assert_not_called()
+
+    def test_esquecer_a_chave_volta_ao_servidor(self):
+        self._servidor()
+        assistente_ia.salvar_chave("minha-chave")
+        assistente_ia.apagar_chave()
+        self.assertEqual(assistente_ia.modo_disponivel(), "servidor")
 
 
 if __name__ == "__main__":

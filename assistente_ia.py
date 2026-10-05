@@ -15,22 +15,26 @@ clicar em "Usar este texto" — que só troca o texto do campo. Nada vai
 para a SED sem passar pelo mesmo "Preencher formulário" → conferir →
 "Enviar para a SED" de sempre.
 
-OPCIONAL, COM A CHAVE DE QUEM USA
----------------------------------
-Usa a API do Gemini (Google) com a chave do PRÓPRIO professor, criada de
-graça no Google AI Studio. Uma assinatura do Gemini NÃO vira chave paga:
-só liga a chave ao plano pago quem vincula uma conta de faturamento no
-Google AI Studio. Sem chave, a janela só explica como conseguir uma; o
-resto do programa não muda.
+DOIS JEITOS DE FALAR COM A IA
+-----------------------------
+1. SERVIÇO DA ESCOLA (quando o programa vem configurado com um): o
+   programa chama o servidor intermediário (pasta `servidor-ia/`), que
+   guarda a chave do Gemini e a instrução. O professor não precisa de
+   nada — é só clicar em "Escrever com IA". O endereço e o segredo vêm
+   das variáveis SERVIDOR_IA_URL e SERVIDOR_IA_TOKEN (inclusive no .env)
+   ou de um `servidor_ia.json` embutido no .exe na hora de montá-lo.
+2. CHAVE PRÓPRIA: o professor cola uma chave do Gemini criada por ele no
+   Google AI Studio e o programa fala direto com a Google. Se existe uma
+   chave própria, ela tem preferência — é a última coisa que o professor
+   fez de propósito. Sem servidor configurado, é o único jeito.
 
-A CHAVE FICA POR USUÁRIO DO WINDOWS, NÃO NA PASTA DE DADOS
-----------------------------------------------------------
+A CHAVE PRÓPRIA FICA POR USUÁRIO DO WINDOWS, NÃO NA PASTA DE DADOS
+------------------------------------------------------------------
 Diferente do resto dos dados — que são do computador, compartilhados
 por todo mundo que usa o laboratório (ver caminhos.pasta_de_dados) — a
 chave é pessoal. Por isso fica em %APPDATA%\\RegistroSED, que outro
 usuário do Windows não consegue ler. Também pode vir da variável
-GEMINI_API_KEY (inclusive escrita no .env), para quem preferir. Ela
-viaja no cabeçalho da chamada, nunca no endereço.
+GEMINI_API_KEY (inclusive escrita no .env), para quem preferir.
 
 O QUE É ENVIADO PARA A IA
 -------------------------
@@ -46,12 +50,13 @@ PRIVACIDADE DO PLANO GRATUITO DA GOOGLE
 Nos termos da Google, o que passa por uma chave GRATUITA pode ser usado
 para melhorar os produtos deles, e pessoas podem ler esse conteúdo; eles
 pedem para não enviar dados pessoais por ali. Com o faturamento ligado
-(plano pago) isso não acontece. A janela explica isso ao professor.
+(plano pago) isso não acontece. Uma assinatura do Gemini NÃO liga a
+chave ao plano pago. O serviço da escola deve usar uma chave PAGA.
 
 SEM DEPENDÊNCIA NOVA
 --------------------
-A chamada é feita com urllib (biblioteca padrão), como a do atualizador
-— nada a mais para empacotar no .exe.
+As chamadas usam urllib (biblioteca padrão), como a do atualizador —
+nada a mais para empacotar no .exe.
 """
 
 from __future__ import annotations
@@ -62,26 +67,51 @@ import queue
 import threading
 import tkinter as tk
 import urllib.error
-import urllib.parse
 import urllib.request
 import webbrowser
 from pathlib import Path
 from tkinter import ttk
 
-URL_API = "https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent"
-URL_CHAVES = "https://aistudio.google.com/apikey"
+import caminhos
+from ia_gemini import (  # noqa: F401  (a janela e os testes buscam daqui)
+    CHAVES_DO_CONTEXTO,
+    INSTRUCOES,
+    MODELO_PADRAO,
+    TEMPO_LIMITE,
+    URL_CHAVES,
+    ErroDaIA,
+    limpar_texto,
+    montar_instrucoes,
+)
+from ia_gemini import pedir_texto as pedir_com_chave_propria
 
-# O modelo estável mais barato e rápido do Gemini — de sobra para um
-# parágrafo de duas frases. Dá para trocar sem mexer no código, com a
-# linha MODELO_IA=... no .env (por exemplo, para um modelo maior).
-MODELO_PADRAO = "gemini-3.5-flash-lite"
-
-TEMPO_LIMITE = 60  # segundos
 ARQUIVO_CHAVE = "chave_ia.txt"
+ARQUIVO_SERVIDOR = "servidor_ia.json"
+
+# Texto do painel da chave: um quando é o ÚNICO caminho (sem serviço da
+# escola) e outro quando a chave própria é só uma alternativa.
+TEXTO_CHAVE_PROPRIA = (
+    "Para escrever com IA, o programa usa o Gemini (Google) com uma chave "
+    "sua, criada de graça no Google AI Studio. A chave fica guardada só "
+    "neste usuário do Windows.\n"
+    "O que você escrever na conversa, junto com os dados da aula, é "
+    "enviado à Google para gerar o texto — não digite nomes de "
+    "estudantes nem outros dados pessoais. Numa chave gratuita, a Google "
+    "pode usar esse conteúdo para melhorar os produtos dela; para que "
+    "isso não aconteça, ligue o faturamento da chave no AI Studio."
+)
+TEXTO_CHAVE_COM_SERVIDOR = (
+    "Este programa já usa o serviço de IA da escola: você não precisa de "
+    "chave nenhuma. Só cole uma chave sua se preferir usar a sua própria "
+    "conta do Google AI Studio — aí o que você escrever passa por essa "
+    "conta e, numa chave gratuita, a Google pode usar esse conteúdo para "
+    "melhorar os produtos dela. Em qualquer caso, não digite nomes de "
+    "estudantes nem outros dados pessoais."
+)
 
 
 # ---------------------------------------------------------------------------
-# Chave da API
+# Chave própria da API
 # ---------------------------------------------------------------------------
 def _pasta_da_chave() -> Path:
     base = os.environ.get("APPDATA")
@@ -109,242 +139,116 @@ def salvar_chave(chave: str) -> None:
     (pasta / ARQUIVO_CHAVE).write_text(chave.strip(), encoding="utf-8")
 
 
+def apagar_chave() -> None:
+    """Esquece a chave salva pela tela (para voltar a usar o serviço da escola)."""
+    try:
+        (_pasta_da_chave() / ARQUIVO_CHAVE).unlink()
+    except OSError:
+        pass
+
+
 # ---------------------------------------------------------------------------
-# O pedido para a IA
+# Serviço da escola (servidor intermediário)
 # ---------------------------------------------------------------------------
-INSTRUCOES = """\
-Você ajuda um professor orientador de Tecnologias Educacionais de uma escola \
-pública estadual de Santa Catarina a preencher o "Registro de Atividades" da \
-SED-SC. Sua tarefa é uma só: escrever a resposta da pergunta do formulário \
-"Quais os objetos do conhecimento (conteúdos temáticos) abordados?", a partir \
-do que o professor contar sobre a aula.
-
-COMO ESCREVER
-- Português do Brasil, formal, objetivo, em terceira pessoa.
-- Um parágrafo de 2 frases (no máximo 3), com cerca de 25 a 60 palavras.
-- Siga o modelo: primeiro os conteúdos ("Foram abordados conteúdos de..." ou \
-"Foram trabalhados..."); depois as habilidades ("Também foram desenvolvidas \
-habilidades de...").
-- A disciplina da aula é a dos DADOS DA AULA. Não deduza a disciplina pelo \
-conteúdo: calcular média numa aula de Arte continua sendo uma aula de Arte. \
-Quando o conteúdo parecer de outra área, deixe claro de quem foi a iniciativa \
-(por exemplo: "Foram trabalhados pelo professor de Arte conteúdos \
-relacionados ao cálculo da média...").
-- Use o que o professor contou e os dados da aula. Muitas vezes a descrição \
-é curta ou genérica, copiada da agenda (por exemplo, "atividade de geografia - \
-mercantilismo"): nesse caso, desenvolva os objetos do conhecimento que fazem \
-parte daquele tema no currículo escolar (no exemplo: metalismo, balança \
-comercial favorável, protecionismo), sem afirmar sobre a aula nada além do \
-que foi contado. Pode nomear as habilidades que decorrem diretamente do que \
-foi feito (letramento digital, pensamento computacional, pesquisa...), mas \
-não invente atividades, ferramentas, quantidades, nomes de pessoas nem \
-códigos da BNCC.
-- Os recursos utilizados (quando vierem nos dados da aula) podem aparecer no \
-texto, do jeito natural ("utilizando os computadores do laboratório").
-- Se o que foi contado (inclusive o assunto da agenda) citar a metodologia ou \
-a estratégia da aula (por exemplo: gamificação, rotação por estações, \
-aprendizagem baseada em projetos, aula expositiva dialogada), mencione-a numa \
-frase curta, do jeito que foi dito. Não deduza nem invente a metodologia: se \
-ninguém falou dela, não escreva nada sobre isso.
-- O assunto anotado na agenda às vezes é só um link: você não consegue \
-abri-lo, então use-o no máximo como pista e nunca copie o link no texto.
-- Escreva nomes de plataformas do jeito certo (Google Sala de Aula, \
-Estudante Online, MakeCode, Scratch, Canva...).
-- Se o professor citar nomes de estudantes, não os repita no texto: fale em \
-"os estudantes" ou "a turma".
-
-FORMATO DA RESPOSTA
-- Responda SOMENTE com o texto que vai no formulário: sem título, sem \
-aspas, sem markdown (nada de asteriscos, negrito ou listas), sem comentário \
-antes ou depois.
-- Se o professor pedir uma mudança, devolva o texto inteiro já corrigido, no \
-mesmo formato.
-
-EXEMPLOS DO ESTILO QUE O PROFESSOR ESPERA
-
-Dados da aula: Disciplina: Arte
-Professor: Cálculo da média, acesso ao sistema Estudante Online e à \
-plataforma Google Sala de Aula. O professor de artes projetou no datashow e \
-mostrou aos alunos.
-Resposta: Foram trabalhados pelo professor de Arte conteúdos relacionados ao \
-cálculo da média e à utilização de ferramentas digitais para o acompanhamento \
-das atividades escolares. Também foram apresentados aos alunos o Estudante \
-Online e o Google Sala de Aula, utilizando o datashow como recurso tecnológico.
-
-Dados da aula: Disciplina: Geografia; Recursos utilizados: \
-Computadores/notebooks (pesquisa) no laboratório
-Professor: atividade de geografia - mercantilismo
-Resposta: Foram abordados conteúdos de Geografia relacionados ao \
-mercantilismo, como o metalismo, a balança comercial favorável e o \
-protecionismo, e sua influência no comércio entre metrópoles e colônias. \
-Também foram desenvolvidas habilidades de pesquisa e análise de informações \
-utilizando os computadores do laboratório.
-
-Dados da aula: Clube de robótica
-Professor: Os alunos do clube de robótica aprenderam os primeiros passos na \
-configuração e montagem da lagarta pelo site do MakeCode.
-Resposta: Foram abordados conteúdos de robótica educacional, com foco na \
-configuração e montagem inicial do robô lagarta. Também foram desenvolvidas \
-habilidades de programação e prototipagem utilizando o MakeCode."""
-
-_ROTULOS_DO_CONTEXTO = (
-    ("Disciplina", "disciplina"),
-    ("Turma", "turma"),
-    ("Etapa", "etapa"),
-    ("Número de aulas", "numero_aulas"),
-    ("Recursos utilizados", "recursos"),
-    ("Assunto anotado na agenda", "assunto"),
-)
-
-
-def montar_instrucoes(contexto: dict) -> str:
+def configuracao_do_servidor():
     """
-    As instruções fixas + os dados da aula selecionada. Só entram as
-    chaves de _ROTULOS_DO_CONTEXTO — de propósito, nenhum nome de pessoa:
-    mesmo que quem chama mande um "professor" no dicionário, ele fica de
-    fora do que sai do computador.
+    (endereço, segredo) do serviço da escola, ou None se este programa não
+    foi configurado com um.
+
+    Só aceita https — o segredo viaja no cabeçalho, e em http puro
+    qualquer um na rede da escola o leria — com a exceção de localhost,
+    que existe para testar o servidor no próprio computador.
     """
-    linhas = []
-    for rotulo, chave in _ROTULOS_DO_CONTEXTO:
-        valor = (contexto or {}).get(chave)
-        if isinstance(valor, (list, tuple)):
-            valor = ", ".join(str(v) for v in valor)
-        valor = " ".join(str(valor or "").split())
-        if valor:
-            linhas.append(f"- {rotulo}: {valor}")
-    dados = "\n".join(linhas) or "- (nenhum dado da agenda: use só o que o professor contar)"
-    return INSTRUCOES + "\n\nDADOS DA AULA\n" + dados
+    url = (os.environ.get("SERVIDOR_IA_URL") or "").strip()
+    token = (os.environ.get("SERVIDOR_IA_TOKEN") or "").strip()
+    if not (url and token):
+        try:
+            dados = json.loads(caminhos.recurso(ARQUIVO_SERVIDOR).read_text(encoding="utf-8"))
+            url = str(dados.get("url") or "").strip()
+            token = str(dados.get("token") or "").strip()
+        except (OSError, ValueError, AttributeError):
+            return None
+    seguro = url.lower().startswith(("https://", "http://127.0.0.1", "http://localhost"))
+    return (url, token) if (seguro and token) else None
 
 
-def limpar_texto(texto: str) -> str:
-    """
-    Deixa a resposta pronta para ir ao formulário mesmo se a IA escapar
-    do formato pedido: sem markdown, sem aspas em volta, sem uma linha de
-    apresentação ("Aqui está o texto:") e num parágrafo só. Quebra de
-    linha é o que mais importa aqui — numa caixa de texto de uma linha, o
-    navegador simplesmente apaga as quebras, e duas frases viravam
-    "...educacionais.Também foram...", grudadas.
-    """
-    linhas = [l.strip() for l in (texto or "").replace("**", "").replace("__", "").splitlines()]
-    linhas = [l for l in linhas if l]
-    if len(linhas) > 1 and linhas[0].endswith(":"):
-        linhas = linhas[1:]
-    t = " ".join(" ".join(linhas).split())
-    pares = {'"': '"', "“": "”", "'": "'"}
-    if len(t) >= 2 and t[0] in pares and t[-1] == pares[t[0]]:
-        t = t[1:-1].strip()
-    return t
+def contexto_para_enviar(contexto: dict) -> dict:
+    """Só os campos da aula que podem sair do computador (nunca nome de professor)."""
+    contexto = contexto or {}
+    return {chave: contexto[chave] for chave in CHAVES_DO_CONTEXTO if contexto.get(chave)}
 
 
-class ErroDaIA(RuntimeError):
-    """Erro já explicado em português, pronto para aparecer na janela."""
-
-
-def _explicar_erro_http(erro: urllib.error.HTTPError) -> str:
+def _mensagem_do_servidor(erro: urllib.error.HTTPError) -> str:
     try:
         corpo = json.loads(erro.read().decode("utf-8"))
-        mensagem = str((corpo.get("error") or {}).get("message") or "")
+        mensagem = str(corpo.get("erro") or "").strip()
     except Exception:
         mensagem = ""
-    # O Gemini responde 400 (e não 401) para uma chave inválida.
-    if erro.code == 401 or (erro.code == 400 and "api key" in mensagem.lower()):
-        return (
-            "A chave da API não foi aceita. Confira se ela foi copiada "
-            "inteira e use \"Trocar chave da API\" para colar de novo."
-        )
-    if erro.code == 403:
-        return (
-            "Esta chave não tem permissão para usar a API (pode ter sido "
-            f"bloqueada ou restringida). Crie outra em {URL_CHAVES}."
-        )
-    if erro.code == 404:
-        return (
-            "O modelo de IA configurado não foi encontrado — pode ter sido "
-            "aposentado. Confira a linha MODELO_IA, se existir no .env."
-        )
-    if erro.code == 429:
-        return (
-            "Muitos pedidos seguidos, ou o limite do dia da chave gratuita "
-            "acabou. Espere um pouco e tente de novo."
-        )
-    if erro.code >= 500:
-        return "O serviço da IA está sobrecarregado ou fora do ar agora. Tente de novo em instantes."
-    return f"O serviço da IA recusou o pedido (erro {erro.code}). {mensagem}".strip()
+    return mensagem or (
+        f"O serviço de IA da escola não respondeu direito (erro {erro.code}). "
+        "Tente de novo mais tarde."
+    )
 
 
-def pedir_texto(chave: str, contexto: dict, conversa: list, modelo: str = "") -> str:
-    """
-    Manda a conversa inteira (lista de {"role", "content"}, terminando
-    numa fala do professor) e devolve o texto novo, já limpo.
-
-    A conversa vai inteira a cada pedido porque a API não guarda nada
-    entre um pedido e outro: é assim que "foi o professor de ARTES" faz
-    sentido para ela — ela lê o texto anterior junto.
-    """
-    modelo = modelo or (os.environ.get("MODELO_IA") or "").strip() or MODELO_PADRAO
+def pedir_ao_servidor(url: str, token: str, contexto: dict, conversa: list) -> str:
+    """Pede o texto ao serviço da escola e devolve o texto já limpo."""
     corpo = json.dumps(
-        {
-            "systemInstruction": {"parts": [{"text": montar_instrucoes(contexto)}]},
-            # No Gemini a fala da IA tem o papel "model", não "assistant".
-            "contents": [
-                {
-                    "role": "model" if fala["role"] == "assistant" else "user",
-                    "parts": [{"text": fala["content"]}],
-                }
-                for fala in conversa
-            ],
-            # Folga de sobra para o parágrafo: se alguém trocar para um
-            # modelo que "pensa" antes de responder, esse pensamento
-            # também conta neste limite — com 500 a resposta vinha cortada.
-            # Sem "temperature" de propósito: o padrão de cada modelo é o
-            # recomendado, e MODELO_IA existe para trocar de modelo sem
-            # mexer no código.
-            "generationConfig": {"maxOutputTokens": 1500},
-        }
+        {"contexto": contexto_para_enviar(contexto), "conversa": conversa}
     ).encode("utf-8")
     requisicao = urllib.request.Request(
-        URL_API.format(modelo=urllib.parse.quote(modelo, safe="")),
+        url,
         data=corpo,
         method="POST",
         headers={
-            # A chave vai no cabeçalho, nunca no endereço: endereço aparece
-            # em mensagens de erro e registros, cabeçalho não.
-            "x-goog-api-key": chave,
             "content-type": "application/json",
+            "x-app-token": token,
+            "user-agent": "RegistroSED-IA",
         },
     )
     try:
         with urllib.request.urlopen(requisicao, timeout=TEMPO_LIMITE) as resposta:
             dados = json.loads(resposta.read().decode("utf-8"))
     except urllib.error.HTTPError as erro:
-        raise ErroDaIA(_explicar_erro_http(erro)) from None
+        raise ErroDaIA(_mensagem_do_servidor(erro), "servidor") from None
     except (urllib.error.URLError, OSError) as erro:
         raise ErroDaIA(
-            "Não consegui falar com o serviço da IA — parece internet. "
-            f"Confira a conexão e tente de novo.\n(detalhe técnico: {erro})"
+            "Não consegui falar com o serviço de IA da escola — parece internet. "
+            f"Confira a conexão e tente de novo.\n(detalhe técnico: {erro})",
+            "rede",
         ) from None
     except ValueError:
-        raise ErroDaIA("O serviço da IA mandou uma resposta que não consegui ler. Tente de novo.") from None
-
-    candidatos = dados.get("candidates") or []
-    if not candidatos:
-        # Sem candidato = o filtro de segurança do serviço barrou o pedido.
-        if (dados.get("promptFeedback") or {}).get("blockReason"):
-            raise ErroDaIA(
-                "O serviço da IA não aceitou escrever sobre isso (filtro de "
-                "segurança). Reescreva a descrição da aula e tente de novo."
-            )
-        raise ErroDaIA("A IA respondeu em branco. Tente de novo.")
-    partes = (candidatos[0].get("content") or {}).get("parts") or []
-    texto = "".join(
-        parte.get("text", "")
-        for parte in partes
-        if isinstance(parte, dict) and not parte.get("thought")
-    )
-    texto = limpar_texto(texto)
+        raise ErroDaIA(
+            "O serviço de IA da escola mandou uma resposta que não consegui ler. "
+            "Tente de novo.",
+            "resposta",
+        ) from None
+    texto = limpar_texto(str(dados.get("texto") or "")) if isinstance(dados, dict) else ""
     if not texto:
-        raise ErroDaIA("A IA respondeu em branco. Tente de novo.")
+        raise ErroDaIA("A IA respondeu em branco. Tente de novo.", "vazio")
     return texto
+
+
+# ---------------------------------------------------------------------------
+# Qual caminho usar
+# ---------------------------------------------------------------------------
+def modo_disponivel() -> str:
+    """"chave" (a própria do professor), "servidor" (da escola) ou "" (nenhum)."""
+    if carregar_chave():
+        return "chave"
+    if configuracao_do_servidor():
+        return "servidor"
+    return ""
+
+
+def pedir(contexto: dict, conversa: list) -> str:
+    """Pede o texto pelo caminho disponível (ver `modo_disponivel`)."""
+    chave = carregar_chave()
+    if chave:
+        return pedir_com_chave_propria(chave, contexto, conversa)
+    servidor = configuracao_do_servidor()
+    if servidor:
+        return pedir_ao_servidor(*servidor, contexto, conversa)
+    raise ErroDaIA("A IA ainda não está configurada neste computador.", "chave")
 
 
 # ---------------------------------------------------------------------------
@@ -389,7 +293,7 @@ class JanelaAssistente:
         self._estilos()
         self._montar()
 
-        if carregar_chave():
+        if modo_disponivel():
             self._mostrar_painel_conversa()
         else:
             self._mostrar_painel_chave(primeira_vez=True)
@@ -408,7 +312,7 @@ class JanelaAssistente:
         # texto na hora: é exatamente o caso que fica genérico demais
         # copiado ao pé da letra. Se o campo já foi editado — ou é um texto
         # da própria IA, reaberto para ajustar —, só espera o professor.
-        if carregar_chave():
+        if modo_disponivel():
             self._pedir_sozinho_se_for_so_o_assunto()
 
     def _pedir_sozinho_se_for_so_o_assunto(self) -> None:
@@ -507,22 +411,14 @@ class JanelaAssistente:
 
         # painel da chave (primeiro uso, ou "Trocar chave")
         self.painel_chave = ttk.Frame(cartao, style="Cartao.TFrame")
-        ttk.Label(
+        self.texto_painel_chave = ttk.Label(
             self.painel_chave,
-            text=(
-                "Para escrever com IA, o programa usa o Gemini (Google) com uma chave "
-                "sua, criada de graça no Google AI Studio. A chave fica guardada só "
-                "neste usuário do Windows.\n"
-                "O que você escrever na conversa, junto com os dados da aula, é "
-                "enviado à Google para gerar o texto — não digite nomes de "
-                "estudantes nem outros dados pessoais. Numa chave gratuita, a Google "
-                "pode usar esse conteúdo para melhorar os produtos dela; para que "
-                "isso não aconteça, ligue o faturamento da chave no AI Studio."
-            ),
+            text=TEXTO_CHAVE_PROPRIA,
             style="Cartao.TLabel",
             wraplength=560,
             justify="left",
-        ).pack(anchor="w", pady=(10, 4))
+        )
+        self.texto_painel_chave.pack(anchor="w", pady=(10, 4))
         ttk.Button(
             self.painel_chave, text="Criar uma chave no Google AI Studio",
             style="IALink.TButton", command=lambda: webbrowser.open(URL_CHAVES),
@@ -540,6 +436,10 @@ class JanelaAssistente:
         self.botao_voltar_da_chave = ttk.Button(
             self.painel_chave, text="Cancelar troca de chave", style="IALink.TButton",
             command=self._mostrar_painel_conversa,
+        )
+        self.botao_usar_servidor = ttk.Button(
+            self.painel_chave, text="Usar o serviço de IA da escola (esquecer minha chave)",
+            style="IALink.TButton", command=self._usar_servidor,
         )
 
         # rodapé — "acoes" empacotado ANTES do status, os dois por baixo:
@@ -577,6 +477,12 @@ class JanelaAssistente:
     def _mostrar_painel_conversa(self) -> None:
         self.painel_chave.pack_forget()
         self.painel_conversa.pack(fill="x", after=self.historico.master)
+        # com o serviço da escola o professor não tem chave para "trocar":
+        # o link vira o caminho para usar uma própria, se quiser
+        self.botao_trocar_chave.configure(
+            text="Usar minha própria chave" if modo_disponivel() == "servidor"
+            else "Trocar chave da API"
+        )
         self.botao_trocar_chave.pack(side="right")
         self.entrada.focus_set()
         self.entrada.mark_set("insert", "end")
@@ -585,12 +491,31 @@ class JanelaAssistente:
         self.painel_conversa.pack_forget()
         self.painel_chave.pack(fill="x", after=self.historico.master)
         self.campo_chave.delete(0, "end")
+        com_servidor = configuracao_do_servidor() is not None
+        self.texto_painel_chave.configure(
+            text=TEXTO_CHAVE_COM_SERVIDOR if com_servidor else TEXTO_CHAVE_PROPRIA
+        )
+        self.botao_voltar_da_chave.pack_forget()
+        self.botao_usar_servidor.pack_forget()
         if primeira_vez:
-            self.botao_voltar_da_chave.pack_forget()
             self.botao_trocar_chave.pack_forget()
         else:
             self.botao_voltar_da_chave.pack(anchor="w", pady=(6, 0))
+            if com_servidor and carregar_chave():
+                self.botao_usar_servidor.pack(anchor="w", pady=(2, 0))
         self.campo_chave.focus_set()
+
+    def _usar_servidor(self) -> None:
+        apagar_chave()
+        if carregar_chave():
+            # sobrou uma chave na variável de ambiente: o programa não a apaga
+            self.status.configure(
+                text="Ainda há uma chave em GEMINI_API_KEY (variável ou .env); "
+                "remova-a para usar o serviço da escola."
+            )
+        else:
+            self.status.configure(text="Usando o serviço de IA da escola.")
+        self._mostrar_painel_conversa()
 
     def _salvar_chave(self) -> None:
         chave = self.campo_chave.get().strip()
@@ -631,8 +556,7 @@ class JanelaAssistente:
         if not texto:
             self.status.configure(text="Escreva algo sobre a aula antes de enviar.")
             return "break"
-        chave = carregar_chave()
-        if not chave:
+        if not modo_disponivel():
             self._mostrar_painel_chave(primeira_vez=True)
             return "break"
         self.entrada.delete("1.0", "end")
@@ -641,16 +565,16 @@ class JanelaAssistente:
         self._enviado_por_ultimo = texto
         self._ocupar(True)
         threading.Thread(
-            target=self._pedir_em_segundo_plano, args=(chave, list(self.conversa)), daemon=True
+            target=self._pedir_em_segundo_plano, args=(list(self.conversa),), daemon=True
         ).start()
         self._trabalho = self.janela.after(150, self._conferir_resposta)
         return "break"
 
-    def _pedir_em_segundo_plano(self, chave: str, conversa: list) -> None:
+    def _pedir_em_segundo_plano(self, conversa: list) -> None:
         # Fora da thread da janela: o Tk não pode ser tocado daqui, então
         # a resposta volta por uma fila, lida por _conferir_resposta.
         try:
-            self._fila.put(("ok", pedir_texto(chave, self.contexto, conversa)))
+            self._fila.put(("ok", pedir(self.contexto, conversa)))
         except ErroDaIA as erro:
             self._fila.put(("erro", str(erro)))
         except Exception as erro:  # noqa: BLE001 - qualquer erro vira mensagem na janela

@@ -11,6 +11,8 @@ registros_enviados.json     # histórico do que já foi enviado à SED
 aulas_nao_realizadas.json
 ultimo_professor.txt
 backup_versao_anterior/
+servidor_ia.json            # endereço + SEGREDO do serviço de IA da escola (só na montagem)
+.vercel/                    # ligação local com o projeto da Vercel
 
 # ---------------------------------------------------------------------
 # Sobras de quem roda o programa
