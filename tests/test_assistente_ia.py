@@ -121,6 +121,8 @@ class PedidoParaAApi(_ComServidor):
 
         corpo = pedido["corpo"]
         self.assertEqual(corpo["model"], assistente_ia.MODELO_PADRAO)
+        # os modelos maiores recusam "temperature" (400): nunca enviar
+        self.assertNotIn("temperature", corpo)
         self.assertEqual(corpo["messages"], [{"role": "user", "content": CONTEXTO["assunto"]}])
         self.assertIn("- Disciplina: Geografia", corpo["system"])
         self.assertIn("- Assunto anotado na agenda: atividade de geografia - mercantilismo", corpo["system"])
@@ -201,6 +203,9 @@ class ErrosExplicados(_ComServidor):
 
 
 class Instrucoes(unittest.TestCase):
+    def test_pede_para_nao_repetir_nome_de_estudante(self):
+        self.assertIn("nomes de estudantes", assistente_ia.montar_instrucoes({}))
+
     def test_campos_vazios_ficam_de_fora(self):
         texto = assistente_ia.montar_instrucoes({"disciplina": "Arte", "turma": "", "recursos": []})
         self.assertIn("- Disciplina: Arte", texto)

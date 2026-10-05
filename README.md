@@ -77,6 +77,12 @@ da assinatura do Claude e cobrada por uso (uma fração de centavo de dólar
 por texto). A chave fica guardada só no seu usuário do Windows. Sem chave,
 o resto do programa funciona exatamente igual.
 
+**Privacidade:** o que você escreve na conversa e os dados da aula
+(disciplina, turma, recursos, assunto da agenda) são enviados à Anthropic
+para gerar o texto. Nome de professor não vai, mas o texto livre o programa
+não consegue filtrar — por isso a janela avisa para não digitar nomes de
+estudantes.
+
 Os dois formatos de instalação (portátil e instalador) se atualizam
 sozinhos quando sai versão nova, e compartilham os mesmos dados — dá para
 trocar de um para o outro sem perder nada. O arquivo

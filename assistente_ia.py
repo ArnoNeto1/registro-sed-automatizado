@@ -35,6 +35,9 @@ O QUE É ENVIADO PARA A IA
 Só o necessário para escrever o texto: disciplina, turma, etapa, nº de
 aulas, recursos marcados, o assunto anotado na agenda e o que o
 professor digitar na conversa. NOMES de professores não são enviados.
+O texto livre da conversa o programa não consegue filtrar — por isso a
+janela avisa para não digitar nomes de estudantes (alunos são menores
+de idade), e a instrução pede à IA para não repeti-los.
 
 SEM DEPENDÊNCIA NOVA
 --------------------
@@ -133,6 +136,8 @@ texto, do jeito natural ("utilizando os computadores do laboratório").
 abri-lo, então use-o no máximo como pista e nunca copie o link no texto.
 - Escreva nomes de plataformas do jeito certo (Google Sala de Aula, \
 Estudante Online, MakeCode, Scratch, Canva...).
+- Se o professor citar nomes de estudantes, não os repita no texto: fale em \
+"os estudantes" ou "a turma".
 
 FORMATO DA RESPOSTA
 - Responda SOMENTE com o texto que vai no formulário: sem título, sem \
@@ -259,7 +264,9 @@ def pedir_texto(chave: str, contexto: dict, conversa: list, modelo: str = "") ->
         {
             "model": modelo or (os.environ.get("MODELO_IA") or "").strip() or MODELO_PADRAO,
             "max_tokens": 500,
-            "temperature": 0.4,
+            # Sem "temperature" de propósito: os modelos maiores atuais
+            # recusam esse parâmetro (erro 400), e MODELO_IA existe
+            # justamente para trocar de modelo sem mexer no código.
             "system": montar_instrucoes(contexto),
             "messages": conversa,
         }
@@ -430,7 +437,9 @@ class JanelaAssistente:
             "Descreva o que foi feito na aula, do seu jeito — ou mande o assunto "
             "da agenda como está. Eu escrevo o texto dos objetos do conhecimento "
             "no formato da SED, e você pode pedir correções aqui mesmo (\"foi o "
-            "professor de Arte, não de Matemática\").",
+            "professor de Arte, não de Matemática\").\n"
+            "Atenção: o que você escrever aqui é enviado ao serviço de IA — "
+            "não digite nomes de estudantes.",
             "dica",
         )
 
@@ -462,7 +471,10 @@ class JanelaAssistente:
                 "Para escrever com IA, o programa usa a API do Claude (Anthropic) com "
                 "uma chave sua. Ela é separada da assinatura do Claude e é cobrada por "
                 "uso — cada texto custa uma fração de centavo de dólar. A chave fica "
-                "guardada só neste usuário do Windows."
+                "guardada só neste usuário do Windows.\n"
+                "O que você escrever na conversa, junto com os dados da aula, é "
+                "enviado à Anthropic para gerar o texto: não digite nomes de "
+                "estudantes."
             ),
             style="Cartao.TLabel",
             wraplength=560,
