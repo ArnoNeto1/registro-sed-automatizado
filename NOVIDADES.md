@@ -10,7 +10,7 @@ seção `## <número>` com o que mudou. O resto acontece sozinho.
 
 ---
 
-## 1.10.0
+## 2.0.0
 
 - **Novo: "Escrever com IA..." para os objetos do conhecimento.** O
   "Conteúdo aplicado" vem com o assunto da agenda, às vezes bem genérico
@@ -25,8 +25,8 @@ seção `## <número>` com o que mudou. O resto acontece sozinho.
   o serviço da escola usa o plano gratuito, em que a Google pode usar o
   conteúdo para melhorar os produtos dela. Não digite nomes de estudantes
   nem outros dados pessoais — o programa barra CPF, e-mail e telefone.
-- **Agradecimento:** a ideia e a primeira versão do "Escrever com IA" são
-  do Guilherme Dornelles (EEB Ivo D'Aquino, Gaspar). Obrigado!
+- **Agradecimento:** a ideia da versão do "Escrever com IA" é do
+  Guilherme Dornelles (EEB Ivo D'Aquino, Gaspar). Obrigado!
 
 ## 1.9.3
 

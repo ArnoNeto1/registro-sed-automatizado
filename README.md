@@ -1,6 +1,7 @@
 # Registro SED Automatizado
 
 [![Versão mais recente](https://img.shields.io/github/v/release/ArnoNeto1/registro-sed-automatizado?label=vers%C3%A3o&color=2f6f4f)](https://github.com/ArnoNeto1/registro-sed-automatizado/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/ArnoNeto1/registro-sed-automatizado/total?label=downloads&color=6b7684)](https://github.com/ArnoNeto1/registro-sed-automatizado/releases)
 [![Baixar o instalador](https://img.shields.io/badge/⬇%20Baixar-Instalador%20(.exe)-2f6f4f?style=for-the-badge)](https://github.com/ArnoNeto1/registro-sed-automatizado/releases/latest/download/Registro-SED-Instalador.exe)
 [![Baixar a versão portátil](https://img.shields.io/badge/⬇%20Baixar-Vers%C3%A3o%20port%C3%A1til-6b7684?style=for-the-badge)](https://github.com/ArnoNeto1/registro-sed-automatizado/releases/latest/download/Registro-SED.exe)
 
@@ -153,6 +154,7 @@ python -m unittest discover -s tests -v
 | `configuracao.py` | Tela de cadastro (nome, escola, CPF, turnos) — substitui a edição manual do `.env`. |
 | `caminhos.py` | Onde ficam os arquivos do programa (`.py` vs `.exe`, portátil vs instalado) e qual navegador usar. |
 | `atualizador.py` | Autoatualização: consulta `versao.json`, baixa, confere (tamanho e SHA-256) e troca os arquivos/o `.exe`. |
+| `contar_downloads.py` | Mostra quantas vezes cada versão foi baixada (lê a contagem pública do GitHub). |
 | `assistente_ia.py` | "Escrever com IA...": a janela de conversa e a escolha entre o serviço da escola e a chave própria (opcional). |
 | `ia_gemini.py` | Núcleo da IA, sem tela: instrução, limpeza do texto e chamada ao Gemini. Compartilhado com o servidor. |
 | `servidor-ia/` | Servidor intermediário (função da Vercel) que guarda a chave do Gemini da escola. Ver o README da pasta. |
@@ -174,13 +176,29 @@ portátil e o instalador, publica os dois numa Release e atualiza
 `versao.json` sozinho. Veja `PUBLICAR ATUALIZACAO.txt` para o passo a passo
 completo.
 
+### Quantas pessoas baixaram o programa
+
+O GitHub conta sozinho cada download dos arquivos das Releases (o selo
+"downloads" lá em cima mostra o total). Para ver os números por versão:
+
+```bash
+python contar_downloads.py
+```
+
+- **Instalador** = novas instalações: o mais próximo de "quantas pessoas".
+- **Portátil + atualizações** = quem baixou o portátil mais cada
+  atualização automática (o programa se atualiza baixando esse arquivo),
+  por isso sobe com a quantidade de computadores que atualizaram.
+- Não são pessoas diferentes: quem baixa duas vezes conta duas, e o GitHub
+  não diz quem baixou. Quem recebeu por pen drive ou e-mail não aparece.
+
 ## Agradecimentos
 
 - **Guilherme Dornelles** (EEB Ivo D'Aquino, Gaspar) — na v1.9.3, o
   atualizador que confere o download antes de trocar o programa (tamanho e
   SHA-256) e a correção da reabertura automática (erro `init.tcl`), ambos
-  com testes automáticos; e, na v1.10.0, a ideia e a primeira versão do
-  "Escrever com IA..." (que depois ganhou o serviço da escola e o Gemini).
+  com testes automáticos; e, na v2.0.0, a ideia da versão do "Escrever
+  com IA..." (que depois ganhou o serviço da escola e o Gemini).
 
 ## Licença
 

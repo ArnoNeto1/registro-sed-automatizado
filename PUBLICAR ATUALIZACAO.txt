@@ -150,3 +150,29 @@ URL_ATUALIZACAO do .env para o endereço novo.
 
 Foi feito assim de propósito — o endereço é configuração, não está
 gravado dentro do programa.
+
+
+-----------------------------------------------------------------------
+QUANTAS PESSOAS BAIXARAM O PROGRAMA?
+-----------------------------------------------------------------------
+
+O GitHub conta sozinho cada download dos arquivos de uma versão
+("Release"), e a contagem é pública. Para ver os números por versão,
+num terminal, dentro da pasta do programa:
+
+    python contar_downloads.py
+
+Como ler:
+
+    Instalador               novas instalações — o mais perto de
+                             "quantas pessoas começaram a usar".
+    Portátil + atualizações  quem baixou o portátil, MAIS cada
+                             atualização automática (o programa se
+                             atualiza baixando esse mesmo arquivo).
+                             Numa versão nova, este número sobe com a
+                             quantidade de computadores que atualizaram.
+
+O que não dá para saber: "pessoas diferentes". Quem baixa duas vezes
+conta duas, o GitHub não diz quem baixou, e quem recebeu o programa por
+pen drive ou e-mail não aparece. O selo "downloads" no alto da página do
+repositório mostra o total de todas as versões juntas.
