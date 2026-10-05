@@ -10,6 +10,18 @@ seção `## <número>` com o que mudou. O resto acontece sozinho.
 
 ---
 
+## 1.9.3
+
+- **Atualização automática mais segura.** Se a internet caísse no meio
+  do download de uma versão nova, o programa podia ficar com um arquivo
+  cortado e parar de abrir. Agora ele confere o download antes de trocar
+  qualquer coisa — e, se algo não veio inteiro, continua com a versão
+  que já funciona e avisa para tentar de novo mais tarde.
+- **Corrigido: erro "init.tcl" ao abrir.** Em alguns computadores o
+  programa às vezes mostrava esse erro ao abrir e tentava se reabrir
+  sozinho, mas a segunda abertura falhava do mesmo jeito. Agora a
+  reabertura funciona.
+
 ## 1.9.2
 
 - **Agora dá para ver a senha digitada.** Na tela de entrada, ao lado
