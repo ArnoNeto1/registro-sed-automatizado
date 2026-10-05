@@ -1,7 +1,8 @@
 {
-  "versao": "1.9.2",
-  "exe": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v1.9.2/Registro-SED.exe",
-  "instalador": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v1.9.2/Registro-SED-Instalador.exe",
+  "versao": "1.9.3",
+  "exe": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v1.9.3/Registro-SED.exe",
+  "sha256": "c1c3868698560c6c1cea20597e5a48808808d541e07d6420d105eb798ab95253",
+  "instalador": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v1.9.3/Registro-SED-Instalador.exe",
   "zip": "https://github.com/ArnoNeto1/registro-sed-automatizado/archive/refs/heads/main.zip",
-  "notas": "- **Agora dá para ver a senha digitada.** Na tela de entrada, ao lado\n  do campo \"Senha da agenda\", tem um \"mostrar\" — clique para revelar o\n  que você digitou (e \"ocultar\" para esconder de novo). Ajuda quem\n  estava errando a senha sem perceber, porque não dava para conferir o\n  que tinha sido digitado antes de clicar em \"Entrar\"."
+  "notas": "- **Atualização automática mais segura.** Se a internet caísse no meio\n  do download de uma versão nova, o programa podia ficar com um arquivo\n  cortado e parar de abrir. Agora ele confere o download antes de trocar\n  qualquer coisa — e, se algo não veio inteiro, continua com a versão\n  que já funciona e avisa para tentar de novo mais tarde.\n- **Corrigido: erro \"init.tcl\" ao abrir.** Em alguns computadores o\n  programa às vezes mostrava esse erro ao abrir e tentava se reabrir\n  sozinho, mas a segunda abertura falhava do mesmo jeito. Agora a\n  reabertura funciona."
 }
