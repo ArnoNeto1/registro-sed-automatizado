@@ -1,8 +1,8 @@
 {
-  "versao": "2.0.0",
-  "exe": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v2.0.0/Registro-SED.exe",
-  "sha256": "85b001d7790e75feea08d9d8edaebbd62747b9210e37a327a818514b1013b430",
-  "instalador": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v2.0.0/Registro-SED-Instalador.exe",
+  "versao": "2.0.1",
+  "exe": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v2.0.1/Registro-SED.exe",
+  "sha256": "da406bd6fb33d57ef86d6bdb3232bbfe82bde793f23ba28f869afad48b5faa4a",
+  "instalador": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v2.0.1/Registro-SED-Instalador.exe",
   "zip": "https://github.com/ArnoNeto1/registro-sed-automatizado/archive/refs/heads/main.zip",
-  "notas": "- **Novo: \"Escrever com IA...\" para os objetos do conhecimento.** O\n  \"Conteúdo aplicado\" vem com o assunto da agenda, às vezes bem genérico\n  (\"atividade de geografia - mercantilismo\"). O botão novo, ao lado do\n  campo, abre uma conversa com uma IA que transforma isso num texto no\n  formato da SED, usando a disciplina, a turma e os recursos da aula. Dá\n  para contar detalhes (inclusive a metodologia) ou pedir correções, e o\n  texto só entra no campo quando você clica em \"Usar este texto\". Não\n  precisa de chave: o programa usa o serviço de IA da escola (quem\n  preferir pode colar uma chave própria do Gemini).\n- **Atenção com o que você escreve ali.** A conversa é enviada à Google, e\n  o serviço da escola usa o plano gratuito, em que a Google pode usar o\n  conteúdo para melhorar os produtos dela. Não digite nomes de estudantes\n  nem outros dados pessoais — o programa barra CPF, e-mail e telefone.\n- **Agradecimento:** a ideia da versão do \"Escrever com IA\" é do\n  Guilherme Dornelles (EEB Ivo D'Aquino, Gaspar). Obrigado!"
+  "notas": "- **Corrigido: o \"Escrever com IA...\" devolvia quase sempre o mesmo\n  texto.** As mesmas frases apareciam no final de qualquer aula, e pedir\n  \"outro texto\" trazia o mesmo parágrafo com poucas palavras trocadas.\n  Agora cada texto fala do assunto da aula, e \"outro texto\" traz uma\n  versão realmente diferente.\n- **Os recursos marcados na aula deixaram de ir para a IA.** Eles já vão\n  no campo próprio do formulário. Se você citar um recurso na conversa\n  (por exemplo, os tablets), ele pode aparecer no texto.\n- **Mais estável.** Quando um modelo da IA atinge o limite de uso ou está\n  sobrecarregado, o programa troca sozinho para outro, sem você precisar\n  tentar de novo."
 }
