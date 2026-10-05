@@ -71,17 +71,20 @@ transforma isso num texto de objetos do conhecimento no formato da SED
 de..."). Dá para contar mais detalhes ou pedir correções na conversa, e o
 texto só entra no campo quando você clica em **"Usar este texto"**.
 
-Usa a API do Claude (Anthropic) com uma chave sua, criada em
-[platform.claude.com](https://platform.claude.com/settings/keys) — separada
-da assinatura do Claude e cobrada por uso (uma fração de centavo de dólar
-por texto). A chave fica guardada só no seu usuário do Windows. Sem chave,
-o resto do programa funciona exatamente igual.
+Usa a API do Gemini (Google) com uma chave sua, criada de graça no
+[Google AI Studio](https://aistudio.google.com/apikey). A chave fica
+guardada só no seu usuário do Windows (ou na variável `GEMINI_API_KEY`).
+Sem chave, o resto do programa funciona exatamente igual. O modelo padrão é
+o `gemini-3.5-flash-lite`; dá para trocar com `MODELO_IA=...` no `.env`.
 
 **Privacidade:** o que você escreve na conversa e os dados da aula
-(disciplina, turma, recursos, assunto da agenda) são enviados à Anthropic
+(disciplina, turma, recursos, assunto da agenda) são enviados à Google
 para gerar o texto. Nome de professor não vai, mas o texto livre o programa
 não consegue filtrar — por isso a janela avisa para não digitar nomes de
-estudantes.
+estudantes. **Atenção:** numa chave *gratuita*, a Google pode usar o
+conteúdo para melhorar os produtos dela e pessoas podem lê-lo. Uma
+assinatura do Gemini não muda isso: só uma chave com a conta de faturamento
+ligada no AI Studio (plano pago) fica de fora desse uso.
 
 Os dois formatos de instalação (portátil e instalador) se atualizam
 sozinhos quando sai versão nova, e compartilham os mesmos dados — dá para
@@ -135,7 +138,7 @@ python -m unittest discover -s tests -v
 | `configuracao.py` | Tela de cadastro (nome, escola, CPF, turnos) — substitui a edição manual do `.env`. |
 | `caminhos.py` | Onde ficam os arquivos do programa (`.py` vs `.exe`, portátil vs instalado) e qual navegador usar. |
 | `atualizador.py` | Autoatualização: consulta `versao.json`, baixa, confere (tamanho e SHA-256) e troca os arquivos/o `.exe`. |
-| `assistente_ia.py` | "Escrever com IA...": conversa que escreve os objetos do conhecimento (API do Claude, opcional). |
+| `assistente_ia.py` | "Escrever com IA...": conversa que escreve os objetos do conhecimento (API do Gemini, opcional). |
 | `escolas.py` | Lista de escolas da CRE Blumenau, como aparecem no formulário da SED. |
 | `tests/` | Testes automáticos (`python -m unittest discover -s tests`). |
 | `installer/setup.iss` | Script do instalador Windows (Inno Setup). |

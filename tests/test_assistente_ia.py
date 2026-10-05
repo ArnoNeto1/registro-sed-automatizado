@@ -6,8 +6,8 @@ padrão do Python, sem chamar a API de verdade:
     python -m unittest discover -s tests -v
 
 Um servidor HTTP de mentira, na própria máquina, faz o papel da API do
-Claude: grava o pedido que chegou (para conferir cabeçalhos, instruções e
-conversa) e devolve a resposta que o teste mandar.
+Gemini: grava o pedido que chegou (para conferir endereço, cabeçalhos,
+instruções e conversa) e devolve a resposta que o teste mandar.
 """
 
 from __future__ import annotations
@@ -53,16 +53,18 @@ class _ApiDeMentira(BaseHTTPRequestHandler):
 
 def _resposta_ok(texto: str) -> dict:
     return {
-        "id": "msg_teste",
-        "type": "message",
-        "role": "assistant",
-        "content": [{"type": "text", "text": texto}],
-        "stop_reason": "end_turn",
+        "candidates": [
+            {
+                "content": {"parts": [{"text": texto}], "role": "model"},
+                "finishReason": "STOP",
+                "index": 0,
+            }
+        ]
     }
 
 
-def _erro(tipo: str, mensagem: str) -> dict:
-    return {"type": "error", "error": {"type": tipo, "message": mensagem}}
+def _erro(codigo: int, status: str, mensagem: str) -> dict:
+    return {"error": {"code": codigo, "message": mensagem, "status": status}}
 
 
 CONTEXTO = {
@@ -82,7 +84,8 @@ class _ComServidor(unittest.TestCase):
     def setUpClass(cls):
         cls.servidor = ThreadingHTTPServer(("127.0.0.1", 0), _ApiDeMentira)
         threading.Thread(target=cls.servidor.serve_forever, daemon=True).start()
-        cls.url = f"http://127.0.0.1:{cls.servidor.server_address[1]}/v1/messages"
+        porta = cls.servidor.server_address[1]
+        cls.url = f"http://127.0.0.1:{porta}/v1beta/models/" + "{modelo}:generateContent"
 
     @classmethod
     def tearDownClass(cls):
@@ -106,7 +109,7 @@ class _ComServidor(unittest.TestCase):
 
 
 class PedidoParaAApi(_ComServidor):
-    def test_cabecalhos_e_corpo_do_pedido(self):
+    def test_endereco_cabecalhos_e_corpo_do_pedido(self):
         RESPOSTA["corpo"] = _resposta_ok(
             "Foram abordados conteúdos de Geografia relacionados ao mercantilismo."
         )
@@ -114,38 +117,76 @@ class PedidoParaAApi(_ComServidor):
         self.assertEqual(texto, "Foram abordados conteúdos de Geografia relacionados ao mercantilismo.")
 
         pedido = PEDIDOS[-1]
-        self.assertEqual(pedido["caminho"], "/v1/messages")
-        self.assertEqual(pedido["cabecalhos"]["x-api-key"], "chave-de-teste")
-        self.assertEqual(pedido["cabecalhos"]["anthropic-version"], "2023-06-01")
+        self.assertEqual(
+            pedido["caminho"], f"/v1beta/models/{assistente_ia.MODELO_PADRAO}:generateContent"
+        )
+        self.assertEqual(pedido["cabecalhos"]["x-goog-api-key"], "chave-de-teste")
         self.assertIn("application/json", pedido["cabecalhos"]["content-type"])
 
         corpo = pedido["corpo"]
-        self.assertEqual(corpo["model"], assistente_ia.MODELO_PADRAO)
-        # os modelos maiores recusam "temperature" (400): nunca enviar
-        self.assertNotIn("temperature", corpo)
-        self.assertEqual(corpo["messages"], [{"role": "user", "content": CONTEXTO["assunto"]}])
-        self.assertIn("- Disciplina: Geografia", corpo["system"])
-        self.assertIn("- Assunto anotado na agenda: atividade de geografia - mercantilismo", corpo["system"])
-        self.assertIn("Computadores/notebooks (pesquisa) no laboratório, Lousa Digital", corpo["system"])
+        # sem temperature: o padrão de cada modelo é o recomendado
+        self.assertNotIn("temperature", json.dumps(corpo))
+        self.assertGreaterEqual(corpo["generationConfig"]["maxOutputTokens"], 1000)
+        self.assertEqual(
+            corpo["contents"],
+            [{"role": "user", "parts": [{"text": CONTEXTO["assunto"]}]}],
+        )
+        sistema = corpo["systemInstruction"]["parts"][0]["text"]
+        self.assertIn("- Disciplina: Geografia", sistema)
+        self.assertIn("- Assunto anotado na agenda: atividade de geografia - mercantilismo", sistema)
+        self.assertIn("Computadores/notebooks (pesquisa) no laboratório, Lousa Digital", sistema)
+
+    def test_chave_nunca_vai_no_endereco(self):
+        self._pedir()
+        self.assertNotIn("chave-de-teste", PEDIDOS[-1]["caminho"])
+        self.assertNotIn("key=", PEDIDOS[-1]["caminho"])
 
     def test_nome_de_professor_nunca_sai_do_computador(self):
         self._pedir()
         tudo = json.dumps(PEDIDOS[-1]["corpo"], ensure_ascii=False)
         self.assertNotIn("FULANA", tudo)
 
-    def test_conversa_inteira_vai_a_cada_pedido(self):
+    def test_conversa_inteira_vai_a_cada_pedido_com_papel_model(self):
         conversa = [
             {"role": "user", "content": "O professor de artes projetou no datashow."},
             {"role": "assistant", "content": "Foram abordados conteúdos de Matemática..."},
             {"role": "user", "content": "foi o professor de ARTES, não matemática"},
         ]
         self._pedir(conversa)
-        self.assertEqual(PEDIDOS[-1]["corpo"]["messages"], conversa)
+        self.assertEqual(
+            PEDIDOS[-1]["corpo"]["contents"],
+            [
+                {"role": "user", "parts": [{"text": "O professor de artes projetou no datashow."}]},
+                {"role": "model", "parts": [{"text": "Foram abordados conteúdos de Matemática..."}]},
+                {"role": "user", "parts": [{"text": "foi o professor de ARTES, não matemática"}]},
+            ],
+        )
 
     def test_modelo_pode_ser_trocado_pelo_env(self):
-        os.environ["MODELO_IA"] = "claude-sonnet-5-5"
+        os.environ["MODELO_IA"] = "gemini-outro-modelo"
         self._pedir()
-        self.assertEqual(PEDIDOS[-1]["corpo"]["model"], "claude-sonnet-5-5")
+        self.assertEqual(PEDIDOS[-1]["caminho"], "/v1beta/models/gemini-outro-modelo:generateContent")
+
+    def test_modelo_com_caracteres_estranhos_nao_muda_o_endereco(self):
+        os.environ["MODELO_IA"] = "x/../../outro"
+        self._pedir()
+        self.assertNotIn("/../", PEDIDOS[-1]["caminho"])
+
+    def test_pensamento_do_modelo_fica_de_fora(self):
+        RESPOSTA["corpo"] = {
+            "candidates": [
+                {
+                    "content": {
+                        "parts": [
+                            {"text": "raciocinando em voz alta...", "thought": True},
+                            {"text": "Foram abordados conteúdos de Geografia."},
+                        ],
+                        "role": "model",
+                    }
+                }
+            ]
+        }
+        self.assertEqual(self._pedir(), "Foram abordados conteúdos de Geografia.")
 
     def test_resposta_sai_limpa_para_o_formulario(self):
         RESPOSTA["corpo"] = _resposta_ok(
@@ -177,27 +218,47 @@ class ErrosExplicados(_ComServidor):
             self._pedir()
         self.assertIn(trecho, str(caso.exception))
 
-    def test_chave_recusada(self):
-        self._erro_esperado(401, _erro("authentication_error", "invalid x-api-key"), "não foi aceita")
-
-    def test_conta_sem_credito(self):
+    def test_chave_recusada_o_gemini_responde_400(self):
         self._erro_esperado(
             400,
-            _erro("invalid_request_error", "Your credit balance is too low to access the Anthropic API."),
-            "sem créditos",
+            _erro(400, "INVALID_ARGUMENT", "API key not valid. Please pass a valid API key."),
+            "não foi aceita",
+        )
+
+    def test_chave_recusada_401(self):
+        self._erro_esperado(401, _erro(401, "UNAUTHENTICATED", "bad key"), "não foi aceita")
+
+    def test_chave_bloqueada(self):
+        self._erro_esperado(
+            403, _erro(403, "PERMISSION_DENIED", "Your API key was reported as leaked."), "bloqueada"
+        )
+
+    def test_modelo_inexistente(self):
+        self._erro_esperado(404, _erro(404, "NOT_FOUND", "model not found"), "MODELO_IA")
+
+    def test_limite_da_chave_gratuita(self):
+        self._erro_esperado(
+            429, _erro(429, "RESOURCE_EXHAUSTED", "quota exceeded"), "Espere um pouco"
         )
 
     def test_servico_sobrecarregado(self):
-        self._erro_esperado(529, _erro("overloaded_error", "Overloaded"), "sobrecarregado")
-
-    def test_muitos_pedidos(self):
-        self._erro_esperado(429, _erro("rate_limit_error", "rate limited"), "Espere alguns segundos")
+        self._erro_esperado(503, _erro(503, "UNAVAILABLE", "overloaded"), "sobrecarregado")
 
     def test_resposta_em_branco(self):
         self._erro_esperado(200, _resposta_ok("   "), "em branco")
 
+    def test_sem_candidatos(self):
+        self._erro_esperado(200, {"candidates": []}, "em branco")
+
+    def test_bloqueado_pelo_filtro_de_seguranca(self):
+        self._erro_esperado(
+            200, {"promptFeedback": {"blockReason": "SAFETY"}}, "filtro de segurança"
+        )
+
     def test_sem_internet(self):
-        with mock.patch.object(assistente_ia, "URL_API", "http://127.0.0.1:9/v1/messages"):
+        with mock.patch.object(
+            assistente_ia, "URL_API", "http://127.0.0.1:9/v1beta/models/{modelo}:generateContent"
+        ):
             with self.assertRaisesRegex(assistente_ia.ErroDaIA, "internet"):
                 self._pedir()
 
@@ -227,7 +288,7 @@ class ChaveDaApi(unittest.TestCase):
         ambiente = mock.patch.dict(os.environ, {"APPDATA": self.pasta}, clear=False)
         ambiente.start()
         self.addCleanup(ambiente.stop)
-        os.environ.pop("ANTHROPIC_API_KEY", None)
+        os.environ.pop("GEMINI_API_KEY", None)
 
     def test_sem_chave(self):
         self.assertEqual(assistente_ia.carregar_chave(), "")
@@ -239,7 +300,7 @@ class ChaveDaApi(unittest.TestCase):
         self.assertTrue(arquivo.exists())
 
     def test_variavel_de_ambiente_como_alternativa(self):
-        os.environ["ANTHROPIC_API_KEY"] = "chave-do-env"
+        os.environ["GEMINI_API_KEY"] = "chave-do-env"
         self.assertEqual(assistente_ia.carregar_chave(), "chave-do-env")
         assistente_ia.salvar_chave("chave-da-tela")
         self.assertEqual(assistente_ia.carregar_chave(), "chave-da-tela")

@@ -19,9 +19,9 @@ seção `## <número>` com o que mudou. O resto acontece sozinho.
   formato da SED, usando a disciplina, a turma e os recursos da aula. Dá
   para contar detalhes ou pedir correções, e o texto só entra no campo
   quando você clica em "Usar este texto". Opcional: precisa de uma chave
-  da API do Claude (platform.claude.com), paga por uso — uma fração de
-  centavo de dólar por texto. O que você escrever na conversa é enviado
-  ao serviço de IA, então não digite nomes de estudantes.
+  do Gemini (Google), que você cria de graça no Google AI Studio. O que
+  você escrever na conversa é enviado à Google, então não digite nomes de
+  estudantes nem outros dados pessoais.
 
 ## 1.9.3
 

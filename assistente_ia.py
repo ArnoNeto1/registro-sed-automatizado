@@ -15,20 +15,22 @@ clicar em "Usar este texto" — que só troca o texto do campo. Nada vai
 para a SED sem passar pelo mesmo "Preencher formulário" → conferir →
 "Enviar para a SED" de sempre.
 
-OPCIONAL, E PAGO POR QUEM USA
------------------------------
-Usa a API do Claude (Anthropic) com a chave do PRÓPRIO professor — que
-é separada da assinatura do Claude e cobrada por uso (cada texto custa
-uma fração de centavo de dólar no modelo usado aqui). Sem chave, a
-janela só explica como conseguir uma; o resto do programa não muda.
+OPCIONAL, COM A CHAVE DE QUEM USA
+---------------------------------
+Usa a API do Gemini (Google) com a chave do PRÓPRIO professor, criada de
+graça no Google AI Studio. Uma assinatura do Gemini NÃO vira chave paga:
+só liga a chave ao plano pago quem vincula uma conta de faturamento no
+Google AI Studio. Sem chave, a janela só explica como conseguir uma; o
+resto do programa não muda.
 
 A CHAVE FICA POR USUÁRIO DO WINDOWS, NÃO NA PASTA DE DADOS
 ----------------------------------------------------------
 Diferente do resto dos dados — que são do computador, compartilhados
 por todo mundo que usa o laboratório (ver caminhos.pasta_de_dados) — a
-chave é pessoal e paga. Por isso fica em %APPDATA%\\RegistroSED, que
-outro usuário do Windows não consegue ler. Também pode vir da variável
-ANTHROPIC_API_KEY (inclusive escrita no .env), para quem preferir.
+chave é pessoal. Por isso fica em %APPDATA%\\RegistroSED, que outro
+usuário do Windows não consegue ler. Também pode vir da variável
+GEMINI_API_KEY (inclusive escrita no .env), para quem preferir. Ela
+viaja no cabeçalho da chamada, nunca no endereço.
 
 O QUE É ENVIADO PARA A IA
 -------------------------
@@ -38,6 +40,13 @@ professor digitar na conversa. NOMES de professores não são enviados.
 O texto livre da conversa o programa não consegue filtrar — por isso a
 janela avisa para não digitar nomes de estudantes (alunos são menores
 de idade), e a instrução pede à IA para não repeti-los.
+
+PRIVACIDADE DO PLANO GRATUITO DA GOOGLE
+---------------------------------------
+Nos termos da Google, o que passa por uma chave GRATUITA pode ser usado
+para melhorar os produtos deles, e pessoas podem ler esse conteúdo; eles
+pedem para não enviar dados pessoais por ali. Com o faturamento ligado
+(plano pago) isso não acontece. A janela explica isso ao professor.
 
 SEM DEPENDÊNCIA NOVA
 --------------------
@@ -53,19 +62,19 @@ import queue
 import threading
 import tkinter as tk
 import urllib.error
+import urllib.parse
 import urllib.request
 import webbrowser
 from pathlib import Path
 from tkinter import ttk
 
-URL_API = "https://api.anthropic.com/v1/messages"
-VERSAO_API = "2023-06-01"
-URL_CHAVES = "https://platform.claude.com/settings/keys"
+URL_API = "https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent"
+URL_CHAVES = "https://aistudio.google.com/apikey"
 
-# O modelo mais barato e rápido da Anthropic — de sobra para um parágrafo
-# de duas frases. Dá para trocar sem mexer no código, com a linha
-# MODELO_IA=... no .env (por exemplo, para um modelo maior).
-MODELO_PADRAO = "claude-haiku-4-5-20251001"
+# O modelo estável mais barato e rápido do Gemini — de sobra para um
+# parágrafo de duas frases. Dá para trocar sem mexer no código, com a
+# linha MODELO_IA=... no .env (por exemplo, para um modelo maior).
+MODELO_PADRAO = "gemini-3.5-flash-lite"
 
 TEMPO_LIMITE = 60  # segundos
 ARQUIVO_CHAVE = "chave_ia.txt"
@@ -84,14 +93,14 @@ def _pasta_da_chave() -> Path:
 def carregar_chave() -> str:
     """
     A chave salva pela tela tem preferência — é a última coisa que o
-    professor fez de propósito. A variável ANTHROPIC_API_KEY (ou a mesma
+    professor fez de propósito. A variável GEMINI_API_KEY (ou a mesma
     linha no .env) fica como alternativa.
     """
     try:
         salva = (_pasta_da_chave() / ARQUIVO_CHAVE).read_text(encoding="utf-8").strip()
     except OSError:
         salva = ""
-    return salva or (os.environ.get("ANTHROPIC_API_KEY") or "").strip()
+    return salva or (os.environ.get("GEMINI_API_KEY") or "").strip()
 
 
 def salvar_chave(chave: str) -> None:
@@ -237,20 +246,27 @@ def _explicar_erro_http(erro: urllib.error.HTTPError) -> str:
         mensagem = str((corpo.get("error") or {}).get("message") or "")
     except Exception:
         mensagem = ""
-    if erro.code == 401:
+    # O Gemini responde 400 (e não 401) para uma chave inválida.
+    if erro.code == 401 or (erro.code == 400 and "api key" in mensagem.lower()):
         return (
             "A chave da API não foi aceita. Confira se ela foi copiada "
             "inteira e use \"Trocar chave da API\" para colar de novo."
         )
     if erro.code == 403:
-        return "Esta chave não tem permissão para usar a API. Crie outra em platform.claude.com."
-    if "credit" in mensagem.lower() or "billing" in mensagem.lower():
         return (
-            "A conta da API está sem créditos. Adicione créditos em "
-            "platform.claude.com (Billing) e tente de novo."
+            "Esta chave não tem permissão para usar a API (pode ter sido "
+            f"bloqueada ou restringida). Crie outra em {URL_CHAVES}."
+        )
+    if erro.code == 404:
+        return (
+            "O modelo de IA configurado não foi encontrado — pode ter sido "
+            "aposentado. Confira a linha MODELO_IA, se existir no .env."
         )
     if erro.code == 429:
-        return "Muitos pedidos seguidos. Espere alguns segundos e tente de novo."
+        return (
+            "Muitos pedidos seguidos, ou o limite do dia da chave gratuita "
+            "acabou. Espere um pouco e tente de novo."
+        )
     if erro.code >= 500:
         return "O serviço da IA está sobrecarregado ou fora do ar agora. Tente de novo em instantes."
     return f"O serviço da IA recusou o pedido (erro {erro.code}). {mensagem}".strip()
@@ -265,24 +281,35 @@ def pedir_texto(chave: str, contexto: dict, conversa: list, modelo: str = "") ->
     entre um pedido e outro: é assim que "foi o professor de ARTES" faz
     sentido para ela — ela lê o texto anterior junto.
     """
+    modelo = modelo or (os.environ.get("MODELO_IA") or "").strip() or MODELO_PADRAO
     corpo = json.dumps(
         {
-            "model": modelo or (os.environ.get("MODELO_IA") or "").strip() or MODELO_PADRAO,
-            "max_tokens": 500,
-            # Sem "temperature" de propósito: os modelos maiores atuais
-            # recusam esse parâmetro (erro 400), e MODELO_IA existe
-            # justamente para trocar de modelo sem mexer no código.
-            "system": montar_instrucoes(contexto),
-            "messages": conversa,
+            "systemInstruction": {"parts": [{"text": montar_instrucoes(contexto)}]},
+            # No Gemini a fala da IA tem o papel "model", não "assistant".
+            "contents": [
+                {
+                    "role": "model" if fala["role"] == "assistant" else "user",
+                    "parts": [{"text": fala["content"]}],
+                }
+                for fala in conversa
+            ],
+            # Folga de sobra para o parágrafo: se alguém trocar para um
+            # modelo que "pensa" antes de responder, esse pensamento
+            # também conta neste limite — com 500 a resposta vinha cortada.
+            # Sem "temperature" de propósito: o padrão de cada modelo é o
+            # recomendado, e MODELO_IA existe para trocar de modelo sem
+            # mexer no código.
+            "generationConfig": {"maxOutputTokens": 1500},
         }
     ).encode("utf-8")
     requisicao = urllib.request.Request(
-        URL_API,
+        URL_API.format(modelo=urllib.parse.quote(modelo, safe="")),
         data=corpo,
         method="POST",
         headers={
-            "x-api-key": chave,
-            "anthropic-version": VERSAO_API,
+            # A chave vai no cabeçalho, nunca no endereço: endereço aparece
+            # em mensagens de erro e registros, cabeçalho não.
+            "x-goog-api-key": chave,
             "content-type": "application/json",
         },
     )
@@ -299,10 +326,20 @@ def pedir_texto(chave: str, contexto: dict, conversa: list, modelo: str = "") ->
     except ValueError:
         raise ErroDaIA("O serviço da IA mandou uma resposta que não consegui ler. Tente de novo.") from None
 
+    candidatos = dados.get("candidates") or []
+    if not candidatos:
+        # Sem candidato = o filtro de segurança do serviço barrou o pedido.
+        if (dados.get("promptFeedback") or {}).get("blockReason"):
+            raise ErroDaIA(
+                "O serviço da IA não aceitou escrever sobre isso (filtro de "
+                "segurança). Reescreva a descrição da aula e tente de novo."
+            )
+        raise ErroDaIA("A IA respondeu em branco. Tente de novo.")
+    partes = (candidatos[0].get("content") or {}).get("parts") or []
     texto = "".join(
-        bloco.get("text", "")
-        for bloco in (dados.get("content") or [])
-        if isinstance(bloco, dict) and bloco.get("type") == "text"
+        parte.get("text", "")
+        for parte in partes
+        if isinstance(parte, dict) and not parte.get("thought")
     )
     texto = limpar_texto(texto)
     if not texto:
@@ -473,20 +510,21 @@ class JanelaAssistente:
         ttk.Label(
             self.painel_chave,
             text=(
-                "Para escrever com IA, o programa usa a API do Claude (Anthropic) com "
-                "uma chave sua. Ela é separada da assinatura do Claude e é cobrada por "
-                "uso — cada texto custa uma fração de centavo de dólar. A chave fica "
-                "guardada só neste usuário do Windows.\n"
+                "Para escrever com IA, o programa usa o Gemini (Google) com uma chave "
+                "sua, criada de graça no Google AI Studio. A chave fica guardada só "
+                "neste usuário do Windows.\n"
                 "O que você escrever na conversa, junto com os dados da aula, é "
-                "enviado à Anthropic para gerar o texto: não digite nomes de "
-                "estudantes."
+                "enviado à Google para gerar o texto — não digite nomes de "
+                "estudantes nem outros dados pessoais. Numa chave gratuita, a Google "
+                "pode usar esse conteúdo para melhorar os produtos dela; para que "
+                "isso não aconteça, ligue o faturamento da chave no AI Studio."
             ),
             style="Cartao.TLabel",
             wraplength=560,
             justify="left",
         ).pack(anchor="w", pady=(10, 4))
         ttk.Button(
-            self.painel_chave, text="Criar uma chave em platform.claude.com",
+            self.painel_chave, text="Criar uma chave no Google AI Studio",
             style="IALink.TButton", command=lambda: webbrowser.open(URL_CHAVES),
         ).pack(anchor="w")
         linha_chave = ttk.Frame(self.painel_chave, style="Cartao.TFrame")
