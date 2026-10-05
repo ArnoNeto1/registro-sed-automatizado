@@ -1,8 +1,8 @@
 {
-  "versao": "2.0.1",
-  "exe": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v2.0.1/Registro-SED.exe",
-  "sha256": "da406bd6fb33d57ef86d6bdb3232bbfe82bde793f23ba28f869afad48b5faa4a",
-  "instalador": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v2.0.1/Registro-SED-Instalador.exe",
+  "versao": "2.1.0",
+  "exe": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v2.1.0/Registro-SED.exe",
+  "sha256": "2b073c5733e75f7ba384f9505b326e9d8f373f6e744f9680f7151b4b1d83aced",
+  "instalador": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v2.1.0/Registro-SED-Instalador.exe",
   "zip": "https://github.com/ArnoNeto1/registro-sed-automatizado/archive/refs/heads/main.zip",
-  "notas": "- **Corrigido: o \"Escrever com IA...\" devolvia quase sempre o mesmo\n  texto.** As mesmas frases apareciam no final de qualquer aula, e pedir\n  \"outro texto\" trazia o mesmo parágrafo com poucas palavras trocadas.\n  Agora cada texto fala do assunto da aula, e \"outro texto\" traz uma\n  versão realmente diferente.\n- **Os recursos marcados na aula deixaram de ir para a IA.** Eles já vão\n  no campo próprio do formulário. Se você citar um recurso na conversa\n  (por exemplo, os tablets), ele pode aparecer no texto.\n- **Mais estável.** Quando um modelo da IA atinge o limite de uso ou está\n  sobrecarregado, o programa troca sozinho para outro, sem você precisar\n  tentar de novo."
+  "notas": "- Ajustes internos de funcionamento. Nada muda no uso do programa."
 }
