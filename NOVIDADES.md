@@ -17,11 +17,16 @@ seção `## <número>` com o que mudou. O resto acontece sozinho.
   ("atividade de geografia - mercantilismo"). O botão novo, ao lado do
   campo, abre uma conversa com uma IA que transforma isso num texto no
   formato da SED, usando a disciplina, a turma e os recursos da aula. Dá
-  para contar detalhes ou pedir correções, e o texto só entra no campo
-  quando você clica em "Usar este texto". Não precisa de chave: o
-  programa usa o serviço de IA da escola (e quem preferir pode colar uma
-  chave própria do Gemini). O que você escrever na conversa é enviado à
-  Google, então não digite nomes de estudantes nem outros dados pessoais.
+  para contar detalhes (inclusive a metodologia) ou pedir correções, e o
+  texto só entra no campo quando você clica em "Usar este texto". Não
+  precisa de chave: o programa usa o serviço de IA da escola (quem
+  preferir pode colar uma chave própria do Gemini).
+- **Atenção com o que você escreve ali.** A conversa é enviada à Google, e
+  o serviço da escola usa o plano gratuito, em que a Google pode usar o
+  conteúdo para melhorar os produtos dela. Não digite nomes de estudantes
+  nem outros dados pessoais — o programa barra CPF, e-mail e telefone.
+- **Agradecimento:** a ideia e a primeira versão do "Escrever com IA" são
+  do Guilherme Dornelles (EEB Ivo D'Aquino, Gaspar). Obrigado!
 
 ## 1.9.3
 

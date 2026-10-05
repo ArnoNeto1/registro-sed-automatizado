@@ -167,6 +167,13 @@ class ConfiguracaoDoServidor(_Ambiente):
         )
 
 
+class AvisoDePrivacidade(unittest.TestCase):
+    def test_diz_o_essencial_sobre_o_plano_gratuito_e_dados_pessoais(self):
+        aviso = assistente_ia.AVISO_DE_PRIVACIDADE
+        for trecho in ("Google", "plano gratuito", "nomes de estudantes", "dados pessoais", "CPF"):
+            self.assertIn(trecho, aviso)
+
+
 class ContextoParaEnviar(unittest.TestCase):
     def test_so_os_campos_combinados(self):
         limpo = assistente_ia.contexto_para_enviar(CONTEXTO)

@@ -90,6 +90,19 @@ from ia_gemini import pedir_texto as pedir_com_chave_propria
 ARQUIVO_CHAVE = "chave_ia.txt"
 ARQUIVO_SERVIDOR = "servidor_ia.json"
 
+# Aviso que fica no alto da conversa, escrito para valer nos DOIS caminhos
+# (serviço da escola e chave própria). O serviço da escola usa hoje uma
+# chave GRATUITA do Gemini: nesse plano a Google pode usar o conteúdo para
+# melhorar os produtos dela. QUANDO A CHAVE DA ESCOLA PASSAR PARA O PLANO
+# PAGO (faturamento ligado na Vercel/Google), ajuste este texto — é o único
+# lugar — e o README.
+AVISO_DE_PRIVACIDADE = (
+    "Atenção: o que você escrever aqui é enviado à Google (Gemini) para gerar o "
+    "texto. O serviço da escola usa o plano gratuito, em que a Google pode usar "
+    "esse conteúdo para melhorar os produtos dela. Por isso não digite nomes de "
+    "estudantes nem outros dados pessoais — CPF, e-mail e telefone são barrados."
+)
+
 # Texto do painel da chave: um quando é o ÚNICO caminho (sem serviço da
 # escola) e outro quando a chave própria é só uma alternativa.
 TEXTO_CHAVE_PROPRIA = (
@@ -400,9 +413,7 @@ class JanelaAssistente:
             "Descreva o que foi feito na aula, do seu jeito — ou mande o assunto "
             "da agenda como está. Eu escrevo o texto dos objetos do conhecimento "
             "no formato da SED, e você pode pedir correções aqui mesmo (\"foi o "
-            "professor de Arte, não de Matemática\").\n"
-            "Atenção: o que você escrever aqui é enviado ao serviço de IA — "
-            "não digite nomes de estudantes.",
+            "professor de Arte, não de Matemática\").\n" + AVISO_DE_PRIVACIDADE,
             "dica",
         )
 

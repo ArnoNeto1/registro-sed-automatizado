@@ -92,11 +92,12 @@ para gerar o texto. Nome de professor não vai, mas o texto livre o programa
 não consegue filtrar — por isso a janela avisa para não digitar nomes de
 estudantes. Texto com CPF, e-mail ou telefone é barrado antes de sair do
 computador (e o servidor confere de novo). **Atenção:** numa chave
-*gratuita*, a Google pode usar o
-conteúdo para melhorar os produtos dela e pessoas podem lê-lo. Uma
-assinatura do Gemini não muda isso: só uma chave com a conta de faturamento
-ligada no AI Studio (plano pago) fica de fora desse uso — e é esse tipo de
-chave que o serviço da escola deve usar.
+*gratuita*, a Google pode usar o conteúdo para melhorar os produtos dela e
+pessoas podem lê-lo. Uma assinatura do Gemini não muda isso: só uma chave
+com a conta de faturamento ligada no AI Studio (plano pago) fica de fora
+desse uso. **Hoje o serviço da escola usa uma chave gratuita**, e a janela
+avisa isso aos professores (`AVISO_DE_PRIVACIDADE` em `assistente_ia.py`);
+ao passar para uma chave paga, ajuste esse texto e o das notas da versão.
 
 Os dois formatos de instalação (portátil e instalador) se atualizam
 sozinhos quando sai versão nova, e compartilham os mesmos dados — dá para
