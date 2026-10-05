@@ -1,8 +1,8 @@
 {
-  "versao": "1.9.3",
-  "exe": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v1.9.3/Registro-SED.exe",
-  "sha256": "c1c3868698560c6c1cea20597e5a48808808d541e07d6420d105eb798ab95253",
-  "instalador": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v1.9.3/Registro-SED-Instalador.exe",
+  "versao": "2.0.0",
+  "exe": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v2.0.0/Registro-SED.exe",
+  "sha256": "85b001d7790e75feea08d9d8edaebbd62747b9210e37a327a818514b1013b430",
+  "instalador": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v2.0.0/Registro-SED-Instalador.exe",
   "zip": "https://github.com/ArnoNeto1/registro-sed-automatizado/archive/refs/heads/main.zip",
-  "notas": "- **Atualização automática mais segura.** Se a internet caísse no meio\n  do download de uma versão nova, o programa podia ficar com um arquivo\n  cortado e parar de abrir. Agora ele confere o download antes de trocar\n  qualquer coisa — e, se algo não veio inteiro, continua com a versão\n  que já funciona e avisa para tentar de novo mais tarde.\n- **Corrigido: erro \"init.tcl\" ao abrir.** Em alguns computadores o\n  programa às vezes mostrava esse erro ao abrir e tentava se reabrir\n  sozinho, mas a segunda abertura falhava do mesmo jeito. Agora a\n  reabertura funciona.\n- **Agradecimento:** estas duas correções foram propostas e escritas por\n  Guilherme Dornelles (EEB Ivo D'Aquino, Gaspar). Obrigado!"
+  "notas": "- **Novo: \"Escrever com IA...\" para os objetos do conhecimento.** O\n  \"Conteúdo aplicado\" vem com o assunto da agenda, às vezes bem genérico\n  (\"atividade de geografia - mercantilismo\"). O botão novo, ao lado do\n  campo, abre uma conversa com uma IA que transforma isso num texto no\n  formato da SED, usando a disciplina, a turma e os recursos da aula. Dá\n  para contar detalhes (inclusive a metodologia) ou pedir correções, e o\n  texto só entra no campo quando você clica em \"Usar este texto\". Não\n  precisa de chave: o programa usa o serviço de IA da escola (quem\n  preferir pode colar uma chave própria do Gemini).\n- **Atenção com o que você escreve ali.** A conversa é enviada à Google, e\n  o serviço da escola usa o plano gratuito, em que a Google pode usar o\n  conteúdo para melhorar os produtos dela. Não digite nomes de estudantes\n  nem outros dados pessoais — o programa barra CPF, e-mail e telefone.\n- **Agradecimento:** a ideia da versão do \"Escrever com IA\" é do\n  Guilherme Dornelles (EEB Ivo D'Aquino, Gaspar). Obrigado!"
 }
