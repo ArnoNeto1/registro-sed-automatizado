@@ -237,6 +237,57 @@ class Resposta(_Base):
         self.assertEqual(len(GEMINI), 1)
 
 
+class DadoPessoalNoPedido(_Base):
+    def _pedido_com(self, fala="atividade de geografia", **contexto):
+        return _corpo({"contexto": contexto, "conversa": [{"role": "user", "content": fala}]})
+
+    def test_cpf_na_fala_e_recusado_sem_chamar_o_gemini(self):
+        status, dados = ia.responder(self._pedido_com("o CPF dele é 529.982.247-25"), "segredo-certo")
+        self.assertEqual(status, 422)
+        self.assertIn("CPF", dados["erro"])
+        self.assertEqual(GEMINI, [])
+
+    def test_email_e_telefone_na_fala(self):
+        for fala, tipo in (("escreva para a@b.com", "e-mail"), ("ligue (47) 99999-8888", "telefone")):
+            status, dados = ia.responder(self._pedido_com(fala), "segredo-certo")
+            self.assertEqual(status, 422, fala)
+            self.assertIn(tipo, dados["erro"])
+        self.assertEqual(GEMINI, [])
+
+    def test_dado_pessoal_no_assunto_da_agenda_tambem(self):
+        status, dados = ia.responder(self._pedido_com(assunto="falar com a@b.com"), "segredo-certo")
+        self.assertEqual(status, 422)
+        self.assertEqual(GEMINI, [])
+
+    def test_dado_pessoal_numa_resposta_antiga_da_ia_nao_conta(self):
+        # só o que a PESSOA escreveu é conferido; a fala da IA já passou pelo filtro
+        corpo = _corpo(
+            {
+                "contexto": {},
+                "conversa": [
+                    {"role": "user", "content": "oi"},
+                    {"role": "assistant", "content": "texto com 52998224725 dentro"},
+                    {"role": "user", "content": "mais curto"},
+                ],
+            }
+        )
+        status, _ = ia.responder(corpo, "segredo-certo")
+        self.assertEqual(status, 200)
+
+    def test_texto_de_aula_com_anos_passa(self):
+        status, _ = ia.responder(self._pedido_com("Brasil Colônia, de 1500-1822"), "segredo-certo")
+        self.assertEqual(status, 200)
+
+    def test_o_dado_nao_vai_para_o_registro(self):
+        saida = io.StringIO()
+        with contextlib.redirect_stderr(saida), contextlib.redirect_stdout(saida):
+            ia.responder(self._pedido_com("CPF 529.982.247-25 e a@b.com"), "segredo-certo")
+        registro = saida.getvalue()
+        self.assertIn("recusado", registro)
+        self.assertNotIn("529.982", registro)
+        self.assertNotIn("a@b.com", registro)
+
+
 class ErrosDoGemini(_Base):
     def _esperar(self, status_gemini, corpo_gemini, status_esperado, trecho):
         RESPOSTA_GEMINI.update(status=status_gemini, corpo=corpo_gemini)

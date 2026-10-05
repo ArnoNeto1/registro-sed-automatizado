@@ -275,6 +275,74 @@ class ErrosExplicados(_ComServidor):
         self.assertEqual(caso.exception.tipo, "rede")
 
 
+class DadoPessoal(unittest.TestCase):
+    ACHAR = {
+        "meu e-mail é fulana@escola.sc.gov.br": "e-mail",
+        "CPF 529.982.247-25 do responsável": "CPF",
+        "cpf 52998224725": "CPF",
+        "CPF digitado errado 123.456.789-00": "CPF",
+        "ligue (47) 99999-8888": "telefone",
+        "whats 47 99999-8888": "telefone",
+        "fone 47999998888": "telefone",
+        "99999-8888": "telefone",
+        "+55 47 99999-8888": "telefone",
+        "telefone (47) 3333-4444": "telefone",
+        "(47)33334444": "telefone",
+    }
+    # texto de aula de verdade: nada disso pode ser barrado
+    NAO_ACHAR = [
+        "atividade de geografia - mercantilismo",
+        "Brasil Colônia, de 1500 a 1822",
+        "período de 1500-1822",
+        "século XVI e 1500 1822",
+        "Revolução Francesa (1789-1799)",
+        "aula de 50 minutos com 2 aulas, turma 8º ano 2026",
+        "data 17/10/2026 às 14h30",
+        "11111111111 alunos",  # 11 dígitos iguais não é CPF
+        "12345678901",  # 11 dígitos que não fecham como CPF
+        "população de 1.234.567 habitantes",
+        "o 9º ano 2024-2025",
+        "números 3.14 e 2.718",
+        "notas 10 9 8 7",
+        "ano 1999 2000 2001",
+        "3333-4444 sem DDD não é telefone",
+        "",
+    ]
+
+    def test_acha_o_que_e_dado_pessoal(self):
+        for texto, tipo in self.ACHAR.items():
+            self.assertEqual(ia_gemini.achar_dado_pessoal(texto), tipo, texto)
+
+    def test_nao_barra_texto_de_aula(self):
+        for texto in self.NAO_ACHAR:
+            self.assertEqual(ia_gemini.achar_dado_pessoal(texto), "", texto)
+
+    def test_texto_vazio_ou_none(self):
+        self.assertEqual(ia_gemini.achar_dado_pessoal(None), "")
+
+    def test_cpf_com_digito_verificador_certo(self):
+        self.assertTrue(ia_gemini._cpf_valido("52998224725"))
+        self.assertTrue(ia_gemini._cpf_valido("11144477735"))
+        self.assertFalse(ia_gemini._cpf_valido("52998224726"))
+        self.assertFalse(ia_gemini._cpf_valido("00000000000"))
+        self.assertFalse(ia_gemini._cpf_valido("123"))
+
+    def test_aviso_diz_o_que_foi_achado(self):
+        self.assertIn("CPF", ia_gemini.aviso_de_dado_pessoal("CPF"))
+        self.assertIn("Tire esse dado pessoal", ia_gemini.aviso_de_dado_pessoal("telefone"))
+
+    def test_textos_do_pedido_so_levam_o_que_a_pessoa_escreveu(self):
+        textos = ia_gemini.textos_do_pedido(
+            {"disciplina": "Arte", "recursos": ["Lousa", "Tablet"], "numero_aulas": 2},
+            [
+                {"role": "user", "content": "fala dela"},
+                {"role": "assistant", "content": "resposta da IA"},
+                {"role": "user", "content": "outra fala"},
+            ],
+        )
+        self.assertEqual(sorted(textos), sorted(["Arte", "Lousa", "Tablet", "2", "fala dela", "outra fala"]))
+
+
 class Instrucoes(unittest.TestCase):
     def test_pede_para_nao_repetir_nome_de_estudante(self):
         self.assertIn("nomes de estudantes", ia_gemini.montar_instrucoes({}))

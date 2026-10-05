@@ -167,6 +167,29 @@ class ConfiguracaoDoServidor(_Ambiente):
         )
 
 
+class ContextoParaEnviar(unittest.TestCase):
+    def test_so_os_campos_combinados(self):
+        limpo = assistente_ia.contexto_para_enviar(CONTEXTO)
+        self.assertEqual(
+            sorted(limpo), ["assunto", "disciplina", "etapa", "numero_aulas", "recursos", "turma"]
+        )
+        self.assertNotIn("professor", limpo)
+
+    def test_campo_com_dado_pessoal_fica_de_fora_em_vez_de_travar(self):
+        # o assunto vem da agenda, que a pessoa não edita na janela da IA
+        com_telefone = dict(CONTEXTO, assunto="falar com a mãe no (47) 99999-8888")
+        limpo = assistente_ia.contexto_para_enviar(com_telefone)
+        self.assertNotIn("assunto", limpo)
+        self.assertEqual(limpo["disciplina"], "Geografia")
+
+    def test_recurso_com_dado_pessoal_tambem(self):
+        limpo = assistente_ia.contexto_para_enviar(dict(CONTEXTO, recursos=["Lousa", "a@b.com"]))
+        self.assertNotIn("recursos", limpo)
+
+    def test_contexto_vazio(self):
+        self.assertEqual(assistente_ia.contexto_para_enviar(None), {})
+
+
 class ClienteDoServidor(_Ambiente):
     @classmethod
     def setUpClass(cls):
@@ -251,7 +274,10 @@ class EscolhaDoCaminho(_Ambiente):
         with mock.patch.object(assistente_ia, "pedir_ao_servidor", return_value="do servidor") as m:
             self.assertEqual(assistente_ia.pedir(CONTEXTO, CONVERSA), "do servidor")
         m.assert_called_once_with(
-            "http://127.0.0.1:8787/api/ia", "teste-local", CONTEXTO, CONVERSA
+            "http://127.0.0.1:8787/api/ia",
+            "teste-local",
+            assistente_ia.contexto_para_enviar(CONTEXTO),
+            CONVERSA,
         )
 
     def test_so_chave_propria(self):
@@ -261,7 +287,11 @@ class EscolhaDoCaminho(_Ambiente):
             assistente_ia, "pedir_com_chave_propria", return_value="direto"
         ) as m:
             self.assertEqual(assistente_ia.pedir(CONTEXTO, CONVERSA), "direto")
-        m.assert_called_once_with("minha-chave", CONTEXTO, CONVERSA)
+        # na chave própria também: o nome do professor nunca chega à instrução
+        m.assert_called_once_with(
+            "minha-chave", assistente_ia.contexto_para_enviar(CONTEXTO), CONVERSA
+        )
+        self.assertNotIn("professor", m.call_args.args[1])
 
     def test_chave_propria_tem_preferencia_sobre_o_servidor(self):
         self._servidor()

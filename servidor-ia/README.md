@@ -44,8 +44,11 @@ Pede a chave com a digitação escondida e atende em
 - só POST com o `x-app-token` certo; a instrução é fixa e mora aqui;
 - só os campos combinados da aula passam, com limite de tamanho; nunca
   nome de professor;
+- recusa texto que pareça ter CPF, e-mail ou telefone (o programa também
+  barra antes de enviar); nome de pessoa não dá para detectar, fica com o
+  aviso da janela;
 - erro cru da Google nunca volta; o conteúdo dos pedidos nunca é
-  registrado.
+  registrado (nem o dado pessoal achado: só o tipo vai para o registro).
 
 ## Atenção: `api/_ia_gemini.py` é cópia
 

@@ -80,6 +80,8 @@ from ia_gemini import (  # noqa: F401  (a janela e os testes buscam daqui)
     TEMPO_LIMITE,
     URL_CHAVES,
     ErroDaIA,
+    achar_dado_pessoal,
+    aviso_de_dado_pessoal,
     limpar_texto,
     montar_instrucoes,
 )
@@ -173,9 +175,23 @@ def configuracao_do_servidor():
 
 
 def contexto_para_enviar(contexto: dict) -> dict:
-    """Só os campos da aula que podem sair do computador (nunca nome de professor)."""
+    """
+    Só os campos da aula que podem sair do computador: nunca nome de
+    professor, nem campo que pareça ter CPF, e-mail ou telefone. Esse campo
+    FICA DE FORA em vez de travar o pedido — ele costuma vir da agenda
+    (o assunto), que a pessoa não consegue editar nesta janela.
+    """
     contexto = contexto or {}
-    return {chave: contexto[chave] for chave in CHAVES_DO_CONTEXTO if contexto.get(chave)}
+    limpo: dict = {}
+    for chave in CHAVES_DO_CONTEXTO:
+        valor = contexto.get(chave)
+        if not valor:
+            continue
+        itens = valor if isinstance(valor, (list, tuple)) else [valor]
+        if any(achar_dado_pessoal(str(item)) for item in itens):
+            continue
+        limpo[chave] = valor
+    return limpo
 
 
 def _mensagem_do_servidor(erro: urllib.error.HTTPError) -> str:
@@ -242,6 +258,7 @@ def modo_disponivel() -> str:
 
 def pedir(contexto: dict, conversa: list) -> str:
     """Pede o texto pelo caminho disponível (ver `modo_disponivel`)."""
+    contexto = contexto_para_enviar(contexto)  # vale para a chave própria também
     chave = carregar_chave()
     if chave:
         return pedir_com_chave_propria(chave, contexto, conversa)
@@ -555,6 +572,12 @@ class JanelaAssistente:
         texto = self.entrada.get("1.0", "end").strip()
         if not texto:
             self.status.configure(text="Escreva algo sobre a aula antes de enviar.")
+            return "break"
+        # CPF, e-mail ou telefone: barra aqui, antes de qualquer coisa sair
+        # do computador, e deixa o texto na caixa para a pessoa corrigir.
+        dado = achar_dado_pessoal(texto)
+        if dado:
+            self.status.configure(text=aviso_de_dado_pessoal(dado))
             return "break"
         if not modo_disponivel():
             self._mostrar_painel_chave(primeira_vez=True)

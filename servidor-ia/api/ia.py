@@ -18,6 +18,8 @@ ninguém):
   - só passam os campos da aula combinados (ia.CHAVES_DO_CONTEXTO), com
     tamanho limitado — nunca nome de professor;
   - tamanho do pedido, da conversa e de cada fala têm teto;
+  - recusa texto que pareça ter CPF, e-mail ou telefone (o escape mais
+    comum; nome de pessoa não dá para detectar, fica com o aviso);
   - nunca devolve o erro cru da Google (poderia vazar detalhe da chave) e
     nunca registra o conteúdo dos pedidos, só o motivo da recusa.
 O que falta para ser à prova de abuso é um teto de gasto na própria Google
@@ -164,6 +166,15 @@ def responder(corpo: bytes, token_recebido: str) -> tuple:
     except PedidoInvalido as erro:
         _registrar("recusado: pedido fora do combinado")
         return 400, {"erro": str(erro)}
+
+    # CPF, e-mail ou telefone no texto: recusa antes de a Google ver. O
+    # programa já avisa, mas o servidor não confia em ninguém. Só o TIPO
+    # vai para o registro, nunca o texto.
+    for texto_da_pessoa in ia.textos_do_pedido(contexto, conversa):
+        tipo_de_dado = ia.achar_dado_pessoal(texto_da_pessoa)
+        if tipo_de_dado:
+            _registrar(f"recusado: parece haver {tipo_de_dado} no texto")
+            return 422, {"erro": ia.aviso_de_dado_pessoal(tipo_de_dado)}
 
     try:
         texto = ia.pedir_texto(chave, contexto, conversa)

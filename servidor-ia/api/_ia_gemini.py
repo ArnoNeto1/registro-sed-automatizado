@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -162,6 +163,67 @@ def limpar_texto(texto: str) -> str:
     if len(t) >= 2 and t[0] in pares and t[-1] == pares[t[0]]:
         t = t[1:-1].strip()
     return t
+
+
+# ---------------------------------------------------------------------------
+# Dado pessoal no texto: CPF, e-mail e telefone
+# ---------------------------------------------------------------------------
+# O escape acidental mais comum num texto livre. Nome de pessoa não dá para
+# detectar com segurança — esse risco fica com o aviso da janela.
+#
+# CUIDADO COM FALSO POSITIVO: aula de História/Geografia fala de "1500-1822"
+# e "séculos XV a XVIII". Por isso o telefone sem DDD entre parênteses só
+# vale se for celular (9 + 8 dígitos), e 11 dígitos soltos só contam como
+# CPF se os dígitos verificadores baterem.
+_RE_EMAIL = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
+_RE_CPF_FORMATADO = re.compile(r"(?<!\d)\d{3}\.\d{3}\.\d{3}-\d{2}(?!\d)")
+_RE_ONZE_DIGITOS = re.compile(r"(?<!\d)\d{11}(?!\d)")
+_RE_TELEFONES = (
+    # +55 47 99999-8888
+    re.compile(r"\+55[\s().-]*\d{2}[\s().-]*9?[\s.-]?\d{4}[\s.-]?\d{4}(?!\d)"),
+    # (47) 99999-8888, 47 99999-8888, 99999-8888
+    re.compile(r"(?<!\d)(?:\(?\d{2}\)?[\s.-]?)?9[\s.-]?\d{4}[\s.-]?\d{4}(?!\d)"),
+    # (47) 3333-4444
+    re.compile(r"\(\d{2}\)\s?\d{4}[\s.-]?\d{4}(?!\d)"),
+)
+
+
+def _cpf_valido(digitos: str) -> bool:
+    if len(digitos) != 11 or len(set(digitos)) == 1:
+        return False
+    for tamanho in (9, 10):
+        soma = sum(int(d) * (tamanho + 1 - i) for i, d in enumerate(digitos[:tamanho]))
+        if (soma * 10) % 11 % 10 != int(digitos[tamanho]):
+            return False
+    return True
+
+
+def achar_dado_pessoal(texto: str) -> str:
+    """Qual dado pessoal o texto parece ter (e-mail, CPF ou telefone), ou vazio se nenhum."""
+    texto = texto or ""
+    if _RE_EMAIL.search(texto):
+        return "e-mail"
+    if _RE_CPF_FORMATADO.search(texto):
+        return "CPF"
+    if any(_cpf_valido(m.group()) for m in _RE_ONZE_DIGITOS.finditer(texto)):
+        return "CPF"
+    if any(padrao.search(texto) for padrao in _RE_TELEFONES):
+        return "telefone"
+    return ""
+
+
+def aviso_de_dado_pessoal(tipo: str) -> str:
+    return f"Parece haver um {tipo} no texto. Tire esse dado pessoal e tente de novo."
+
+
+def textos_do_pedido(contexto: dict, conversa: list) -> list:
+    """Tudo o que a PESSOA escreveu e que vai sair: campos da aula e falas dela."""
+    textos = []
+    for valor in (contexto or {}).values():
+        itens = valor if isinstance(valor, (list, tuple)) else [valor]
+        textos.extend(str(item) for item in itens)
+    textos.extend(fala["content"] for fala in conversa if fala.get("role") == "user")
+    return textos
 
 
 class ErroDaIA(RuntimeError):
