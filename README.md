@@ -30,12 +30,17 @@ resumo de tudo que vai para a SED, e só manda depois que você clicar em
 
 ## Veja funcionando
 
-![Demonstração: baixar, cadastrar, entrar, ler a agenda e preencher o formulário](docs/demonstracao.gif)
+[![Vídeo de divulgação: o programa preenchendo o registro da SED sozinho (47 segundos)](docs/video-capa.jpg)](docs/video-promocional.mp4)
 
-Do download até o formulário pronto para conferir — o programa para aí e
-espera você clicar em "Enviar para a SED". Nesta demonstração, os nomes dos
-professores da agenda, o e-mail da escola e o campo de senha aparecem
-tarjados por privacidade; no seu computador eles aparecem normalmente.
+**▶ [Assista ao vídeo de divulgação (47 s)](docs/video-promocional.mp4)** — o
+programa de verdade rodando: ele lê a agenda do NTE, preenche o formulário
+da SED sozinho e só envia quando você clica em "Enviar".
+
+**▶ [Assista ao tutorial passo a passo (76 s)](docs/video-tutorial.mp4)** — as
+7 etapas completas, da tela de entrada até o "Registro enviado para a SED".
+
+Os nomes de professores, turmas e escola que aparecem nos vídeos são
+fictícios — nenhum dado real de ninguém.
 
 ## Como instalar e usar
 
