@@ -32,13 +32,7 @@ resumo de tudo que vai para a SED, e só manda depois que você clicar em
 
 ![Vídeo de divulgação: o programa lê a agenda do NTE, preenche o registro da SED sozinho e só envia quando você clica em Enviar](docs/video-promocional.gif)
 
-**▶ [Baixe o vídeo de divulgação em alta qualidade (47 s)](docs/video-promocional.mp4)** —
-a mesma animação acima, com mais nitidez.
-
-**▶ [Baixe o tutorial passo a passo (76 s)](docs/video-tutorial.mp4)** — as
-7 etapas completas, da tela de entrada até o "Registro enviado para a SED".
-
-Os nomes de professores, turmas e escola que aparecem nos vídeos são
+Os nomes de professores, turmas e escola que aparecem no vídeo são
 fictícios — nenhum dado real de ninguém.
 
 ## Como instalar e usar
