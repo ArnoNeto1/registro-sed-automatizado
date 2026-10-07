@@ -62,7 +62,7 @@ suporte/instalação de equipamento, manutenção, ou uma formação/reunião,
 use as outras abas em cima da lista de aulas — os campos do formulário se
 ajustam sozinhos para o tipo escolhido.
 
-### Objetos do conhecimento com IA (opcional)
+### Escrever com IA (opcional)
 
 O "Conteúdo aplicado" vem com o assunto que o professor escreveu na
 agenda — muitas vezes genérico ("atividade de geografia - mercantilismo").
@@ -71,6 +71,17 @@ transforma isso num texto de objetos do conhecimento no formato da SED
 ("Foram abordados conteúdos de... Também foram desenvolvidas habilidades
 de..."). Dá para contar mais detalhes ou pedir correções na conversa, e o
 texto só entra no campo quando você clica em **"Usar este texto"**.
+
+O mesmo botão existe na **"Breve descrição..."** dos registros de **Suporte a
+outros espaços**, **Manutenção de equipamentos** e **Formação/Reunião** (os
+quatro campos, contando o suporte que vem da agenda e o avulso). A janela é a
+mesma, mas a IA escreve uma frase só (no máximo duas), formal e sem inventar
+nada, a partir do que o professor conta e do que está marcado na tela: o tipo
+de atendimento, os itens da manutenção, quem organizou o encontro, o texto de
+"Outro", o número de aulas e, no suporte vindo da agenda, o assunto anotado
+nela. Para o programa dizer à IA qual dos textos pedir, o contexto leva um
+campo `finalidade` (`objetos`, `suporte`, `manutencao` ou `formacao`; sem ele
+vale o laboratório, como nas versões antigas).
 
 Usa o Gemini (Google) por **dois caminhos**:
 
@@ -93,11 +104,12 @@ estiver sobrecarregado, o programa (e o servidor) tenta sozinho o
 própria, então elas se somam. Com `MODELO_IA=...` você escolhe: um nome só
 usa esse modelo e nenhum outro; vários, separados por vírgula, formam a lista.
 
-**Privacidade:** o que você escreve na conversa e os dados da aula
-(disciplina, turma, assunto da agenda) são enviados à Google
+**Privacidade:** o que você escreve na conversa e os dados do registro
+(no laboratório: disciplina, turma, assunto da agenda; nos outros tipos: o
+que está marcado na tela e o número de aulas) são enviados à Google
 para gerar o texto. Nome de professor não vai, mas o texto livre o programa
 não consegue filtrar — por isso a janela avisa para não digitar nomes de
-estudantes. Texto com CPF, e-mail ou telefone é barrado antes de sair do
+estudantes, de colegas ou de outras pessoas. Texto com CPF, e-mail ou telefone é barrado antes de sair do
 computador (e o servidor confere de novo). **Atenção:** numa chave
 *gratuita*, a Google pode usar o conteúdo para melhorar os produtos dela e
 pessoas podem lê-lo. Uma assinatura do Gemini não muda isso: só uma chave

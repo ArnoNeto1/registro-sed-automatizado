@@ -10,6 +10,22 @@ seção `## <número>` com o que mudou. O resto acontece sozinho.
 
 ---
 
+## 2.2.0
+
+- **Novo: "Escrever com IA..." também na "Breve descrição".** Nos registros
+  de **Suporte a outros espaços**, **Manutenção de equipamentos** e
+  **Formação/Reunião**, o campo da breve descrição ganhou o mesmo botão que
+  já existe no "Conteúdo aplicado". Você conta do seu jeito o que foi feito
+  e a IA escreve a descrição em uma frase, no estilo do formulário da SED,
+  usando o que você marcou na tela (o tipo de atendimento, os itens da
+  manutenção ou quem organizou o encontro). Dá para pedir "outro texto" ou
+  correções, e o texto só entra no campo quando você clica em "Usar este
+  texto".
+- **Atenção com o que você escreve ali.** Vale o mesmo aviso de antes: a
+  conversa é enviada à Google. Não digite nomes de estudantes, de colegas ou
+  de outras pessoas, nem outros dados pessoais — o programa barra CPF,
+  e-mail e telefone.
+
 ## 2.1.0
 
 - Ajustes internos de funcionamento. Nada muda no uso do programa.

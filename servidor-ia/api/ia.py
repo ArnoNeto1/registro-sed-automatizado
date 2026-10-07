@@ -13,10 +13,12 @@ pode ser extraído por alguém determinado, então o servidor não confia em
 ninguém):
   - só aceita POST com o cabeçalho x-app-token certo (APP_TOKEN);
   - a instrução é FIXA e vive aqui: ninguém consegue usar este endereço
-    como uma IA genérica de graça, só para escrever "objetos do
-    conhecimento";
-  - só passam os campos da aula combinados (ia.CHAVES_DO_CONTEXTO), com
-    tamanho limitado — nunca nome de professor;
+    como uma IA genérica de graça, só para escrever os textos do registro
+    (objetos do conhecimento e as breves descrições de suporte,
+    manutenção e formação), e o tipo de texto é escolhido entre uma
+    lista fechada (ia.FINALIDADES);
+  - só passam os campos do registro combinados (ia.CHAVES_DO_CONTEXTO),
+    com tamanho limitado — nunca nome de professor;
   - tamanho do pedido, da conversa e de cada fala têm teto;
   - recusa texto que pareça ter CPF, e-mail ou telefone (o escape mais
     comum; nome de pessoa não dá para detectar, fica com o aviso);
@@ -112,6 +114,14 @@ def validar(dados) -> tuple:
         if len(texto) > MAX_TEXTO_CAMPO:
             raise PedidoInvalido(f"O campo {chave} está grande demais.")
         contexto[chave] = texto
+    # A "finalidade" (que texto a IA escreve: objetos do conhecimento, ou a
+    # breve descrição de suporte, manutenção ou formação) só vale se for uma
+    # das combinadas. Sem ela — as versões até a 2.1.0 do programa não a
+    # mandam — é o texto do laboratório, como sempre foi. Uma desconhecida é
+    # recusada: um erro claro é melhor que um texto do tipo errado no
+    # formulário.
+    if contexto.get("finalidade", ia.FINALIDADE_PADRAO) not in ia.FINALIDADES:
+        raise PedidoInvalido("Pedido mal formado (finalidade).")
 
     falas = dados.get("conversa")
     if not isinstance(falas, list) or not falas or len(falas) > MAX_FALAS:

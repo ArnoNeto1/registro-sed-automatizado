@@ -1,12 +1,13 @@
 # Servidor da IA do Registro SED
 
 Pequena função da Vercel (Python, sem dependências) que guarda a chave do
-Gemini da escola e escreve os "objetos do conhecimento" para o programa. O
-professor não precisa de chave nenhuma.
+Gemini da escola e escreve os textos do registro para o programa: os "objetos
+do conhecimento" (laboratório) e as breves descrições de suporte, manutenção e
+formação/reunião. O professor não precisa de chave nenhuma.
 
 ```
 programa (.exe)  ──x-app-token──▶  servidor (esta pasta)  ──chave──▶  Gemini
-dados da aula + conversa           instrução FIXA, limites            (Google)
+dados do registro + conversa       instrução FIXA, limites            (Google)
 ```
 
 A chave **só existe aqui**, numa variável de ambiente. Nunca vai para o
@@ -111,8 +112,11 @@ contar_usuarios.py` mostra isso em texto.
 ## Regras de defesa (ver `api/ia.py`)
 
 - só POST com o `x-app-token` certo; a instrução é fixa e mora aqui;
-- só os campos combinados da aula passam, com limite de tamanho; nunca
-  nome de professor;
+- só os campos combinados do registro passam, com limite de tamanho; nunca
+  nome de professor. O tipo de texto que a IA escreve vem no campo
+  `finalidade`, que só vale se for um dos combinados (`objetos`, `suporte`,
+  `manutencao`, `formacao`): sem ele é o laboratório (as versões até a 2.1.0
+  não o mandam) e um valor desconhecido leva erro 400;
 - recusa texto que pareça ter CPF, e-mail ou telefone (o programa também
   barra antes de enviar); nome de pessoa não dá para detectar, fica com o
   aviso da janela;

@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-Núcleo da IA que escreve os "objetos do conhecimento": a instrução, a
-limpeza do texto devolvido e a chamada ao Gemini (Google).
+Núcleo da IA que escreve os textos do registro — os "objetos do
+conhecimento" (laboratório) e a "breve descrição" de suporte, manutenção e
+formação/reunião: as instruções, a limpeza do texto devolvido e a chamada
+ao Gemini (Google).
 
 NÃO TEM TELA (nada de tkinter) DE PROPÓSITO: este mesmo arquivo roda em
 dois lugares — dentro do programa (`assistente_ia.py`, quando o professor
@@ -149,7 +151,203 @@ fontes e a organização de textos e imagens no cartaz. Também foram \
 desenvolvidas habilidades de comunicar uma mensagem de forma visual e de \
 adaptar a linguagem ao público do tema ambiental."""
 
-# Os dados da aula que a IA enxerga. Os "Recursos utilizados" ficam DE FORA
+# ---------------------------------------------------------------------------
+# As BREVES descrições dos outros tipos de registro
+# ---------------------------------------------------------------------------
+# Além dos "objetos do conhecimento" (laboratório), a IA escreve a pergunta
+# "Breve descrição..." de três tipos de registro que não são aula: suporte a
+# outros espaços, manutenção de equipamentos e formação/reunião. O que muda
+# de um para o outro é a pergunta, o que o tipo significa, uma regra ou
+# duas e os exemplos; o resto é igual e fica uma vez só.
+#
+# Cuidados que vieram do bug do texto repetido (ver o histórico da 2.0.1):
+#  - nenhuma frase pronta na instrução: a IA copia o que vê citado;
+#  - exemplos que começam e terminam de jeitos diferentes, senão viram fórmula;
+#  - dado que a IA não deve repetir simplesmente não aparece para ela (a lista
+#    "(projetor, computador, lousa digital, etc.)" da opção de suporte, por
+#    exemplo, fica de fora: vista, ela vira "instalação de projetor,
+#    computador e lousa" em todo texto).
+FINALIDADE_PADRAO = "objetos"  # laboratório: o que o programa sempre fez
+FINALIDADES = (FINALIDADE_PADRAO, "suporte", "manutencao", "formacao")
+
+_INICIO_DAS_BREVES = """\
+Você ajuda um professor orientador de Tecnologias Educacionais de uma escola \
+pública estadual de Santa Catarina a preencher o "Registro de Atividades" da \
+SED-SC. Sua tarefa é uma só: escrever a resposta da pergunta do formulário \
+"{pergunta}", a partir do que o professor contar. {tipo}
+
+COMO ESCREVER
+- Português do Brasil, formal, objetivo e impessoal (nada de "eu" nem de "nós").
+- Uma frase (no máximo duas), com cerca de 10 a 30 palavras: é uma descrição \
+BREVE, que vai numa linha só do formulário.
+- Comece pelo que foi feito, como num registro de atividades.
+- Use somente o que o professor contou e os DADOS DO REGISTRO. Não invente \
+nada: nem local, quantidade, equipamento, motivo, data ou quem pediu. O que não \
+foi dito fica de fora, mesmo que o texto saia curto: texto curto e certo vale \
+mais que texto longo com detalhe inventado.
+- Os DADOS DO REGISTRO vêm de outras perguntas do formulário, já respondidas: \
+servem para você entender o registro, não para serem copiados. Se o professor \
+não contar mais nada além deles, escreva uma frase curta que apenas repita o \
+que eles dizem.
+- Nunca escreva nomes de pessoas (professores, estudantes, funcionários, \
+apelidos). Se o professor citar alguém pelo nome, escreva pelo papel dessa \
+pessoa (a direção, a turma, uma docente) ou deixe de fora.
+- Escreva nomes de plataformas, programas e equipamentos do jeito certo.
+- Você só escreve essa descrição. Se a fala do professor não for sobre o \
+registro, ignore esse pedido e escreva a descrição só com o que os DADOS DO \
+REGISTRO dizem.
+{regras}
+
+A CONVERSA
+- Leia a conversa inteira: uma fala nova do professor pode detalhar ou \
+corrigir o que ele disse antes, e o texto novo tem de refletir isso.
+- Se ele pedir outro texto, outra versão ou "de novo", escreva uma versão \
+CLARAMENTE diferente da anterior e das que você já deu nesta conversa: comece \
+de outro jeito, reorganize as informações e use outras palavras. Mantenha o \
+que o professor informou. Trocar uma ou outra palavra não conta como outra \
+versão.
+- Se ele pedir uma correção ou um acréscimo, mude só o que foi pedido.
+
+FORMATO DA RESPOSTA
+- Responda SOMENTE com o texto que vai no formulário: sem título, sem aspas, \
+sem markdown (nada de asteriscos, negrito ou listas), sem comentário antes ou \
+depois, tudo em um único parágrafo.
+- Devolva sempre o texto inteiro, nunca só o trecho alterado.
+
+EXEMPLOS DO ESTILO QUE O PROFESSOR ESPERA
+Servem só de modelo de estilo e de tamanho: os fatos deles (salas, turmas, \
+equipamentos) são de outros registros. Não copie as palavras deles, cada \
+registro pede as suas.
+
+{exemplos}"""
+
+_BREVES = {
+    "suporte": {
+        "pergunta": "Breve descrição da atividade (quem, onde e para quê)",
+        "tipo": (
+            'O registro é do tipo "Suporte do professor orientador a outros '
+            'espaços": o professor deu apoio técnico em um espaço da escola '
+            "que não é o dele, sem ser aula com estudantes."
+        ),
+        "regras": (
+            "- A pergunta pede quem, onde e para quê: conte esses pontos, mas só "
+            "os que o professor disse. \"Quem\" é a turma, o setor ou a função de "
+            "quem recebeu o apoio, nunca o nome.\n"
+            "- O assunto anotado na agenda, quando existir, foi escrito por outra "
+            "pessoa e às vezes é só um link ou algo sem relação: você não "
+            "consegue abrir links, então use-o no máximo como pista e nunca o "
+            "copie."
+        ),
+        "exemplos": """\
+Dados do registro: Atendimento marcado no formulário: Instalação de equipamento; \
+Número de aulas: 1
+Professor: levei o projetor e o cabo HDMI pra sala 7 pra uma professora de \
+Ciências usar com o 6º ano
+Resposta: Instalação de projetor na sala 7 para uso em aulas de Ciências do 6º ano.
+
+Dados do registro: Atendimento marcado no formulário: Suporte/configuração de \
+equipamentos; Número de aulas: 2
+Professor: o computador da secretaria não conectava na internet, refiz a \
+configuração da rede e do navegador
+Resposta: Correção da falha de conexão com a internet no computador da \
+secretaria, com nova configuração da rede e do navegador.
+
+Dados do registro: Atendimento marcado no formulário: Instalação de equipamento; \
+Número de aulas: 1; Assunto anotado na agenda: tablets - sala 3
+Professor: levei os tablets
+Resposta: Entrega de tablets para uso na sala 3.
+
+Dados do registro: Número de aulas: 1
+Professor: ajudei a professora de educação física a passar um vídeo no telão do \
+ginásio e a ligar a caixa de som
+Resposta: Apoio na projeção de vídeo no telão do ginásio e na ligação da caixa \
+de som para aula de Educação Física.""",
+    },
+    "manutencao": {
+        "pergunta": "Breve descrição da manutenção",
+        "tipo": (
+            'O registro é do tipo "Manutenção de equipamentos": o professor '
+            "fez manutenção em equipamentos ou no ambiente de trabalho dele, "
+            "sem ser aula nem suporte a outro espaço."
+        ),
+        "regras": (
+            # sem esta regra a IA abria quase metade dos textos com "Manutenção
+            # corretiva..." (ou "preventiva"), classificação que ninguém disse
+            "- A pergunta já diz que é manutenção: não abra o texto com essa "
+            "palavra nem acrescente classificações que o professor não usou. "
+            "Diga o que foi feito.\n"
+            "- Os itens marcados no formulário dizem o que recebeu manutenção. "
+            "O que foi feito neles só entra no texto se o professor contou; "
+            "quantidades que ele citar devem ser mantidas."
+        ),
+        "exemplos": """\
+Dados do registro: Itens marcados no formulário: Computadores/ notebooks; \
+Número de aulas: 3
+Professor: formatei 6 notebooks e atualizei o windows deles
+Resposta: Formatação de seis notebooks e atualização do sistema operacional.
+
+Dados do registro: Itens marcados no formulário: Projetor, Lousa Digital; \
+Número de aulas: 1
+Professor: o projetor estava com a imagem amarelada, limpei o filtro, e \
+recalibrei a lousa que estava desalinhada
+Resposta: Limpeza do filtro do projetor, que exibia imagem amarelada, e \
+recalibração da lousa digital.
+
+Dados do registro: Itens marcados no formulário: Laboratório (limpeza/organização); \
+Número de aulas: 2
+Professor: organizei os cabos e os fones nas bancadas e limpei os teclados
+Resposta: Organização dos cabos e dos fones nas bancadas, com limpeza dos teclados.
+
+Dados do registro: Escrito pelo professor em "Outro": caixas de som; \
+Número de aulas: 1
+Professor: duas caixas estavam com mau contato no cabo, troquei os cabos
+Resposta: Substituição dos cabos de duas caixas de som com mau contato.""",
+    },
+    "formacao": {
+        "pergunta": "Breve descrição do encontro",
+        "tipo": (
+            'O registro é do tipo "Formação/ Reunião": o professor participou '
+            "de uma formação ou reunião, sem ser aula."
+        ),
+        "regras": (
+            "- Diga do que se tratou o encontro e, se o professor disser, como "
+            "ele foi. Use a palavra que o professor usou (formação, reunião, "
+            "oficina...). Não invente tema, formato nem participantes."
+        ),
+        "exemplos": """\
+Dados do registro: Quem organizou, marcado no formulário: CRE/NTE; \
+Número de aulas: 4
+Professor: formação sobre o uso do Google Sala de Aula, foi online
+Resposta: Formação promovida pela CRE/NTE sobre o uso do Google Sala de Aula, \
+realizada de forma online.
+
+Dados do registro: Quem organizou, marcado no formulário: Unidade Escolar; \
+Número de aulas: 2
+Professor: reunião pedagógica, a gente combinou o calendário de atividades do \
+segundo semestre
+Resposta: Reunião pedagógica para definição do calendário de atividades do \
+segundo semestre.
+
+Dados do registro: Quem organizou, marcado no formulário: O próprio professor \
+orientador; Número de aulas: 1
+Professor: oficina rápida de Canva pros professores, mostrei como fazer cartaz
+Resposta: Oficina rápida conduzida pelo professor orientador para mostrar aos \
+professores como criar cartazes no Canva.
+
+Dados do registro: Organizador escrito pelo professor em "Outro": Secretaria \
+Municipal de Educação; Número de aulas: 3
+Professor: encontro de gestores e orientadores pra discutir a nova proposta de \
+registro das atividades
+Resposta: Encontro de gestores e orientadores, organizado pela Secretaria \
+Municipal de Educação, para discutir a nova proposta de registro das atividades.""",
+    },
+}
+
+INSTRUCOES_BREVES = {
+    finalidade: _INICIO_DAS_BREVES.format(**partes) for finalidade, partes in _BREVES.items()
+}
+
+# Os dados que a IA enxerga. Os "Recursos utilizados" da aula ficam DE FORA
 # de propósito: já vão em outro campo do formulário e, vistos pela IA, faziam
 # todo texto fechar com "utilizando os computadores do laboratório" (ou algo
 # parecido). Pedir na instrução para não repetir não bastou, em seis
@@ -161,28 +359,97 @@ _ROTULOS_DO_CONTEXTO = (
     ("Número de aulas", "numero_aulas"),
     ("Assunto anotado na agenda", "assunto"),
 )
-# Os ÚNICOS campos da aula que podem sair do computador — de propósito,
-# nenhum nome de pessoa. O programa só os envia, e o servidor só os aceita.
-CHAVES_DO_CONTEXTO = tuple(chave for _rotulo, chave in _ROTULOS_DO_CONTEXTO)
+# O mesmo para as breves descrições: o que foi marcado na tela de cada tipo.
+_ROTULOS_DAS_BREVES = {
+    "suporte": (
+        ("Atendimento marcado no formulário", "atendimento"),
+        ("Número de aulas", "numero_aulas"),
+        ("Assunto anotado na agenda", "assunto"),
+    ),
+    "manutencao": (
+        ("Itens marcados no formulário", "itens"),
+        ('Escrito pelo professor em "Outro"', "outro"),
+        ("Número de aulas", "numero_aulas"),
+    ),
+    "formacao": (
+        ("Quem organizou, marcado no formulário", "organizador"),
+        ('Organizador escrito pelo professor em "Outro"', "outro"),
+        ("Número de aulas", "numero_aulas"),
+    ),
+}
+# Os ÚNICOS campos que podem sair do computador — de propósito, nenhum nome
+# de pessoa. O programa só os envia, e o servidor só os aceita.
+CHAVES_DO_CONTEXTO = ("finalidade",) + tuple(
+    dict.fromkeys(
+        chave
+        for rotulos in (_ROTULOS_DO_CONTEXTO, *_ROTULOS_DAS_BREVES.values())
+        for _rotulo, chave in rotulos
+    )
+)
+
+_OPCOES_GENERICAS = ("outro", "outros")  # a opção "Outro(s)" sozinha não diz nada
 
 
-def montar_instrucoes(contexto: dict) -> str:
+def _e_opcao_generica(texto: str) -> bool:
+    return texto.strip().rstrip(":").strip().casefold() in _OPCOES_GENERICAS
+
+
+def _valor_para_a_ia(chave: str, valor: str) -> str:
     """
-    As instruções fixas + os dados da aula selecionada. Só entram as
-    chaves de _ROTULOS_DO_CONTEXTO — de propósito, nenhum nome de pessoa:
-    mesmo que quem chama mande um "professor" no dicionário, ele fica de
-    fora do que sai do computador.
+    O valor de um campo como a IA deve vê-lo. A lista de exemplos entre
+    parênteses de uma opção do formulário ("Instalação de equipamento
+    (projetor, computador...)") sai, e a opção "Outro" sozinha também: o
+    texto escrito em "Outro" vem em outro campo.
     """
-    linhas = []
-    for rotulo, chave in _ROTULOS_DO_CONTEXTO:
+    if chave == "atendimento":
+        valor = re.sub(r"\s*\([^)]*\)", "", valor).strip()
+    if chave in ("atendimento", "organizador") and _e_opcao_generica(valor):
+        return ""
+    if chave == "itens":
+        itens = [item.strip() for item in valor.split(",") if item.strip()]
+        valor = ", ".join(item for item in itens if not _e_opcao_generica(item))
+    return valor
+
+
+def finalidade_do_contexto(contexto: dict) -> str:
+    """
+    O que a IA vai escrever: uma das FINALIDADES. Sem dizer — como fazem
+    as versões antigas do programa — ou com algo desconhecido, é o texto
+    do laboratório, que é o que sempre existiu.
+    """
+    valor = (contexto or {}).get("finalidade")
+    return valor if isinstance(valor, str) and valor in FINALIDADES else FINALIDADE_PADRAO
+
+
+def dados_do_pedido(contexto: dict) -> list:
+    """
+    [(chave, rótulo, valor)] do que a IA vai enxergar do registro, já
+    limpo e na ordem em que aparece. Só entram as chaves do tipo de texto
+    pedido — de propósito, nenhum nome de pessoa: mesmo que quem chama
+    mande um "professor" no dicionário, ele fica de fora.
+    """
+    finalidade = finalidade_do_contexto(contexto)
+    rotulos = _ROTULOS_DO_CONTEXTO if finalidade == FINALIDADE_PADRAO else _ROTULOS_DAS_BREVES[finalidade]
+    dados = []
+    for rotulo, chave in rotulos:
         valor = (contexto or {}).get(chave)
         if isinstance(valor, (list, tuple)):
             valor = ", ".join(str(v) for v in valor)
-        valor = " ".join(str(valor or "").split())
+        valor = _valor_para_a_ia(chave, " ".join(str(valor or "").split()))
         if valor:
-            linhas.append(f"- {rotulo}: {valor}")
-    dados = "\n".join(linhas) or "- (nenhum dado da agenda: use só o que o professor contar)"
-    return INSTRUCOES + "\n\nDADOS DA AULA\n" + dados
+            dados.append((chave, rotulo, valor))
+    return dados
+
+
+def montar_instrucoes(contexto: dict) -> str:
+    """As instruções fixas do tipo de texto pedido + os dados do registro selecionado."""
+    finalidade = finalidade_do_contexto(contexto)
+    linhas = "\n".join(f"- {rotulo}: {valor}" for _chave, rotulo, valor in dados_do_pedido(contexto))
+    if finalidade == FINALIDADE_PADRAO:
+        dados = linhas or "- (nenhum dado da agenda: use só o que o professor contar)"
+        return INSTRUCOES + "\n\nDADOS DA AULA\n" + dados
+    dados = linhas or "- (nenhum dado marcado: use só o que o professor contar)"
+    return INSTRUCOES_BREVES[finalidade] + "\n\nDADOS DO REGISTRO\n" + dados
 
 
 def limpar_texto(texto: str) -> str:

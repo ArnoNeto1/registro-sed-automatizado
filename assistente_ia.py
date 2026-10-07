@@ -1,8 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-Assistente de IA para a pergunta "Quais os objetos do conhecimento
-(conteúdos temáticos) abordados?" do formulário da SED — o campo
-"Conteúdo aplicado" da tela.
+Assistente de IA para dois tipos de pergunta do formulário da SED:
+
+  - "Quais os objetos do conhecimento (conteúdos temáticos) abordados?" —
+    o campo "Conteúdo aplicado" da tela, do laboratório;
+  - a "Breve descrição..." dos registros de Suporte a outros espaços,
+    Manutenção de equipamentos e Formação/Reunião.
 
 COMO É USADO
 ------------
@@ -14,6 +17,11 @@ na mesma conversa ("foi o professor de ARTES, não matemática") até
 clicar em "Usar este texto" — que só troca o texto do campo. Nada vai
 para a SED sem passar pelo mesmo "Preencher formulário" → conferir →
 "Enviar para a SED" de sempre.
+
+A janela é a mesma para os dois: o que muda é a `finalidade` que vai no
+contexto (ver ia_gemini.FINALIDADES) — com ela a IA escreve o texto do
+tipo certo e a janela troca os textos dela (TEXTOS_DA_JANELA). Sem
+finalidade é o laboratório, como sempre foi.
 
 DOIS JEITOS DE FALAR COM A IA
 -----------------------------
@@ -41,12 +49,15 @@ programa usando essa chave em silêncio, sem passar pelo serviço da escola.
 
 O QUE É ENVIADO PARA A IA
 -------------------------
-Só o necessário para escrever o texto: disciplina, turma, etapa, nº de
-aulas, o assunto anotado na agenda e o que o professor digitar na
-conversa. NOMES de professores não são enviados.
+Só o necessário para escrever o texto: no laboratório, disciplina, turma,
+etapa, nº de aulas, o assunto anotado na agenda; nos outros registros, o
+que está marcado na tela (atendimento, itens, organizador), o que foi
+escrito em "Outro", o nº de aulas e, no suporte vindo da agenda, o
+assunto anotado nela. Mais o que o professor digitar na conversa. NOMES
+de professores não são enviados.
 O texto livre da conversa o programa não consegue filtrar — por isso a
-janela avisa para não digitar nomes de estudantes (alunos são menores
-de idade), e a instrução pede à IA para não repeti-los.
+janela avisa para não digitar nomes de pessoas (alunos são menores de
+idade), e a instrução pede à IA para não repeti-los.
 
 PRIVACIDADE DO PLANO GRATUITO DA GOOGLE
 ---------------------------------------
@@ -78,6 +89,8 @@ from tkinter import ttk
 import caminhos
 from ia_gemini import (  # noqa: F401  (a janela e os testes buscam daqui)
     CHAVES_DO_CONTEXTO,
+    FINALIDADE_PADRAO,
+    FINALIDADES,
     INSTRUCOES,
     MODELO_PADRAO,
     TEMPO_LIMITE,
@@ -85,6 +98,8 @@ from ia_gemini import (  # noqa: F401  (a janela e os testes buscam daqui)
     ErroDaIA,
     achar_dado_pessoal,
     aviso_de_dado_pessoal,
+    dados_do_pedido,
+    finalidade_do_contexto,
     limpar_texto,
     montar_instrucoes,
 )
@@ -103,7 +118,8 @@ AVISO_DE_PRIVACIDADE = (
     "Atenção: o que você escrever aqui é enviado à Google (Gemini) para gerar o "
     "texto. O serviço da escola usa o plano gratuito, em que a Google pode usar "
     "esse conteúdo para melhorar os produtos dela. Por isso não digite nomes de "
-    "estudantes nem outros dados pessoais — CPF, e-mail e telefone são barrados."
+    "estudantes, de colegas ou de outras pessoas, nem outros dados pessoais — "
+    "CPF, e-mail e telefone são barrados."
 )
 
 # Texto do painel da chave: um quando é o ÚNICO caminho (sem serviço da
@@ -112,9 +128,10 @@ TEXTO_CHAVE_PROPRIA = (
     "Para escrever com IA, o programa usa o Gemini (Google) com uma chave "
     "sua, criada de graça no Google AI Studio. A chave fica guardada só "
     "neste usuário do Windows.\n"
-    "O que você escrever na conversa, junto com os dados da aula, é "
+    "O que você escrever na conversa, junto com os dados do registro, é "
     "enviado à Google para gerar o texto — não digite nomes de "
-    "estudantes nem outros dados pessoais. Numa chave gratuita, a Google "
+    "estudantes, de colegas ou de outras pessoas, nem outros dados "
+    "pessoais. Numa chave gratuita, a Google "
     "pode usar esse conteúdo para melhorar os produtos dela; para que "
     "isso não aconteça, ligue o faturamento da chave no AI Studio."
 )
@@ -124,8 +141,128 @@ TEXTO_CHAVE_COM_SERVIDOR = (
     "conta do Google AI Studio — aí o que você escrever passa por essa "
     "conta e, numa chave gratuita, a Google pode usar esse conteúdo para "
     "melhorar os produtos dela. Em qualquer caso, não digite nomes de "
-    "estudantes nem outros dados pessoais."
+    "estudantes, de colegas ou de outras pessoas, nem outros dados "
+    "pessoais."
 )
+
+# Os textos da janela para cada coisa que a IA escreve (as chaves de
+# ia_gemini.FINALIDADES). O primeiro é o do laboratório, que continua
+# como sempre foi; os outros são as breves descrições dos registros que
+# não são aula — por isso nenhum deles fala de "aula".
+TEXTOS_DA_JANELA = {
+    FINALIDADE_PADRAO: {
+        "titulo_da_janela": "Registro SED — objetos do conhecimento com IA",
+        "titulo": "Objetos do conhecimento com IA",
+        "dica": (
+            "Descreva o que foi feito na aula, do seu jeito — ou mande o assunto "
+            "da agenda como está. Eu escrevo o texto dos objetos do conhecimento "
+            "no formato da SED, e você pode pedir correções aqui mesmo (\"foi o "
+            "professor de Arte, não de Matemática\")."
+        ),
+        "sem_texto": "Escreva algo sobre a aula antes de enviar.",
+        "chave_guardada": "Chave guardada. Agora é só descrever a aula.",
+    },
+    "suporte": {
+        "titulo_da_janela": "Registro SED — descrição do suporte com IA",
+        "titulo": "Descrição do suporte com IA",
+        "dica": (
+            "Conte em poucas palavras o que foi feito, onde e para quem, do seu "
+            "jeito. Eu escrevo a breve descrição no formato do formulário da SED, "
+            "e você pode pedir correções aqui mesmo (\"foi na sala 5, não na 3\")."
+        ),
+        "sem_texto": "Escreva algo sobre o suporte antes de enviar.",
+        "chave_guardada": "Chave guardada. Agora é só contar o que foi feito.",
+    },
+    "manutencao": {
+        "titulo_da_janela": "Registro SED — descrição da manutenção com IA",
+        "titulo": "Descrição da manutenção com IA",
+        "dica": (
+            "Conte em poucas palavras o que foi feito na manutenção, do seu "
+            "jeito. Eu escrevo a breve descrição no formato do formulário da "
+            "SED, e você pode pedir correções aqui mesmo (\"foram 8 notebooks, "
+            "não 6\")."
+        ),
+        "sem_texto": "Escreva algo sobre a manutenção antes de enviar.",
+        "chave_guardada": "Chave guardada. Agora é só contar o que foi feito.",
+    },
+    "formacao": {
+        "titulo_da_janela": "Registro SED — descrição do encontro com IA",
+        "titulo": "Descrição do encontro com IA",
+        "dica": (
+            "Conte em poucas palavras do que se tratou a formação ou reunião, do "
+            "seu jeito. Eu escrevo a breve descrição no formato do formulário da "
+            "SED, e você pode pedir correções aqui mesmo (\"foi online, não "
+            "presencial\")."
+        ),
+        "sem_texto": "Escreva algo sobre o encontro antes de enviar.",
+        "chave_guardada": "Chave guardada. Agora é só contar do que se tratou.",
+    },
+}
+
+OPCAO_OUTRO = "Outro:"  # a opção com caixa de texto, igual à do formulário da SED
+TAMANHO_DO_ASSUNTO_NO_RESUMO = 60
+
+
+# ---------------------------------------------------------------------------
+# O que cada tela entrega à janela
+# ---------------------------------------------------------------------------
+# Funções simples, sem tela (o app só lê os campos e chama): assim as regras
+# que dependem do que está marcado — "Outro" só vale se estiver marcado — se
+# testam sem abrir janela nenhuma.
+def _numero_de_aulas(bruto) -> str:
+    texto = str(bruto or "").strip()
+    return texto if texto.isascii() and texto.isdigit() else ""
+
+
+def contexto_do_suporte(atendimento: str, numero_aulas, assunto: str = "") -> dict:
+    """Suporte a outros espaços. `assunto` só existe no vindo da agenda."""
+    return {
+        "finalidade": "suporte",
+        "atendimento": (atendimento or "").strip(),
+        "numero_aulas": _numero_de_aulas(numero_aulas),
+        "assunto": (assunto or "").strip(),
+    }
+
+
+def contexto_da_manutencao(itens_marcados, texto_de_outro: str, numero_aulas) -> dict:
+    """Manutenção. O texto de "Outro" só conta se "Outro:" estiver entre os itens marcados."""
+    marcados = [str(item) for item in itens_marcados]
+    return {
+        "finalidade": "manutencao",
+        "itens": ", ".join(marcados),
+        "outro": (texto_de_outro or "").strip() if OPCAO_OUTRO in marcados else "",
+        "numero_aulas": _numero_de_aulas(numero_aulas),
+    }
+
+
+def contexto_da_formacao(organizador: str, texto_de_outro: str, numero_aulas) -> dict:
+    """Formação/Reunião. O texto de "Outro" só conta se o organizador marcado for "Outro:"."""
+    organizador = (organizador or "").strip()
+    return {
+        "finalidade": "formacao",
+        "organizador": organizador,
+        "outro": (texto_de_outro or "").strip() if organizador == OPCAO_OUTRO else "",
+        "numero_aulas": _numero_de_aulas(numero_aulas),
+    }
+
+
+def resumo_do_registro(contexto: dict) -> str:
+    """
+    A linha da janela com o que a IA já recebe dos registros que não são
+    aula. Sai do que realmente VAI para a IA (já sem os campos barrados
+    pelo filtro de dados pessoais), e não do que a tela tem.
+    """
+    partes = []
+    for chave, _rotulo, valor in dados_do_pedido(contexto_para_enviar(contexto)):
+        if chave == "numero_aulas":
+            partes.append(f"{valor} aula(s)")
+        elif chave == "assunto":
+            if len(valor) > TAMANHO_DO_ASSUNTO_NO_RESUMO:
+                valor = valor[:TAMANHO_DO_ASSUNTO_NO_RESUMO].rstrip() + "…"
+            partes.append(f'agenda: "{valor}"')
+        else:
+            partes.append(valor)
+    return " · ".join(partes) or "Nada marcado ainda"
 
 
 # ---------------------------------------------------------------------------
@@ -194,10 +331,12 @@ def configuracao_do_servidor():
 
 def contexto_para_enviar(contexto: dict) -> dict:
     """
-    Só os campos da aula que podem sair do computador: nunca nome de
+    Só os campos do registro que podem sair do computador: nunca nome de
     professor, nem campo que pareça ter CPF, e-mail ou telefone. Esse campo
     FICA DE FORA em vez de travar o pedido — ele costuma vir da agenda
-    (o assunto), que a pessoa não consegue editar nesta janela.
+    (o assunto), que a pessoa não consegue editar nesta janela. Uma lista
+    (os itens da manutenção) vai como um texto só, que é o que o servidor
+    aceita.
     """
     contexto = contexto or {}
     limpo: dict = {}
@@ -208,6 +347,8 @@ def contexto_para_enviar(contexto: dict) -> dict:
         itens = valor if isinstance(valor, (list, tuple)) else [valor]
         if any(achar_dado_pessoal(str(item)) for item in itens):
             continue
+        if isinstance(valor, (list, tuple)):
+            valor = ", ".join(str(item) for item in itens)
         limpo[chave] = valor
     return limpo
 
@@ -299,6 +440,8 @@ class JanelaAssistente:
     def __init__(self, mestre, contexto: dict, texto_inicial: str, cores: dict, ao_usar):
         self.mestre = mestre
         self.contexto = dict(contexto or {})
+        self.finalidade = finalidade_do_contexto(self.contexto)
+        self.textos = TEXTOS_DA_JANELA[self.finalidade]
         self.cores = cores
         self.ao_usar = ao_usar
         self.conversa: list = []
@@ -320,7 +463,7 @@ class JanelaAssistente:
 
         j = tk.Toplevel(mestre)
         self.janela = j
-        j.title("Registro SED — objetos do conhecimento com IA")
+        j.title(self.textos["titulo_da_janela"])
         j.configure(bg=cores["fundo"])
         j.transient(mestre.winfo_toplevel())
         j.minsize(560, 460)
@@ -351,6 +494,8 @@ class JanelaAssistente:
             self._pedir_sozinho_se_for_so_o_assunto()
 
     def _pedir_sozinho_se_for_so_o_assunto(self) -> None:
+        if self.finalidade != FINALIDADE_PADRAO:
+            return  # só o laboratório traz um assunto pronto, no campo, para desenvolver
         assunto = " ".join(str(self.contexto.get("assunto") or "").split())
         escrito = " ".join(self.entrada.get("1.0", "end").split())
         if escrito and escrito == assunto and not self.conversa:
@@ -383,21 +528,25 @@ class JanelaAssistente:
         cartao.pack(fill="both", expand=True, padx=12, pady=12)
         self.cartao = cartao
 
-        ttk.Label(
-            cartao, text="Objetos do conhecimento com IA", style="Secao.TLabel"
-        ).pack(anchor="w")
-        resumo = " · ".join(
-            str(self.contexto.get(k) or "").strip()
-            for k in ("disciplina", "turma")
-            if str(self.contexto.get(k) or "").strip()
-        )
-        aulas = str(self.contexto.get("numero_aulas") or "").strip()
-        if aulas:
-            resumo = f"{resumo} · {aulas} aula(s)" if resumo else f"{aulas} aula(s)"
+        ttk.Label(cartao, text=self.textos["titulo"], style="Secao.TLabel").pack(anchor="w")
+        if self.finalidade == FINALIDADE_PADRAO:
+            resumo = " · ".join(
+                str(self.contexto.get(k) or "").strip()
+                for k in ("disciplina", "turma")
+                if str(self.contexto.get(k) or "").strip()
+            )
+            aulas = str(self.contexto.get("numero_aulas") or "").strip()
+            if aulas:
+                resumo = f"{resumo} · {aulas} aula(s)" if resumo else f"{aulas} aula(s)"
+            resumo = resumo or "Aula sem dados da agenda"
+        else:
+            resumo = resumo_do_registro(self.contexto)
         ttk.Label(
             cartao,
-            text=(resumo or "Aula sem dados da agenda") + "  —  a IA já recebe esses dados.",
+            text=resumo + "  —  a IA já recebe esses dados.",
             style="Suave.TLabel",
+            wraplength=560,
+            justify="left",
         ).pack(anchor="w", pady=(2, 10))
 
         # histórico da conversa
@@ -414,13 +563,7 @@ class JanelaAssistente:
         h.tag_configure("fala", spacing1=2, spacing3=2)
         h.tag_configure("erro", foreground=c["laranja"], spacing1=10)
         h.tag_configure("dica", foreground=c["suave"], font=("Segoe UI", 9, "italic"))
-        self._escrever(
-            "Descreva o que foi feito na aula, do seu jeito — ou mande o assunto "
-            "da agenda como está. Eu escrevo o texto dos objetos do conhecimento "
-            "no formato da SED, e você pode pedir correções aqui mesmo (\"foi o "
-            "professor de Arte, não de Matemática\").\n" + AVISO_DE_PRIVACIDADE,
-            "dica",
-        )
+        self._escrever(self.textos["dica"] + "\n" + AVISO_DE_PRIVACIDADE, "dica")
 
         # painel de conversa: entrada + Enviar
         self.painel_conversa = ttk.Frame(cartao, style="Cartao.TFrame")
@@ -560,7 +703,7 @@ class JanelaAssistente:
         except OSError as erro:
             self.status.configure(text=f"Não consegui guardar a chave: {erro}")
             return
-        self.status.configure(text="Chave guardada. Agora é só descrever a aula.")
+        self.status.configure(text=self.textos["chave_guardada"])
         self._mostrar_painel_conversa()
         self._pedir_sozinho_se_for_so_o_assunto()
 
@@ -587,7 +730,7 @@ class JanelaAssistente:
             return "break"
         texto = self.entrada.get("1.0", "end").strip()
         if not texto:
-            self.status.configure(text="Escreva algo sobre a aula antes de enviar.")
+            self.status.configure(text=self.textos["sem_texto"])
             return "break"
         # CPF, e-mail ou telefone: barra aqui, antes de qualquer coisa sair
         # do computador, e deixa o texto na caixa para a pessoa corrigir.

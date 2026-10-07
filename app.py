@@ -1717,12 +1717,15 @@ class Janela(tk.Tk):
             ).grid(row=3 + i, column=0, columnspan=2, sticky="w", pady=1)
         linha_base = 3 + len(TIPOS_DE_SUPORTE)
 
-        ttk.Label(
-            cartao_suporte,
-            text="Breve descrição da atividade (quem, onde e para quê):",
-            style="Cartao.TLabel",
-        ).grid(row=linha_base, column=0, columnspan=2, sticky="w", pady=(12, 4))
+        # A linha do rótulo divide o espaço com o "Escrever com IA..." (o
+        # mesmo dos objetos do conhecimento, ver _linha_rotulo_com_ia).
         self.campo_descricao_suporte = ttk.Entry(cartao_suporte, width=70, font=("Segoe UI", 10))
+        self._linha_rotulo_com_ia(
+            cartao_suporte,
+            "Breve descrição da atividade (quem, onde e para quê):",
+            self.campo_descricao_suporte,
+            self._contexto_ia_suporte_agenda,
+        ).grid(row=linha_base, column=0, columnspan=2, sticky="w", pady=(12, 4))
         self.campo_descricao_suporte.grid(row=linha_base + 1, column=0, columnspan=2, sticky="ew")
         cartao_suporte.columnconfigure(1, weight=1)
 
@@ -1761,14 +1764,15 @@ class Janela(tk.Tk):
             ).grid(row=2 + i, column=0, columnspan=2, sticky="w", pady=1)
         linha_base_s = 2 + len(TIPOS_DE_SUPORTE)
 
-        ttk.Label(
-            cartao_suporte_avulso,
-            text="Breve descrição da atividade (quem, onde e para quê):",
-            style="Cartao.TLabel",
-        ).grid(row=linha_base_s, column=0, columnspan=2, sticky="w", pady=(12, 4))
         self.campo_suporte_avulso_descricao = ttk.Entry(
             cartao_suporte_avulso, width=70, font=("Segoe UI", 10)
         )
+        self._linha_rotulo_com_ia(
+            cartao_suporte_avulso,
+            "Breve descrição da atividade (quem, onde e para quê):",
+            self.campo_suporte_avulso_descricao,
+            self._contexto_ia_suporte_avulso,
+        ).grid(row=linha_base_s, column=0, columnspan=2, sticky="w", pady=(12, 4))
         self.campo_suporte_avulso_descricao.grid(
             row=linha_base_s + 1, column=0, columnspan=2, sticky="ew"
         )
@@ -1821,12 +1825,15 @@ class Janela(tk.Tk):
         self.campo_manutencao_outro = ttk.Entry(linha_outro_m, width=40, font=("Segoe UI", 10))
         self.campo_manutencao_outro.pack(side="left", padx=(8, 0))
 
-        ttk.Label(
-            cartao_manutencao, text="Breve descrição da manutenção:", style="Cartao.TLabel"
-        ).grid(row=4, column=0, columnspan=4, sticky="w", pady=(12, 4))
         self.campo_manutencao_descricao = ttk.Entry(
             cartao_manutencao, width=70, font=("Segoe UI", 10)
         )
+        self._linha_rotulo_com_ia(
+            cartao_manutencao,
+            "Breve descrição da manutenção:",
+            self.campo_manutencao_descricao,
+            self._contexto_ia_manutencao,
+        ).grid(row=4, column=0, columnspan=4, sticky="w", pady=(12, 4))
         self.campo_manutencao_descricao.grid(row=5, column=0, columnspan=4, sticky="ew")
         cartao_manutencao.columnconfigure(3, weight=1)
 
@@ -1861,10 +1868,13 @@ class Janela(tk.Tk):
         self.campo_formacao_outro = ttk.Entry(linha_outro_f, width=40, font=("Segoe UI", 10))
         self.campo_formacao_outro.pack(side="left", padx=(8, 0))
 
-        ttk.Label(
-            cartao_formacao, text="Breve descrição do encontro:", style="Cartao.TLabel"
-        ).grid(row=linha_base_f + 1, column=0, columnspan=4, sticky="w", pady=(12, 4))
         self.campo_formacao_descricao = ttk.Entry(cartao_formacao, width=70, font=("Segoe UI", 10))
+        self._linha_rotulo_com_ia(
+            cartao_formacao,
+            "Breve descrição do encontro:",
+            self.campo_formacao_descricao,
+            self._contexto_ia_formacao,
+        ).grid(row=linha_base_f + 1, column=0, columnspan=4, sticky="w", pady=(12, 4))
         self.campo_formacao_descricao.grid(row=linha_base_f + 2, column=0, columnspan=4, sticky="ew")
         cartao_formacao.columnconfigure(3, weight=1)
 
@@ -3230,6 +3240,74 @@ class Janela(tk.Tk):
 
         assistente_ia.abrir(
             self, contexto, self.campo_conteudo.get("1.0", "end").strip(), _PALETA, _usar
+        )
+
+    def _linha_rotulo_com_ia(self, pai, texto: str, campo, contexto) -> ttk.Frame:
+        """
+        O rótulo de um campo de "Breve descrição" com o botão "Escrever
+        com IA..." ao lado dele — o mesmo do "Conteúdo aplicado", só que a
+        IA escreve a descrição breve do tipo de registro (suporte,
+        manutenção ou formação/reunião). `campo` é o campo que recebe o
+        texto; `contexto` é a função que lê da tela, na hora do clique, o
+        que a IA recebe. Quem chama coloca a linha no grid.
+        """
+        linha = ttk.Frame(pai, style="Cartao.TFrame")
+        ttk.Label(linha, text=texto, style="Cartao.TLabel").pack(side="left")
+        ttk.Button(
+            linha,
+            text="Escrever com IA...",
+            style="Compacto.TButton",
+            command=lambda: self._escrever_descricao_com_ia(campo, contexto()),
+        ).pack(side="left", padx=(10, 0))
+        return linha
+
+    def _escrever_descricao_com_ia(self, campo, contexto: dict) -> None:
+        """
+        Abre a conversa com a IA para um campo de "Breve descrição". É a
+        mesma janela dos objetos do conhecimento (ver
+        _escrever_conteudo_com_ia e assistente_ia); o `contexto` diz qual
+        tipo de registro é e leva só o que está marcado na tela — nunca nome
+        de professor. O que a IA escreve só entra no campo quando a pessoa
+        clica em "Usar este texto", e dali segue o fluxo de sempre.
+        """
+
+        def _usar(texto: str) -> None:
+            campo.delete(0, "end")
+            campo.insert(0, texto)
+            self._definir_status(
+                "Texto da IA colocado na breve descrição — confira e clique em "
+                "\"Preencher formulário\"."
+            )
+
+        assistente_ia.abrir(self, contexto, campo.get().strip(), _PALETA, _usar)
+
+    # Cada tela entrega à IA o que tem marcado. Quatro métodos e não um só
+    # porque os widgets são PRÓPRIOS de cada tela (o suporte da agenda e o
+    # avulso não compartilham nada — ver o comentário em _montar). As regras
+    # ("Outro" só vale marcado) estão em assistente_ia, que se testa sem tela.
+    def _contexto_ia_suporte_agenda(self) -> dict:
+        return assistente_ia.contexto_do_suporte(
+            self.var_tipo_suporte.get(),
+            self.campo_aulas_suporte.get(),
+            getattr(self.grupo_atual, "conteudo", "") or "",
+        )
+
+    def _contexto_ia_suporte_avulso(self) -> dict:
+        return assistente_ia.contexto_do_suporte(
+            self.var_suporte_avulso_tipo.get(), self.campo_suporte_avulso_aulas.get()
+        )
+
+    def _contexto_ia_manutencao(self) -> dict:
+        marcados = [item for item, var in self.vars_manutencao.items() if var.get()]
+        return assistente_ia.contexto_da_manutencao(
+            marcados, self.campo_manutencao_outro.get(), self.campo_manutencao_aulas.get()
+        )
+
+    def _contexto_ia_formacao(self) -> dict:
+        return assistente_ia.contexto_da_formacao(
+            self.var_formacao_organizador.get(),
+            self.campo_formacao_outro.get(),
+            self.campo_formacao_aulas.get(),
         )
 
     def _abrir_aula_sem_agendamento(self) -> None:
