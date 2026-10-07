@@ -30,13 +30,12 @@ resumo de tudo que vai para a SED, e só manda depois que você clicar em
 
 ## Veja funcionando
 
-[![Vídeo de divulgação: o programa preenchendo o registro da SED sozinho (47 segundos)](docs/video-capa.jpg)](docs/video-promocional.mp4)
+![Vídeo de divulgação: o programa lê a agenda do NTE, preenche o registro da SED sozinho e só envia quando você clica em Enviar](docs/video-promocional.gif)
 
-**▶ [Assista ao vídeo de divulgação (47 s)](docs/video-promocional.mp4)** — o
-programa de verdade rodando: ele lê a agenda do NTE, preenche o formulário
-da SED sozinho e só envia quando você clica em "Enviar".
+**▶ [Baixe o vídeo de divulgação em alta qualidade (47 s)](docs/video-promocional.mp4)** —
+a mesma animação acima, com mais nitidez.
 
-**▶ [Assista ao tutorial passo a passo (76 s)](docs/video-tutorial.mp4)** — as
+**▶ [Baixe o tutorial passo a passo (76 s)](docs/video-tutorial.mp4)** — as
 7 etapas completas, da tela de entrada até o "Registro enviado para a SED".
 
 Os nomes de professores, turmas e escola que aparecem nos vídeos são
