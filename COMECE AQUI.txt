@@ -13,38 +13,36 @@ Ele NUNCA envia nada sem você clicar em "Enviar para a SED".
 INSTALAR (uns 3 minutos, uma vez só)
 -----------------------------------------------------------------------
 
-PASSO 1 — Baixar o programa
+PASSO 1 — Baixar o instalador
 
-    Abra:
-    https://github.com/ArnoNeto1/registro-sed-automatizado/releases
+    Clique neste endereço (ou copie e cole na barra do navegador):
 
-    Clique no arquivo  Registro-SED.exe  da versão mais recente.
+    https://github.com/ArnoNeto1/registro-sed-automatizado/releases/latest/download/Registro-SED-Instalador.exe
 
-    Não precisa instalar Python nem nada: é um arquivo só.
+    O arquivo  Registro-SED-Instalador.exe  vai para a sua pasta
+    Downloads. Não precisa instalar Python nem nada.
 
 
-PASSO 2 — Guardar numa pasta própria
+PASSO 2 — Instalar
 
-    Crie uma pasta na Área de Trabalho, por exemplo:
+    Dê dois cliques no Registro-SED-Instalador.exe e siga as telas
+    ("Avançar", "Instalar"). Ele cria o atalho "Registro SED
+    Automatizado" no Menu Iniciar e na Área de Trabalho.
 
-        Registro SED
+    >>> O Windows pode mostrar uma tela azul dizendo "O Windows
+    >>> protegeu o computador". Isso NÃO é vírus: acontece com todo
+    >>> programa novo que não é de uma empresa conhecida. Clique em
+    >>> "Mais informações" e depois em "Executar assim mesmo".
 
-    e coloque o Registro-SED.exe DENTRO dela.
-
-    Isso importa: o programa cria ao lado dele os arquivos de
-    configuração e de histórico. Solto na pasta Downloads, no meio de
-    tudo, você vai acabar apagando sem querer.
+    Depois ele pergunta se pode fazer alterações no computador (é a
+    senha de administrador do Windows): clique em "Sim". É só na
+    instalação, uma vez.
 
 
 PASSO 3 — Abrir e preencher a tela de boas-vindas
 
-    Dê dois cliques no Registro-SED.exe.
-
-    >>> O Windows vai mostrar uma tela azul dizendo "O Windows protegeu
-    >>> o computador". Isso NÃO é vírus: acontece com todo programa
-    >>> novo que não é de uma empresa conhecida. Clique em
-    >>> "Mais informações" e depois em "Executar assim mesmo".
-    >>> Só na primeira vez.
+    Abra o programa pelo atalho "Registro SED Automatizado" (na Área de
+    Trabalho ou no Menu Iniciar).
 
     Vai abrir uma tela pedindo:
 
@@ -112,9 +110,9 @@ PERGUNTAS QUE TODO MUNDO FAZ
     precisar refazer nada.)
 
 "Ele mexe no meu Chrome?"
-    Não. Ele abre uma janela separada, com um perfil próprio dentro da
-    pasta do programa. Suas abas, seu histórico e suas senhas não são
-    tocados.
+    Não. Ele abre uma janela separada, com um perfil próprio, guardado na
+    pasta de dados do programa. Suas abas, seu histórico e suas senhas
+    não são tocados.
 
 "E se eu não tiver Chrome?"
     Ele usa o Microsoft Edge, que já vem no Windows.
@@ -131,6 +129,7 @@ PERGUNTAS QUE TODO MUNDO FAZ
     confirma.
 
 "Dei dois cliques e não aconteceu nada."
-    Olhe se apareceu um arquivo  erro.txt  na pasta do programa e mande
-    ele para quem cuida do programa. É exatamente para isso que ele
-    existe.
+    Olhe se apareceu um arquivo  erro.txt  na pasta
+    C:\ProgramData\RegistroSED  (cole esse endereço na barra do
+    Explorador de Arquivos) e mande ele para quem cuida do programa. É
+    exatamente para isso que ele existe.

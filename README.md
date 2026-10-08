@@ -3,10 +3,9 @@
 [![Versão mais recente](https://img.shields.io/github/v/release/ArnoNeto1/registro-sed-automatizado?label=vers%C3%A3o&color=2f6f4f)](https://github.com/ArnoNeto1/registro-sed-automatizado/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/ArnoNeto1/registro-sed-automatizado/total?label=downloads&color=6b7684)](https://github.com/ArnoNeto1/registro-sed-automatizado/releases)
 [![Baixar o instalador](https://img.shields.io/badge/⬇%20Baixar-Instalador%20(.exe)-2f6f4f?style=for-the-badge)](https://github.com/ArnoNeto1/registro-sed-automatizado/releases/latest/download/Registro-SED-Instalador.exe)
-[![Baixar a versão portátil](https://img.shields.io/badge/⬇%20Baixar-Vers%C3%A3o%20port%C3%A1til-6b7684?style=for-the-badge)](https://github.com/ArnoNeto1/registro-sed-automatizado/releases/latest/download/Registro-SED.exe)
 
-> Os dois botões acima baixam sempre a versão mais nova, sem precisar
-> procurar nada. Na dúvida, escolha o **Instalador**.
+> O botão acima baixa sempre a versão mais nova, sem precisar procurar
+> nada.
 
 ## Para que serve
 
@@ -37,14 +36,10 @@ fictícios — nenhum dado real de ninguém.
 
 ## Como instalar e usar
 
-1. Baixe a versão mais recente na página de
-   [**Releases**](https://github.com/ArnoNeto1/registro-sed-automatizado/releases/latest).
-   Não precisa instalar Python nem nada — escolha um dos dois arquivos:
-   - **`Registro-SED.exe`** — portátil. Coloque numa pasta própria (ex.:
-     `Área de Trabalho\Registro SED`) e dê dois cliques para abrir.
-   - **`Registro-SED-Instalador.exe`** — instala de verdade, com atalho no
-     Menu Iniciar e na Área de Trabalho. Pede senha de administrador uma
-     vez, na instalação.
+1. Clique em **⬇ Baixar Instalador (.exe)**, lá em cima, abra o arquivo
+   baixado e siga as telas ("Avançar"). Não precisa instalar Python nem
+   nada. Ele cria o atalho no Menu Iniciar e na Área de Trabalho e pede a
+   senha de administrador do Windows uma vez, só na instalação.
 2. Na primeira abertura, preencha a tela de cadastro: escola, seu nome, seu
    CPF e os turnos que você atende.
 3. O programa já abre com a agenda do dia carregada e a aula mais recente
@@ -116,9 +111,7 @@ desse uso. **Hoje o serviço da escola usa uma chave gratuita**, e a janela
 avisa isso aos professores (`AVISO_DE_PRIVACIDADE` em `assistente_ia.py`);
 ao passar para uma chave paga, ajuste esse texto e o das notas da versão.
 
-Os dois formatos de instalação (portátil e instalador) se atualizam
-sozinhos quando sai versão nova, e compartilham os mesmos dados — dá para
-trocar de um para o outro sem perder nada. O arquivo
+O programa se atualiza sozinho quando sai versão nova. O arquivo
 [**`COMECE AQUI.txt`**](COMECE%20AQUI.txt), aqui no repositório, tem mais
 detalhes: como dividir o computador com outro professor do laboratório,
 perguntas frequentes.
@@ -177,7 +170,7 @@ python -m unittest discover -s tests -v
 | `escolas.py` | Lista de escolas da CRE Blumenau, como aparecem no formulário da SED. Também é a lista oficial da contagem de escolas: o servidor leva uma cópia exata em `servidor-ia/api/_escolas.py`. |
 | `tests/` | Testes automáticos (`python -m unittest discover -s tests`). |
 | `installer/setup.iss` | Script do instalador Windows (Inno Setup). |
-| `.github/workflows/montar-programa.yml` | Gera o `.exe` portátil e o instalador e publica a release, automaticamente. |
+| `.github/workflows/montar-programa.yml` | Gera o `.exe` (o que a autoatualização baixa) e o instalador (o que os professores baixam) e publica a release, automaticamente. |
 
 Dados do professor (`.env`/cadastro, login do navegador, histórico de
 envios) ficam ao lado do executável no modo portátil, ou em
@@ -191,6 +184,12 @@ Aumente o número em `VERSAO.txt`, descreva o que mudou numa seção nova em
 portátil e o instalador, publica os dois numa Release e atualiza
 `versao.json` sozinho. Veja `PUBLICAR ATUALIZACAO.txt` para o passo a passo
 completo.
+
+**Nunca apague nem renomeie o `Registro-SED.exe` de uma Release.** Os
+professores só recebem o link do **Instalador** (para não confundirem qual
+baixar), mas esse `.exe` é o arquivo que a autoatualização baixa em TODO
+computador, inclusive nos de quem instalou pelo instalador: é o `exe` do
+`versao.json`, conferido por SHA-256. Sem ele ninguém consegue se atualizar.
 
 ### Quantas pessoas baixaram o programa
 

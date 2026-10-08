@@ -71,6 +71,25 @@ a versão já exista".
 
 
 -----------------------------------------------------------------------
+ATENÇÃO: NUNCA APAGUE NEM RENOMEIE O Registro-SED.exe DA RELEASE
+-----------------------------------------------------------------------
+
+Os professores só recebem o link do INSTALADOR (README e COMECE AQUI.txt),
+para não confundirem qual baixar. Mas o arquivo Registro-SED.exe de cada
+Release continua essencial: é o que a autoatualização baixa (o "exe" do
+versao.json, conferido por SHA-256) no computador de TODO professor —
+inclusive de quem instalou pelo instalador, porque o programa instalado é
+esse mesmo arquivo. Apagá-lo, ou publicar uma Release sem ele, deixa todo
+mundo sem conseguir se atualizar. A página da Release mostra os dois
+arquivos, e isso é esperado: quem chegou lá pelo link do README ou do
+guia nunca vê essa escolha.
+
+Quem não consegue instalar (sem senha de administrador) pode receber o
+link direto do portátil de você:
+https://github.com/ArnoNeto1/registro-sed-automatizado/releases/latest/download/Registro-SED.exe
+
+
+-----------------------------------------------------------------------
 ONDE FICA A CONFIGURAÇÃO DO BUILD (IMPORTANTE)
 -----------------------------------------------------------------------
 
