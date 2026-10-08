@@ -72,10 +72,13 @@ servidor.
 ## Contagem de uso (`api/uso.py`)
 
 Função separada, publicada junto: o programa (a partir da 2.1.0) manda
-`POST /api/uso` com `{"id": "<32 caracteres hex>", "versao": "2.1.0"}` e o
-mesmo `x-app-token` da IA, no máximo uma vez por dia por computador. O
-`GET /api/uso` devolve os totais em JSON (público: só números); `python
-contar_usuarios.py` mostra isso em texto.
+`POST /api/uso` com `{"id": "<32 caracteres hex>", "versao": "2.3.0",
+"escola": "<nome da lista oficial>"}` (a escola vem a partir da 2.3.0 e é
+opcional) e o mesmo `x-app-token` da IA, no máximo uma vez por dia por
+computador (e por escola). O `GET /api/uso` devolve os totais em JSON
+(público: só números, inclusive quantas escolas diferentes); `python
+contar_usuarios.py` mostra isso em texto. A lista de QUAIS escolas só abre
+em `GET /api/uso?detalhe=escolas` com o cabeçalho `x-painel-token`.
 
 - **Onde guarda:** num Redis gratuito da Upstash (plano Free: 500 mil
   comandos por mês, sem cartão). Para ligar: Vercel → Marketplace →
@@ -88,6 +91,19 @@ contar_usuarios.py` mostra isso em texto.
   mas não guardam os números: não dá para listá-los nem saber quem é
   quem. O código não grava o IP nem registra o número, o segredo ou o
   conteúdo; o registro só diz o motivo de uma recusa.
+- **As escolas:** só entra um nome IGUAL a um da lista oficial
+  (`api/_escolas.py`, **cópia exata** de `escolas.py`: um teste falha se
+  ficarem diferentes; mexeu na raiz? `cp escolas.py servidor-ia/api/_escolas.py`).
+  Texto livre, nome de pessoa ou outra grafia são descartados, e o computador
+  conta do mesmo jeito. Para cada escola guarda-se um contador de
+  computadores (também HyperLogLog) e "escola → último dia" (`uso:escolas`);
+  o número do computador **nunca** fica ao lado do nome da escola em forma
+  que se possa listar.
+- **A senha do painel (`PAINEL_TOKEN`):** variável nova, só do mantenedor,
+  marcada como "sensível" na Vercel. Sem ela a lista de escolas fica fechada
+  para todo mundo; o `APP_TOKEN` NÃO a abre (ele viaja dentro do `.exe`). A
+  resposta da lista nunca vai para cache público. Variável nova só vale em
+  deploy novo.
 - **Quem fica de fora:** o computador que tem `modo_teste.txt` na pasta de
   dados (ver `PUBLICAR ATUALIZACAO.txt`).
 

@@ -29,6 +29,8 @@ backup_versao_anterior/
 servidor_ia.json
 # ligação local com o projeto da Vercel
 .vercel/
+# senha do painel de escolas (contar_usuarios.py a lê da pasta pessoal, não daqui)
+painel_token.txt
 
 # ---------------------------------------------------------------------
 # Sobras de quem roda o programa

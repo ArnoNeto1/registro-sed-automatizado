@@ -179,7 +179,7 @@ repositório mostra o total de todas as versões juntas.
 
 
 -----------------------------------------------------------------------
-QUANTOS COMPUTADORES ESTÃO USANDO O PROGRAMA? (contagem anônima)
+QUANTOS COMPUTADORES E ESCOLAS ESTÃO USANDO O PROGRAMA?
 -----------------------------------------------------------------------
 
 Os downloads do GitHub misturam os seus testes com os dos professores.
@@ -192,10 +192,20 @@ ver os números, num terminal, dentro da pasta do programa:
 (ou abra https://registro-sed-ia-plexe1.vercel.app/api/uso no navegador;
 são só números).
 
-O que o aviso leva: um número aleatório da instalação e a versão do
-programa. Nada de nome, CPF, escola, aulas ou do que se escreve na IA. O
-servidor não grava o IP e não guarda os números de um jeito que dê para
+O que o aviso leva: um número aleatório da instalação, a versão do
+programa e (a partir da 2.3.0) a escola escolhida no cadastro, mas só se
+for igual a um nome da lista oficial (escolas.py). Nada de nome de
+professor, CPF, aulas ou do que se escreve na IA. O servidor não grava o
+IP e não guarda os números dos computadores de um jeito que dê para
 listá-los: só conta quantos são diferentes (com cerca de 1% de erro).
+
+Quais ESCOLAS usam: o endereço de totais mostra só quantas escolas
+diferentes. Os NOMES só abrem com a senha do painel (variável PAINEL_TOKEN
+na Vercel), que fica só no seu computador, no arquivo painel_token.txt da
+pasta %APPDATA%\RegistroSED (ou na variável REGISTRO_SED_PAINEL_TOKEN) —
+nunca no repositório. Com ela, "python contar_usuarios.py" mostra também
+quais escolas já usam (computadores e último dia) e quais ainda não
+apareceram.
 
 Como ler:
 
@@ -203,9 +213,9 @@ Como ler:
       mesmo computador contam uma vez; quem reinstala ou apaga a pasta de
       dados conta de novo; computadores que se restauram sozinhos ao
       reiniciar podem contar de novo a cada dia.
-    - Só aparece quem já atualizou para a 2.1.0 ou mais nova. Nos
-      primeiros dias os números sobem conforme os professores abrem o
-      programa.
+    - Só aparece quem já atualizou para a 2.1.0 ou mais nova (e a escola,
+      para quem atualizou para a 2.3.0). Nos primeiros dias os números
+      sobem conforme os professores abrem o programa.
 
 Para tirar um computador da contagem (o seu, por exemplo), crie um
 arquivo chamado modo_teste.txt na pasta de dados dele (ao lado do .exe,

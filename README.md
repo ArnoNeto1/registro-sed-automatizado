@@ -169,12 +169,12 @@ python -m unittest discover -s tests -v
 | `caminhos.py` | Onde ficam os arquivos do programa (`.py` vs `.exe`, portátil vs instalado) e qual navegador usar. |
 | `atualizador.py` | Autoatualização: consulta `versao.json`, baixa, confere (tamanho e SHA-256) e troca os arquivos/o `.exe`. |
 | `contar_downloads.py` | Mostra quantas vezes cada versão foi baixada (lê a contagem pública do GitHub). |
-| `contagem.py` | Contagem anônima de computadores que usam o programa: no máximo um aviso por dia, em segundo plano, só com um número aleatório e a versão. |
-| `contar_usuarios.py` | Mostra quantos computadores usaram o programa (lê os totais do servidor da escola). |
+| `contagem.py` | Contagem de computadores e de escolas que usam o programa: no máximo um aviso por dia, em segundo plano, só com um número aleatório, a versão e a escola (se for um nome da lista oficial). |
+| `contar_usuarios.py` | Mostra quantos computadores e escolas usaram o programa (lê os totais do servidor da escola) e, com a senha do painel, quais escolas. |
 | `assistente_ia.py` | "Escrever com IA...": a janela de conversa e a escolha entre o serviço da escola e a chave própria (opcional). |
 | `ia_gemini.py` | Núcleo da IA, sem tela: instrução, limpeza do texto e chamada ao Gemini. Compartilhado com o servidor. |
-| `servidor-ia/` | Servidor intermediário (função da Vercel) que guarda a chave do Gemini da escola e conta, de forma anônima, os computadores que usam o programa. Ver o README da pasta. |
-| `escolas.py` | Lista de escolas da CRE Blumenau, como aparecem no formulário da SED. |
+| `servidor-ia/` | Servidor intermediário (função da Vercel) que guarda a chave do Gemini da escola e conta os computadores e as escolas que usam o programa. Ver o README da pasta. |
+| `escolas.py` | Lista de escolas da CRE Blumenau, como aparecem no formulário da SED. Também é a lista oficial da contagem de escolas: o servidor leva uma cópia exata em `servidor-ia/api/_escolas.py`. |
 | `tests/` | Testes automáticos (`python -m unittest discover -s tests`). |
 | `installer/setup.iss` | Script do instalador Windows (Inno Setup). |
 | `.github/workflows/montar-programa.yml` | Gera o `.exe` portátil e o instalador e publica a release, automaticamente. |
@@ -208,20 +208,30 @@ python contar_downloads.py
 - Não são pessoas diferentes: quem baixa duas vezes conta duas, e o GitHub
   não diz quem baixou. Quem recebeu por pen drive ou e-mail não aparece.
 
-### Quantos computadores usam o programa
+### Quantos computadores e escolas usam o programa
 
 Os downloads misturam testes com uso de verdade. Por isso, a partir da
 2.1.0 o programa avisa o servidor da escola, no máximo uma vez por dia e em
-segundo plano, que está aberto: só um número aleatório da instalação e a
-versão — nada de nome, CPF, escola ou aulas, e o servidor não guarda o IP.
-Para ver os totais:
+segundo plano, que está aberto: um número aleatório da instalação e a
+versão — nada de nome de professor, CPF ou aulas, e o servidor não guarda o
+IP. A partir da 2.3.0 vai também a **escola escolhida no cadastro**, mas só
+se for igual a um nome da lista oficial da CRE (`escolas.py`): são nomes
+públicos, e qualquer outro texto nunca sai do computador. Para ver os
+totais:
 
 ```bash
 python contar_usuarios.py
 ```
 
 - São **computadores**, não pessoas exatas; só entra quem já atualizou para
-  a 2.1.0.
+  a 2.1.0 (e a escola, para a 2.3.0).
+- O endereço de totais é público e só mostra **números** (inclusive quantas
+  escolas diferentes). Os **nomes** das escolas só abrem com a senha do
+  painel (`PAINEL_TOKEN` na Vercel), que fica no arquivo `painel_token.txt`
+  da pasta `%APPDATA%\RegistroSED` do mantenedor (ou na variável
+  `REGISTRO_SED_PAINEL_TOKEN`), nunca no repositório. Com ela o script
+  mostra também quais escolas já usam (computadores e último dia de cada
+  uma) e quais da lista ainda não apareceram.
 - Um computador sai da contagem criando `modo_teste.txt` na pasta de dados
   dele.
 - Detalhes em [`servidor-ia/README.md`](servidor-ia/README.md) e em

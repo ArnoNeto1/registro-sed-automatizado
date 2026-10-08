@@ -1,25 +1,41 @@
 # -*- coding: utf-8 -*-
 """
-Contagem ANÔNIMA de quantos computadores usam o Registro SED (função da
-Vercel, em Python). Serve só para o mantenedor saber o tamanho do uso.
+Contagem ANÔNIMA de quantos computadores (e de quantas escolas) usam o
+Registro SED (função da Vercel, em Python). Serve só para o mantenedor saber
+o tamanho do uso.
 
-    POST /api/uso   {"id": "<32 caracteres hex>", "versao": "2.1.0"}
+    POST /api/uso   {"id": "<32 caracteres hex>", "versao": "2.3.0",
+                     "escola": "<nome da lista oficial>"}   (escola é opcional)
                     com o cabeçalho x-app-token (o mesmo segredo da IA)
     GET  /api/uso   os totais, em JSON (público: são só números)
+    GET  /api/uso?detalhe=escolas
+                    a lista de escolas, SÓ com o cabeçalho x-painel-token
+                    (a senha do mantenedor; nunca em cache público)
 
 O QUE FICA GUARDADO — E O QUE NÃO FICA:
   - Cada computador manda um número aleatório que ele mesmo inventou (sem
-    ligação com nome, CPF, escola ou usuário do Windows) e a versão do
-    programa. Nada mais é lido: campos a mais são jogados fora.
-  - O número entra em contadores HyperLogLog do Redis (Upstash): eles dão a
-    quantidade de números DIFERENTES, com cerca de 1% de erro, mas não
-    guardam os números — não dá para listá-los nem descobrir quem é quem.
+    ligação com nome, CPF ou usuário do Windows), a versão do programa e a
+    escola escolhida no cadastro. Nada mais é lido: campos a mais são
+    jogados fora.
+  - A escola só entra se for IGUAL a um nome da lista oficial da CRE
+    (_escolas.py, cópia exata de escolas.py): texto livre, nome de pessoa ou
+    outra grafia são descartados, e o computador conta do mesmo jeito.
+  - O número do computador entra em contadores HyperLogLog do Redis
+    (Upstash): eles dão a quantidade de números DIFERENTES, com cerca de 1%
+    de erro, mas não guardam os números — não dá para listá-los nem
+    descobrir quem é quem. Para as escolas guarda-se, além disso, só
+    "escola -> último dia em que apareceu" e um contador de computadores por
+    escola (também HyperLogLog): o número do computador NUNCA fica ao lado
+    do nome da escola em forma que se possa listar.
   - Este código não grava o endereço de IP e não registra o número, o
     segredo nem conteúdo nenhum: o registro só diz o MOTIVO de uma recusa.
   - As contas são por dia (horário de Brasília), por versão e no total.
 
 VARIÁVEIS DE AMBIENTE (painel da Vercel):
   APP_TOKEN                            o mesmo da IA (ver api/ia.py);
+  PAINEL_TOKEN                         a senha que abre a lista de escolas
+                                       (só do mantenedor; sem ela a lista
+                                       fica fechada para todo mundo);
   KV_REST_API_URL, KV_REST_API_TOKEN   criadas sozinhas quando o Redis da
                                        Upstash é ligado ao projeto (também
                                        valem UPSTASH_REDIS_REST_URL e
@@ -35,17 +51,23 @@ import os
 import re
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 from http.server import BaseHTTPRequestHandler
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import _escolas  # noqa: E402  (cópia exata de escolas.py, na raiz do repositório)
 
 LIMITE_CORPO = 1_000  # bytes
 FUSO = datetime.timezone(datetime.timedelta(hours=-3))  # Brasília
 VALIDADE_EM_SEGUNDOS = 400 * 24 * 3600  # cada chave diária some depois de ~13 meses
+ESCOLAS_OFICIAIS = frozenset(_escolas.ESCOLAS_CRE_BLUMENAU)  # a ÚNICA lista de escolas que entra
 
 # [0-9], e não \d: \d aceitaria dígitos de outros alfabetos. fullmatch, e não
 # match com $: o $ aceitaria uma quebra de linha sobrando no fim.
 _RE_ID = re.compile(r"[0-9a-f]{32}")
 _RE_VERSAO = re.compile(r"[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}")
+_RE_DIA = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
 
 
 class ArmazenamentoIndisponivel(RuntimeError):
@@ -96,28 +118,61 @@ def _como_numero(versao: str) -> tuple:
     return tuple(int(parte) for parte in versao.split("."))
 
 
-def registrar(id_instalacao: str, versao: str, agora: datetime.datetime | None = None) -> None:
-    """Conta este computador hoje, na versão e no total. Repetir no mesmo dia não muda nada."""
+def registrar(
+    id_instalacao: str, versao: str, agora: datetime.datetime | None = None, escola: str = ""
+) -> None:
+    """
+    Conta este computador hoje, na versão e no total. Repetir no mesmo dia
+    não muda nada. Com `escola` (só vale um nome da lista oficial; qualquer
+    outra coisa é ignorada) conta também o computador naquela escola e
+    anota o dia em que a escola apareceu por último.
+    """
     dia = _datas(agora or _agora(), 1)[0]
     chave_do_dia = f"uso:dia:{dia}"
     chave_da_versao = f"uso:v:{versao}:{dia}"
-    _redis(
-        [
-            ["PFADD", chave_do_dia, id_instalacao],
-            ["EXPIRE", chave_do_dia, VALIDADE_EM_SEGUNDOS],
-            ["PFADD", chave_da_versao, id_instalacao],
-            ["EXPIRE", chave_da_versao, VALIDADE_EM_SEGUNDOS],
-            ["PFADD", "uso:todos", id_instalacao],
-            ["SADD", "uso:versoes", versao],
+    comandos = [
+        ["PFADD", chave_do_dia, id_instalacao],
+        ["EXPIRE", chave_do_dia, VALIDADE_EM_SEGUNDOS],
+        ["PFADD", chave_da_versao, id_instalacao],
+        ["EXPIRE", chave_da_versao, VALIDADE_EM_SEGUNDOS],
+        ["PFADD", "uso:todos", id_instalacao],
+        ["SADD", "uso:versoes", versao],
+    ]
+    if escola in ESCOLAS_OFICIAIS:
+        # O número do computador só entra no contador (HyperLogLog, que não
+        # dá para listar); o que fica legível é "escola -> último dia".
+        chave_da_escola = f"uso:escola:{escola}"
+        comandos += [
+            ["PFADD", chave_da_escola, id_instalacao],
+            ["EXPIRE", chave_da_escola, VALIDADE_EM_SEGUNDOS],
+            ["HSET", "uso:escolas", escola, dia],
         ]
-    )
+    _redis(comandos)
+
+
+def _escolas_vistas(resultado) -> dict:
+    """
+    {escola: último dia} a partir do HGETALL do Redis (que devolve campo,
+    valor, campo, valor...). Só passa nome da lista oficial com data no
+    formato certo: o que estiver estragado ou for de fora é jogado fora.
+    """
+    if isinstance(resultado, dict):
+        pares = list(resultado.items())
+    else:
+        itens = list(resultado or [])
+        pares = list(zip(itens[0::2], itens[1::2]))
+    return {
+        nome: dia
+        for nome, dia in pares
+        if isinstance(nome, str) and nome in ESCOLAS_OFICIAIS and isinstance(dia, str) and _RE_DIA.fullmatch(dia)
+    }
 
 
 def totais(agora: datetime.datetime | None = None) -> dict:
     """Quantos computadores usaram o programa: hoje, ontem, em 7 e 30 dias, no total e por versão."""
     agora = agora or _agora()
     dias = [f"uso:dia:{d}" for d in _datas(agora, 30)]
-    hoje, ontem, sete, trinta, desde_o_inicio, versoes = _redis(
+    hoje, ontem, sete, trinta, desde_o_inicio, versoes, escolas_bruto = _redis(
         [
             ["PFCOUNT", dias[0]],
             ["PFCOUNT", dias[1]],
@@ -125,8 +180,11 @@ def totais(agora: datetime.datetime | None = None) -> dict:
             ["PFCOUNT", *dias],
             ["PFCOUNT", "uso:todos"],
             ["SMEMBERS", "uso:versoes"],
+            ["HGETALL", "uso:escolas"],
         ]
     )
+    escolas_vistas = _escolas_vistas(escolas_bruto)
+    ultimos_30_dias = set(_datas(agora, 30))
     versoes = sorted(
         (v for v in (versoes or []) if isinstance(v, str) and _RE_VERSAO.fullmatch(v)),
         key=_como_numero,
@@ -145,7 +203,27 @@ def totais(agora: datetime.datetime | None = None) -> dict:
         "ultimos_30_dias": trinta,
         "desde_o_inicio": desde_o_inicio,
         "por_versao": por_versao,
+        # só os NÚMEROS: quais são as escolas, só com a senha do painel (detalhe_escolas)
+        "escolas_diferentes": len(escolas_vistas),
+        "escolas_ultimos_30_dias": sum(1 for dia in escolas_vistas.values() if dia in ultimos_30_dias),
         "aviso": "contagem aproximada de computadores (instalações), não de pessoas",
+    }
+
+
+def detalhe_escolas(agora: datetime.datetime | None = None) -> dict:
+    """As escolas que já apareceram, com o nº de computadores de cada uma e o último dia de uso. PRIVADO."""
+    agora = agora or _agora()
+    (bruto,) = _redis([["HGETALL", "uso:escolas"]])
+    vistas = _escolas_vistas(bruto)
+    nomes = sorted(vistas)
+    contagens = _redis([["PFCOUNT", f"uso:escola:{nome}"] for nome in nomes]) if nomes else []
+    return {
+        "atualizado_em": agora.astimezone(FUSO).strftime("%Y-%m-%d %H:%M"),
+        "escolas": [
+            {"escola": nome, "computadores": quantos, "ultimo_uso": vistas[nome]}
+            for nome, quantos in zip(nomes, contagens)
+        ],
+        "aviso": "computadores por escola são aproximados; um computador usado em duas escolas conta nas duas",
     }
 
 
@@ -175,8 +253,13 @@ def responder_aviso(corpo: bytes, token_recebido: str) -> tuple:
     if not valido:
         _registrar("recusado: pedido fora do combinado")
         return 400, {"erro": "Pedido mal formado."}
+    # A escola é opcional e só vale se for um nome da lista oficial; qualquer
+    # outra coisa (tipo errado, texto livre) é ignorada: o computador conta igual.
+    escola = dados.get("escola")
+    if not (isinstance(escola, str) and escola in ESCOLAS_OFICIAIS):
+        escola = ""
     try:
-        registrar(id_instalacao, versao)
+        registrar(id_instalacao, versao, escola=escola)
     except ArmazenamentoIndisponivel:
         _registrar("armazenamento indisponível")
         return 503, {"erro": "A contagem está indisponível agora."}
@@ -187,6 +270,28 @@ def responder_totais() -> tuple:
     """(status HTTP, dicionário JSON) para quem pede os totais."""
     try:
         return 200, totais()
+    except ArmazenamentoIndisponivel:
+        _registrar("armazenamento indisponível")
+        return 503, {"erro": "A contagem está indisponível agora."}
+
+
+def responder_detalhe(token_recebido: str) -> tuple:
+    """
+    (status HTTP, dicionário JSON) para a lista de escolas — só com a senha
+    do mantenedor (PAINEL_TOKEN). O segredo do programa (APP_TOKEN) NÃO abre
+    isto: ele viaja dentro do .exe e qualquer pessoa consegue extraí-lo. Sem
+    PAINEL_TOKEN configurado a lista fica fechada para todos (nem "vazio
+    igual a vazio" abre).
+    """
+    token = os.environ.get("PAINEL_TOKEN", "").strip()
+    if not token:
+        _registrar("painel sem PAINEL_TOKEN configurado")
+        return 503, {"erro": "O painel ainda não está configurado."}
+    if not hmac.compare_digest(token_recebido.encode("utf-8"), token.encode("utf-8")):
+        _registrar("recusado: senha do painel errada")
+        return 401, {"erro": "Senha do painel não reconhecida."}
+    try:
+        return 200, detalhe_escolas()
     except ArmazenamentoIndisponivel:
         _registrar("armazenamento indisponível")
         return 503, {"erro": "A contagem está indisponível agora."}
@@ -216,6 +321,15 @@ class handler(BaseHTTPRequestHandler):  # nome exigido pela Vercel
         self._enviar(status, dados)
 
     def do_GET(self):  # noqa: N802
+        consulta = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query, keep_blank_values=True)
+        if "detalhe" in consulta:
+            # a lista de escolas: com a senha do painel, nunca em cache público
+            if consulta["detalhe"] == ["escolas"]:
+                status, dados = responder_detalhe(self.headers.get("x-painel-token", ""))
+            else:
+                status, dados = 400, {"erro": "Consulta não reconhecida."}
+            self._enviar(status, dados)
+            return
         status, dados = responder_totais()
         self._enviar(status, dados, publico=True)
 

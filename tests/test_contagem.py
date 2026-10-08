@@ -8,6 +8,7 @@ internet: o servidor da escola é de mentira e a pasta de dados é temporária.
 
 from __future__ import annotations
 
+import ast
 import datetime
 import json
 import os
@@ -26,6 +27,8 @@ import contagem  # noqa: E402
 
 PEDIDOS: list = []
 RESPOSTA = {"status": 200}
+ESCOLA = "EEB PEDRO II"  # da lista oficial (escolas.py)
+OUTRA_ESCOLA = "EEB SANTOS DUMONT"
 
 
 class _ServidorDeMentira(BaseHTTPRequestHandler):
@@ -118,6 +121,71 @@ class Envio(_Base):
         self.assertEqual(contagem._endereco_do_aviso("http://127.0.0.1:8787/api/ia"), "http://127.0.0.1:8787/api/uso")
 
 
+class Escola(_Base):
+    """A escola do cadastro vai junto, mas SÓ se for um nome da lista oficial."""
+
+    def dados(self, i: int = -1) -> dict:
+        return json.loads(PEDIDOS[i]["corpo"].decode("utf-8"))
+
+    def test_escola_da_lista_oficial_vai_junto(self):
+        self.assertTrue(contagem.registrar_uso(self.config, self.dia, ESCOLA))
+        dados = self.dados()
+        self.assertEqual(set(dados), {"id", "versao", "escola"})
+        self.assertEqual(dados["escola"], ESCOLA)
+
+    def test_escola_fora_da_lista_nao_sai_do_computador(self):
+        # texto livre, outra grafia, o aviso da tela de cadastro, tipo errado: nada disso é enviado
+        for estranha in ("EEB QUALQUER", "fulana da silva", "eeb pedro ii", ESCOLA + " ", "Selecione uma escola", "", None, 5):
+            PEDIDOS.clear()
+            self.arquivo("ultima_contagem.txt").unlink(missing_ok=True)
+            self.assertTrue(contagem.registrar_uso(self.config, self.dia, estranha), repr(estranha))
+            self.assertEqual(set(self.dados()), {"id", "versao"}, repr(estranha))
+
+    def test_sem_escola_o_pedido_e_o_de_antes(self):
+        contagem.registrar_uso(self.config, self.dia)
+        self.assertEqual(set(self.dados()), {"id", "versao"})
+
+    def test_no_maximo_uma_vez_por_dia_por_escola(self):
+        self.assertTrue(contagem.registrar_uso(self.config, self.dia, ESCOLA))
+        self.assertFalse(contagem.registrar_uso(self.config, self.dia, ESCOLA))
+        self.assertEqual(len(PEDIDOS), 1)
+        self.assertTrue(contagem.registrar_uso(self.config, self.dia + datetime.timedelta(days=1), ESCOLA))
+
+    def test_trocar_de_escola_no_mesmo_dia_avisa_de_novo(self):
+        # o notebook de quem atende em duas escolas conta nas duas
+        self.assertTrue(contagem.registrar_uso(self.config, self.dia, ESCOLA))
+        self.assertTrue(contagem.registrar_uso(self.config, self.dia, OUTRA_ESCOLA))
+        self.assertFalse(contagem.registrar_uso(self.config, self.dia, OUTRA_ESCOLA))
+        self.assertEqual([self.dados(i)["escola"] for i in range(2)], [ESCOLA, OUTRA_ESCOLA])
+
+    def test_marcador_do_formato_antigo_nao_impede_o_primeiro_aviso_com_escola(self):
+        # quem já avisou hoje com a versão que não mandava escola (arquivo só com o dia)
+        self.arquivo("ultima_contagem.txt").write_text(self.dia.isoformat(), encoding="utf-8")
+        self.assertTrue(contagem.registrar_uso(self.config, self.dia, ESCOLA))
+
+    def test_marcador_do_formato_antigo_sem_escola_nao_repete_o_aviso(self):
+        self.arquivo("ultima_contagem.txt").write_text(self.dia.isoformat(), encoding="utf-8")
+        self.assertFalse(contagem.registrar_uso(self.config, self.dia))
+        self.assertEqual(PEDIDOS, [])
+
+    def test_falha_do_servidor_nao_marca_o_dia(self):
+        RESPOSTA["status"] = 500
+        self.assertFalse(contagem.registrar_uso(self.config, self.dia, ESCOLA))
+        self.assertFalse(self.arquivo("ultima_contagem.txt").exists())
+        RESPOSTA["status"] = 200
+        self.assertTrue(contagem.registrar_uso(self.config, self.dia, ESCOLA))
+
+    def test_computador_do_mantenedor_nao_manda_escola_nenhuma(self):
+        self.arquivo("modo_teste.txt").write_text("teste", encoding="utf-8")
+        self.assertFalse(contagem.registrar_uso(self.config, self.dia, ESCOLA))
+        self.assertEqual(PEDIDOS, [])
+
+    def test_nunca_levanta_erro_mesmo_sem_a_lista_de_escolas(self):
+        with mock.patch.dict(sys.modules, {"escolas": None}):  # o import da lista falha
+            self.assertTrue(contagem.registrar_uso(self.config, self.dia, ESCOLA))
+        self.assertEqual(set(self.dados()), {"id", "versao"})  # sem poder conferir a lista, a escola não vai
+
+
 class QuemFicaDeFora(_Base):
     def test_computador_do_mantenedor_nao_conta_nem_cria_arquivo(self):
         self.arquivo("modo_teste.txt").write_text("teste", encoding="utf-8")
@@ -161,15 +229,29 @@ class Falhas(_Base):
 
 
 class LigacaoComOPrograma(unittest.TestCase):
+    def setUp(self):
+        self.fonte = (RAIZ / "app.py").read_text(encoding="utf-8")
+
     def test_app_chama_a_contagem_em_segundo_plano(self):
-        fonte = (RAIZ / "app.py").read_text(encoding="utf-8")
         for trecho in (
             "import contagem",
-            "contagem.registrar_uso(assistente_ia.configuracao_do_servidor())",
             "threading.Thread(target=self._contar_uso, daemon=True).start()",
         ):
             # assertTrue, e não assertIn: se falhar, assertIn despejaria o app.py inteiro na tela
-            self.assertTrue(trecho in fonte, f"app.py não tem: {trecho}")
+            self.assertTrue(trecho in self.fonte, f"app.py não tem: {trecho}")
+
+    def test_app_entrega_a_escola_do_cadastro_a_contagem(self):
+        chamadas = [
+            no
+            for no in ast.walk(ast.parse(self.fonte))
+            if isinstance(no, ast.Call) and isinstance(no.func, ast.Attribute) and no.func.attr == "registrar_uso"
+        ]
+        self.assertEqual(len(chamadas), 1, "o app deve chamar contagem.registrar_uso uma vez só")
+        chamada = chamadas[0]
+        self.assertEqual(ast.get_source_segment(self.fonte, chamada.args[0]), "assistente_ia.configuracao_do_servidor()")
+        palavras = {k.arg: ast.get_source_segment(self.fonte, k.value) for k in chamada.keywords}
+        # a escola ESCOLHIDA no cadastro (a mesma que vai para a SED), e nada mais
+        self.assertEqual(palavras, {"escola": 'self.orientador.get("escola", "")'})
 
 
 if __name__ == "__main__":

@@ -10,6 +10,10 @@ seção `## <número>` com o que mudou. O resto acontece sozinho.
 
 ---
 
+## 2.3.0
+
+- Ajustes internos de funcionamento. Nada muda no uso do programa.
+
 ## 2.2.0
 
 - **Novo: "Escrever com IA..." também na "Breve descrição".** Nos registros

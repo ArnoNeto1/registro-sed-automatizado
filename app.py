@@ -1109,9 +1109,9 @@ class Janela(tk.Tk):
         # porque uma internet lenta não pode segurar a janela fechada.
         threading.Thread(target=self._procurar_atualizacao, daemon=True).start()
 
-        # Contagem anônima de computadores que usam o programa (ver contagem.py):
-        # em segundo plano, no máximo uma vez por dia, sem interface e sem nunca
-        # atrapalhar a abertura.
+        # Contagem de computadores e de escolas que usam o programa (ver
+        # contagem.py): em segundo plano, no máximo uma vez por dia, sem
+        # interface e sem nunca atrapalhar a abertura.
         threading.Thread(target=self._contar_uso, daemon=True).start()
 
         # Antes de qualquer coisa: os dados obrigatórios estão
@@ -2284,7 +2284,12 @@ class Janela(tk.Tk):
 
     def _contar_uso(self) -> None:
         try:
-            contagem.registrar_uso(assistente_ia.configuracao_do_servidor())
+            # a escola é a ESCOLHIDA no cadastro (a mesma que vai para a SED); a
+            # contagem só a envia se for um nome da lista oficial (ver contagem.py)
+            contagem.registrar_uso(
+                assistente_ia.configuracao_do_servidor(),
+                escola=self.orientador.get("escola", ""),
+            )
         except Exception:  # noqa: BLE001 - contar nunca pode atrapalhar
             pass
 

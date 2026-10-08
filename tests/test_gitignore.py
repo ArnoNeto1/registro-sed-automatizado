@@ -29,6 +29,7 @@ PROTEGIDOS = (
     "id_instalacao.txt",
     "ultima_contagem.txt",
     "modo_teste.txt",
+    "painel_token.txt",
 )
 
 
