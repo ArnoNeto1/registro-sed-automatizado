@@ -1,8 +1,8 @@
 {
-  "versao": "2.2.0",
-  "exe": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v2.2.0/Registro-SED.exe",
-  "sha256": "6e55421cd858c3a7f3c3a819493e43577183fc35f195fed522c38fc6e589ffe4",
-  "instalador": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v2.2.0/Registro-SED-Instalador.exe",
+  "versao": "2.3.0",
+  "exe": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v2.3.0/Registro-SED.exe",
+  "sha256": "d95f168a29389f6c2181a2c0af89384d93e9d5f1a793d23a08278b562ab97957",
+  "instalador": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v2.3.0/Registro-SED-Instalador.exe",
   "zip": "https://github.com/ArnoNeto1/registro-sed-automatizado/archive/refs/heads/main.zip",
-  "notas": "- **Novo: \"Escrever com IA...\" também na \"Breve descrição\".** Nos registros\n  de **Suporte a outros espaços**, **Manutenção de equipamentos** e\n  **Formação/Reunião**, o campo da breve descrição ganhou o mesmo botão que\n  já existe no \"Conteúdo aplicado\". Você conta do seu jeito o que foi feito\n  e a IA escreve a descrição em uma frase, no estilo do formulário da SED,\n  usando o que você marcou na tela (o tipo de atendimento, os itens da\n  manutenção ou quem organizou o encontro). Dá para pedir \"outro texto\" ou\n  correções, e o texto só entra no campo quando você clica em \"Usar este\n  texto\".\n- **Atenção com o que você escreve ali.** Vale o mesmo aviso de antes: a\n  conversa é enviada à Google. Não digite nomes de estudantes, de colegas ou\n  de outras pessoas, nem outros dados pessoais — o programa barra CPF,\n  e-mail e telefone."
+  "notas": "- Ajustes internos de funcionamento. Nada muda no uso do programa."
 }
