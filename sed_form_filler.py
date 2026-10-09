@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import re
 
+import conferir_escola
 from config import (
     ESCOLA,
     ETAPA_AEE,
@@ -34,6 +35,7 @@ from config import (
     ORIENTADOR_TIPO,
     REGIONAL,
     SED_FORM_URL,
+    SENHAS_SALVAS,
     resolver_componente,
 )
 
@@ -737,6 +739,29 @@ def _marcar_enviar_por_email(page) -> None:
     )
 
 
+def _escolher_escola(page, escola: str) -> None:
+    """
+    Escolhe a escola na página 2 do formulário.
+
+    O menu só aceita o texto EXATO da lista da SED. Se a escola salva no
+    cadastro difere só na grafia ("EEB Profº João Widemann"), usa-se o nome
+    da lista — é a mesma escola, sem risco. Se não existe na lista, ainda se
+    TENTA do jeito que veio (a lista do programa pode estar atrasada em
+    relação ao formulário), mas, se falhar, o erro explica o que está errado
+    e o que fazer, em vez do genérico "não consegui confirmar a seleção".
+    """
+    conferencia = conferir_escola.conferir(escola)
+    if conferencia.situacao == "so_grafia":
+        escola = conferencia.escola
+    try:
+        _select_google_dropdown(page, "Selecione a sua Escola", escola)
+    except RuntimeError:
+        if conferencia.situacao in ("sugerida", "desconhecida"):
+            # quem usa o .env (SENHAS_SALVAS) não tem o botão "Meus dados": a instrução é outra
+            raise RuntimeError(conferir_escola.explicar(escola, conferencia, no_env=SENHAS_SALVAS)) from None
+        raise
+
+
 def preencher_dados_fixos(
     page, orientador_nome: str = "", orientador_tipo: str = "", escola: str = ""
 ) -> None:
@@ -816,7 +841,7 @@ def preencher_dados_fixos(
     _avancar(page, proxima_pagina="Selecione a sua Escola")
 
     # Página 2 — Escola
-    _select_google_dropdown(page, "Selecione a sua Escola", esc)
+    _escolher_escola(page, esc)
     _avancar(page, proxima_pagina="Atividade/Aula com estudantes")
 
 

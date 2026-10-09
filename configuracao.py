@@ -41,6 +41,7 @@ import re
 import tkinter as tk
 from tkinter import messagebox, ttk
 
+import conferir_escola
 import tema
 from caminhos import caminho_de_dados
 
@@ -88,6 +89,25 @@ def carregar() -> dict:
 def salvar(dados: dict) -> None:
     with open(caminho_de_dados(ARQUIVO), "w", encoding="utf-8") as f:
         json.dump(dados, f, ensure_ascii=False, indent=2)
+
+
+def corrigir_escola_salva(antiga: str, nova: str) -> bool:
+    """
+    Troca a escola `antiga` pela `nova` no configuracao.json (ver
+    conferir_escola.corrigir_escola). Devolve True se gravou.
+
+    NUNCA grava quando não há o que corrigir nem quando a leitura vem vazia:
+    carregar() devolve {} se a leitura FALHAR (arquivo preso por outro
+    programa, JSON cortado...), e gravar esse {} por cima apagaria o cadastro
+    inteiro (professores, CPFs, turnos). Esta função roda sozinha, na abertura
+    do programa, então não pode correr esse risco.
+    """
+    dados = carregar()
+    novo = conferir_escola.corrigir_escola(dados, antiga, nova)
+    if not dados or novo == dados:
+        return False
+    salvar(novo)
+    return True
 
 
 # Paleta atual (Claro/Escuro/Igual ao sistema — escolhido em "Meus
@@ -388,13 +408,24 @@ class TelaDeCadastro(_Dialogo):
             valor_salvo = (
                 escolas_do_professor[indice] if len(escolas_do_professor) > indice else ""
             )
+            # O que vai para o campo nunca é um valor que a lista da SED não
+            # tenha. Nas versões 1.3 a 1.5 a escola dava para DIGITAR, e o que
+            # foi digitado ("EEE Profº João Widemann") ficou salvo: reposto
+            # aqui, era gravado de novo ao salvar, e o formulário da SED não
+            # o aceitava. Só a grafia diferente entra já corrigida; o resto
+            # fica em branco, com aviso, para a pessoa escolher. Os turnos
+            # continuam sendo buscados pelo valor ORIGINAL (valor_salvo), para
+            # ela não perder o que já tinha marcado.
+            valor_na_tela, aviso_da_escola = conferir_escola.escola_para_mostrar(
+                valor_salvo, escolas_conhecidas()
+            )
             # Só a Escola 1 (obrigatória) ganha o texto de aviso — 2 e 3
             # são opcionais, e em branco já deixa isso claro sozinho. Cor
             # de aviso (igual à do texto de ajuda) enquanto for só o
             # aviso; some sozinha assim que escolher uma escola de
             # verdade da lista.
-            if valor_salvo or numero != 1:
-                combo.set(valor_salvo)
+            if valor_na_tela or numero != 1:
+                combo.set(valor_na_tela)
             else:
                 combo.set(PLACEHOLDER_ESCOLA)
                 combo.configure(style="Placeholder.TCombobox")
@@ -406,10 +437,20 @@ class TelaDeCadastro(_Dialogo):
             self.combos_escola.append(combo)
             linha += 1
             if numero == 1:
+                # O aviso toma o LUGAR do texto de ajuda (que ele já repete: "escolha na
+                # lista"), em vez de ganhar uma linha própria: a tela não rola, e uma linha
+                # a mais empurrava o botão Salvar para fora de um monitor de 768 px de altura.
                 ttk.Label(
                     cartao,
-                    text="Escolha na lista — é o nome exato que a SED usa no formulário",
-                    style="Suave.TLabel",
+                    text=aviso_da_escola or "Escolha na lista — é o nome exato que a SED usa no formulário",
+                    style="Aviso.TLabel" if aviso_da_escola else "Suave.TLabel",
+                    wraplength=500,
+                    justify="left",
+                ).grid(row=linha, column=1, sticky="w", padx=(10, 0), pady=(0, 6))
+                linha += 1
+            elif aviso_da_escola:
+                ttk.Label(
+                    cartao, text=aviso_da_escola, style="Aviso.TLabel", wraplength=500, justify="left"
                 ).grid(row=linha, column=1, sticky="w", padx=(10, 0), pady=(0, 6))
                 linha += 1
 

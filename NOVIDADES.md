@@ -10,6 +10,24 @@ seção `## <número>` com o que mudou. O resto acontece sozinho.
 
 ---
 
+## 2.3.1
+
+- **Corrigido o erro "Não consegui confirmar a seleção de ... no menu
+  'Selecione a sua Escola'".** Quem cadastrou a escola digitando o nome em
+  uma versão antiga (por exemplo "EEE Profº João Widemann", em vez de
+  "EEB PROF JOAO WIDEMANN") ficava com o nome gravado do jeito errado, e o
+  formulário da SED não o aceitava. Agora o programa confere a escola do
+  seu cadastro assim que abre:
+  - se só a escrita difere (maiúsculas, acento, "Profº"), ele acerta
+    sozinho, sem incomodar;
+  - se o nome parece ser de outra escola da lista, ele **pergunta** antes
+    de trocar e só troca se você disser que sim;
+  - se não achar nada parecido, explica o que fazer: abrir "Meus dados" e
+    escolher a escola na lista.
+- A tela "Meus dados" deixou de guardar de novo um nome de escola que a SED
+  não conhece: ela mostra um aviso e deixa o campo em branco para você
+  escolher a escola certa na lista.
+
 ## 2.3.0
 
 - Ajustes internos de funcionamento. Nada muda no uso do programa.

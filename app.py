@@ -107,6 +107,7 @@ from config import (  # noqa: E402
     turno_do_horario,
 )
 import assistente_ia  # noqa: E402
+import conferir_escola  # noqa: E402
 import configuracao  # noqa: E402
 import contagem  # noqa: E402
 import tema  # noqa: E402
@@ -2440,6 +2441,7 @@ class Janela(tk.Tk):
             )
         faltando = configuracao_incompleta()
         if not faltando:
+            self._conferir_escola_do_cadastro()
             return
         lista = "\n".join(f"   • {item}" for item in faltando)
         pasta_env = str(pasta_de_dados())
@@ -2460,6 +2462,62 @@ class Janela(tk.Tk):
             "preencha esses campos, salve e abra o programa de novo.\n\n"
             "Sem isso, o registro iria para a SED com os dados errados.",
         )
+
+    def _conferir_escola_do_cadastro(self) -> None:
+        """
+        Confere, ao abrir, se a escola do cadastro existe na lista da SED (ver
+        conferir_escola.py). O formulário só aceita o texto EXATO da lista, e
+        nas versões 1.3 a 1.5 a escola dava para DIGITAR: quem digitou
+        ("EEE Profº João Widemann") ficou com um valor que nunca batia, e só
+        descobria isso depois de o navegador abrir, com um erro técnico.
+
+        Só a grafia diferente (maiúsculas, acento, "Profº") é corrigida sozinha:
+        é a mesma escola. Com sugestão ("EEE" no lugar de "EEB") PERGUNTA antes
+        de trocar — o registro iria para a escola errada na SED se o palpite
+        estivesse errado. Sem sugestão, só explica o que fazer.
+        """
+        escola = self.orientador.get("escola") or ""
+        conferencia = conferir_escola.conferir(escola)
+        if conferencia.situacao in ("certa", "vazia"):
+            return
+        if conferencia.situacao == "so_grafia":
+            self._guardar_escola_corrigida(escola, conferencia.escola)
+            return
+        sugestoes = conferencia.sugestoes
+        if len(sugestoes) == 1 and not SENHAS_SALVAS:
+            pergunta = (
+                conferir_escola.diagnostico(escola, conferencia)
+                + f'\n\nQuer trocar agora para "{sugestoes[0]}"?\n\n'
+                "Sim: o programa corrige o cadastro e fecha. Depois, é só abrir pelo atalho de sempre.\n"
+                'Não: você escolhe a escola em "Meus dados".'
+            )
+            if messagebox.askyesno("Escola do cadastro", pergunta):
+                self._guardar_escola_corrigida(escola, sugestoes[0])
+                # como em _editar_cadastro: no .exe o programa só FECHA (ver _reabrir_e_sair),
+                # então o texto manda abrir de novo na mão em vez de prometer que reabre
+                messagebox.showinfo(
+                    "Escola corrigida",
+                    "Pronto. Feche o programa e abra de novo pelo atalho de sempre para a escola nova valer.",
+                )
+                self._fechar()
+                _reabrir_e_sair()
+                return
+        else:
+            messagebox.showwarning(
+                "Escola do cadastro", conferir_escola.explicar(escola, conferencia, no_env=SENHAS_SALVAS)
+            )
+        onde = "a linha ESCOLA= do .env" if SENHAS_SALVAS else '"Meus dados"'
+        self._definir_status(f"A escola do cadastro não está na lista da SED — corrija em {onde}.")
+
+    def _guardar_escola_corrigida(self, antiga: str, nova: str) -> None:
+        """Passa a valer a escola certa agora e, na configuração pela tela, deixa-a gravada no cadastro."""
+        self.orientador["escola"] = nova
+        if SENHAS_SALVAS:
+            return  # formato antigo: a escola mora no .env, que o programa não reescreve
+        try:
+            configuracao.corrigir_escola_salva(antiga, nova)
+        except OSError:
+            pass  # sem poder gravar, vale só nesta sessão; a conferência avisa de novo na próxima abertura
 
     def _piscar_sugerida(self) -> None:
         """
