@@ -1,8 +1,8 @@
 {
-  "versao": "2.3.0",
-  "exe": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v2.3.0/Registro-SED.exe",
-  "sha256": "d95f168a29389f6c2181a2c0af89384d93e9d5f1a793d23a08278b562ab97957",
-  "instalador": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v2.3.0/Registro-SED-Instalador.exe",
+  "versao": "2.3.1",
+  "exe": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v2.3.1/Registro-SED.exe",
+  "sha256": "228ee2a0f5173bc72ee736e0f5f1e41c9513a191b8f3c05f9de4477d88e3a7f9",
+  "instalador": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v2.3.1/Registro-SED-Instalador.exe",
   "zip": "https://github.com/ArnoNeto1/registro-sed-automatizado/archive/refs/heads/main.zip",
-  "notas": "- Ajustes internos de funcionamento. Nada muda no uso do programa."
+  "notas": "- **Corrigido o erro \"Não consegui confirmar a seleção de ... no menu\n  'Selecione a sua Escola'\".** Quem cadastrou a escola digitando o nome em\n  uma versão antiga (por exemplo \"EEE Profº João Widemann\", em vez de\n  \"EEB PROF JOAO WIDEMANN\") ficava com o nome gravado do jeito errado, e o\n  formulário da SED não o aceitava. Agora o programa confere a escola do\n  seu cadastro assim que abre:\n  - se só a escrita difere (maiúsculas, acento, \"Profº\"), ele acerta\n    sozinho, sem incomodar;\n  - se o nome parece ser de outra escola da lista, ele **pergunta** antes\n    de trocar e só troca se você disser que sim;\n  - se não achar nada parecido, explica o que fazer: abrir \"Meus dados\" e\n    escolher a escola na lista.\n- A tela \"Meus dados\" deixou de guardar de novo um nome de escola que a SED\n  não conhece: ela mostra um aviso e deixa o campo em branco para você\n  escolher a escola certa na lista."
 }
