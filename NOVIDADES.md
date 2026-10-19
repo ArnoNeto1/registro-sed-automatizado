@@ -10,6 +10,17 @@ seção `## <número>` com o que mudou. O resto acontece sozinho.
 
 ---
 
+## 2.3.2
+
+- **Escolas com mais de um laboratório.** Antes, o programa só trazia as
+  aulas do laboratório principal da agenda do NTE. Agora ele também traz as
+  aulas dos outros laboratórios de tecnologia da escola (por exemplo
+  "Lab. Maker" ou "Laboratório de Informática 02"). Elas aparecem na mesma
+  aba "Laboratório", com o nome da sala ao lado da turma, para você saber
+  de qual laboratório é cada aula.
+- Salas que não são do laboratório, como Auditório e Biblioteca, continuam
+  de fora.
+
 ## 2.3.1
 
 - **Corrigido o erro "Não consegui confirmar a seleção de ... no menu

@@ -2898,6 +2898,14 @@ class Janela(tk.Tk):
             else:
                 situacao, tags = "● Pendente", ("pendente",)
             dia = dt.date.fromisoformat(g.data).strftime("%d/%m")
+            # Escola com mais de um laboratório: as aulas do(s) outro(s)
+            # caem nesta mesma aba (ver e_outro_laboratorio_tec), e o nome
+            # da sala junto da turma diz de qual laboratório é cada uma.
+            # Na coluna da turma porque é a larga — a de horário tem a
+            # largura exata do texto dela.
+            turma = g.turma
+            if g.recurso != "Lab. Tecs" and _categoria_da_atividade(g) == "Laboratório":
+                turma = f"{g.turma}  · {g.recurso}"
             self.tabela.insert(
                 "",
                 "end",
@@ -2906,7 +2914,7 @@ class Janela(tk.Tk):
                     f"{dia}  {g.inicio}-{g.fim}",
                     g.professor.title(),
                     g.disciplina,
-                    g.turma,
+                    turma,
                     situacao,
                 ),
                 tags=tags,

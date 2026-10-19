@@ -368,13 +368,53 @@ def categoria_do_recurso(nome: str) -> str | None:
     return None
 
 
+# Escola com MAIS DE UM laboratório de Tecnologias Educacionais — relatado
+# por um professor: a agenda padrão do site é um laboratório só, e o
+# segundo nunca era lido (não bate com nenhuma palavra de
+# _CATEGORIAS_RECURSO_RELEVANTE). Como cada escola dá o nome que quiser
+# ("Lab. Tecs 2", "Laboratório Maker", "Sala de Informática"...),
+# reconhece pela PALAVRA, como os outros recursos. As aulas desses
+# laboratórios caem na aba "Laboratório" de sempre (categoria_do_recurso
+# devolve None para eles), com o nome da sala na linha da tabela.
+# "tecs"/"tecnolog" e não só "tec": "bibliotECa" também tem "tec".
+# "ste" só como palavra inteira (sigla de Sala de Tecnologia Educacional).
+_PALAVRAS_LABORATORIO_TEC = ("lab", "tecs", "tecnolog", "maker", "inform", "robot", r"ste\b")
+
+# ...mas laboratório de outra área não é trabalho do orientador de Tec.
+# Educ./Maker — puxar essas reservas juntaria aula de quem nada tem a ver
+# com o laboratório dele.
+_PALAVRAS_LABORATORIO_OUTRA_AREA = ("cienc", "quimic", "fisic", "biolog", "matemat")
+
+
+def e_outro_laboratorio_tec(nome: str) -> bool:
+    """Este recurso do menu parece um laboratório de Tecnologias
+    Educacionais (além do lido como padrão)?"""
+    chave = chave_comparacao(nome)
+    if categoria_do_recurso(nome):
+        return False  # projetor/tablet: já tem aba própria
+    if any(p in chave for p in _PALAVRAS_LABORATORIO_OUTRA_AREA):
+        return False
+    # Só no COMEÇO de uma palavra: "colaborativo" tem "lab" no meio.
+    return any(re.search(r"\b" + p, chave) for p in _PALAVRAS_LABORATORIO_TEC)
+
+
+def _assinatura(agendamentos: list[Agendamento]) -> set:
+    """O que identifica uma semana lida, para reconhecer a MESMA agenda
+    lida duas vezes (ver scrape_semana_completa)."""
+    return {
+        (a.data, a.inicio, a.fim, a.professor, a.disciplina, a.turma, a.turno)
+        for a in agendamentos
+    }
+
+
 def descobrir_outros_recursos(page) -> list[tuple[str, str, str]]:
     """
     Lê o menu "Agenda: ..." da página atual e devolve os recursos
     reserváveis desta escola que valem a pena ler além do laboratório —
-    já filtrados pelo nome (ver categoria_do_recurso). O Lab. Tecs em si
-    nunca aparece aqui: não bate com nenhuma palavra da lista, porque já
-    é lido à parte por quem chama esta função.
+    já filtrados pelo nome (ver categoria_do_recurso e
+    e_outro_laboratorio_tec). O laboratório padrão também pode aparecer
+    aqui (o nome dele bate com "lab") — quem chama esta função reconhece
+    e descarta a repetição.
 
     Devolve lista de (nome, id_da_agenda, categoria) — vazia se a escola
     não tiver nenhum recurso reconhecido (o caso mais comum).
@@ -394,6 +434,8 @@ def descobrir_outros_recursos(page) -> list[tuple[str, str, str]]:
             categoria = categoria_do_recurso(texto)
             if categoria:
                 encontrados.append((texto, m.group(1), categoria))
+            elif e_outro_laboratorio_tec(texto):
+                encontrados.append((texto, m.group(1), "Laboratório"))
     except Exception:
         pass
     return encontrados
@@ -407,13 +449,22 @@ def scrape_semana_completa(page, monday: dt.date, turnos: list[str] | None = Non
     página, já que cada escola tem os seus (às vezes nenhum extra).
     """
     todos = scrape_week(page, monday, turnos, nome_recurso="Lab. Tecs")
+    assinatura_padrao = _assinatura(todos)
     try:
         extras = descobrir_outros_recursos(page)
     except Exception:
         extras = []
-    for nome, agenda_id, _categoria in extras:
+    for nome, agenda_id, categoria in extras:
         try:
-            todos.extend(scrape_week(page, monday, turnos, agenda_id=agenda_id, nome_recurso=nome))
+            lidos = scrape_week(page, monday, turnos, agenda_id=agenda_id, nome_recurso=nome)
+            # O próprio laboratório padrão também aparece no menu, com o
+            # número dele — e não dá para saber qual é pelo nome (cada
+            # escola chama do seu jeito). Uma agenda de laboratório com
+            # exatamente as mesmas reservas da padrão é ela mesma: lida de
+            # novo, duplicaria todas as aulas na tabela.
+            if categoria == "Laboratório" and _assinatura(lidos) == assinatura_padrao:
+                continue
+            todos.extend(lidos)
         except Exception:
             # Um recurso extra falhando (site fora do ar bem naquela hora,
             # nome mudou) não pode derrubar a leitura do laboratório, que
