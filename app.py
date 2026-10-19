@@ -156,6 +156,33 @@ def _categoria_da_atividade(g) -> str:
 
 CATEGORIAS_RECURSO_EM_ORDEM = ("Laboratório", "Tablets/Celular", "Projetores")
 
+
+def _e_laboratorio_maker(nome: str) -> bool:
+    return "maker" in nome.lower()
+
+
+def so_laboratorios_do_orientador(grupos, tipo: str) -> list:
+    """
+    Escola com mais de um laboratório, cada um com o seu orientador: quem
+    é de Tecnologias Educacionais não vê as aulas do Lab. Maker, e quem é
+    do Laboratório Maker só vê as do Maker. A escolha é a que o professor
+    já faz em "Meus dados" ("Você é orientador de:"), a mesma que vai no
+    formulário da SED.
+
+    Só mexe na aba Laboratório (Projetores/Tablets ficam). Se a agenda não
+    tiver NENHUM laboratório do tipo dele (escola sem Lab. Maker, por
+    exemplo), mostra todos — esconder tudo pareceria agenda vazia.
+    """
+    quer_maker = tipo == "maker"
+
+    def e_lab(g):
+        return _categoria_da_atividade(g) == "Laboratório"
+
+    if not any(e_lab(g) and _e_laboratorio_maker(g.recurso) == quer_maker for g in grupos):
+        return list(grupos)
+    return [g for g in grupos if not e_lab(g) or _e_laboratorio_maker(g.recurso) == quer_maker]
+
+
 # Três abas que NÃO vêm de agendamento nenhum — "Suporte a outros
 # espaços", "Manutenção de equipamentos" e "Formação/Reunião" no
 # formulário da SED não têm hora marcada na agenda do NTE, então ficam
@@ -4318,7 +4345,11 @@ class Janela(tk.Tk):
         if tipo == "status":
             self._definir_status(evento[1])
         elif tipo == "aulas":
-            self.grupos = evento[1]
+            # Filtrado já na chegada (ver so_laboratorios_do_orientador):
+            # sugestão, avisos e tabela nascem só com o laboratório dele.
+            self.grupos = so_laboratorios_do_orientador(
+                evento[1], self.orientador.get("tipo", "tecnologias")
+            )
             quieto = bool(evento[2]) if len(evento) > 2 else False
             self.enviados = carregar_enviados()
             # Aulas que já começaram há mais tempo que a janela de

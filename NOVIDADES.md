@@ -10,6 +10,17 @@ seção `## <número>` com o que mudou. O resto acontece sozinho.
 
 ---
 
+## 2.3.3
+
+- **Cada orientador vê só o seu laboratório.** Na escola que tem Lab. Tecs
+  e Lab. Maker, o programa agora segue o que você marcou em "Meus dados",
+  na pergunta "Você é orientador de:":
+  - **Tecnologias Educacionais:** aparecem as aulas dos laboratórios de
+    tecnologia, sem as do Lab. Maker;
+  - **Laboratório Maker:** aparecem só as aulas do Lab. Maker.
+- Se a sua escola não tiver laboratório do tipo que você marcou, nada muda:
+  a lista continua mostrando todas as aulas do laboratório.
+
 ## 2.3.2
 
 - **Escolas com mais de um laboratório.** Antes, o programa só trazia as

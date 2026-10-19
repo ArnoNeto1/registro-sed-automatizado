@@ -136,5 +136,49 @@ class LerSemanaComDoisLaboratorios(unittest.TestCase):
         self.assertEqual(len(lidas), 2)
 
 
+class LaboratorioDoOrientador(unittest.TestCase):
+    """Na escola com Lab. Tecs e Lab. Maker, cada orientador vê só o seu,
+    conforme "Você é orientador de:" em "Meus dados" (app.py). Testa a
+    função pura, sem abrir janela."""
+
+    @classmethod
+    def setUpClass(cls):
+        try:
+            import app
+        except Exception as e:  # sem tkinter/dotenv nesta máquina
+            raise unittest.SkipTest(f"app.py não importa aqui: {e}")
+        cls.app = app
+
+    def _grupos(self, *salas):
+        from agenda_scraper import filtrar_e_agrupar
+        aulas = [_aula(f"PROF{i}", f"{7 + i:02d}:15", sala) for i, sala in enumerate(salas)]
+        return filtrar_e_agrupar(aulas)
+
+    def _ve(self, tipo, *salas):
+        grupos = self._grupos(*salas)
+        return sorted(g.recurso for g in self.app.so_laboratorios_do_orientador(grupos, tipo))
+
+    def test_tecnologias_nao_ve_o_maker(self):
+        self.assertEqual(
+            self._ve("tecnologias", "Lab. Tecs", "Lab. Maker", "Laboratório de Informática 02", "Tablets"),
+            ["Lab. Tecs", "Laboratório de Informática 02", "Tablets"],
+        )
+
+    def test_maker_so_ve_o_maker(self):
+        self.assertEqual(
+            self._ve("maker", "Lab. Tecs", "Lab. Maker", "Laboratório de Informática 02", "Tablets"),
+            ["Lab. Maker", "Tablets"],
+        )
+
+    def test_maker_em_escola_sem_lab_maker_ve_tudo(self):
+        # esconder o único laboratório pareceria agenda vazia
+        self.assertEqual(self._ve("maker", "Lab. Tecs", "Tablets"), ["Lab. Tecs", "Tablets"])
+
+    def test_escola_de_um_laboratorio_so_nao_muda(self):
+        self.assertEqual(self._ve("tecnologias", "Lab. Tecs"), ["Lab. Tecs"])
+
+
+
+
 if __name__ == "__main__":
     unittest.main()
