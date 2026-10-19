@@ -1,8 +1,8 @@
 {
-  "versao": "2.3.2",
-  "exe": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v2.3.2/Registro-SED.exe",
-  "sha256": "b28c2d7df39dfd3623d5ce4e16a645b40c0976e65c7c4dd0e9df9f667a46a983",
-  "instalador": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v2.3.2/Registro-SED-Instalador.exe",
+  "versao": "2.3.3",
+  "exe": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v2.3.3/Registro-SED.exe",
+  "sha256": "e239cac482588f2573dcb3391ae78ac0fdd37b070d80c5d3f0e3989a0889830c",
+  "instalador": "https://github.com/ArnoNeto1/registro-sed-automatizado/releases/download/v2.3.3/Registro-SED-Instalador.exe",
   "zip": "https://github.com/ArnoNeto1/registro-sed-automatizado/archive/refs/heads/main.zip",
-  "notas": "- **Escolas com mais de um laboratório.** Antes, o programa só trazia as\n  aulas do laboratório principal da agenda do NTE. Agora ele também traz as\n  aulas dos outros laboratórios de tecnologia da escola (por exemplo\n  \"Lab. Maker\" ou \"Laboratório de Informática 02\"). Elas aparecem na mesma\n  aba \"Laboratório\", com o nome da sala ao lado da turma, para você saber\n  de qual laboratório é cada aula.\n- Salas que não são do laboratório, como Auditório e Biblioteca, continuam\n  de fora."
+  "notas": "- **Cada orientador vê só o seu laboratório.** Na escola que tem Lab. Tecs\n  e Lab. Maker, o programa agora segue o que você marcou em \"Meus dados\",\n  na pergunta \"Você é orientador de:\":\n  - **Tecnologias Educacionais:** aparecem as aulas dos laboratórios de\n    tecnologia, sem as do Lab. Maker;\n  - **Laboratório Maker:** aparecem só as aulas do Lab. Maker.\n- Se a sua escola não tiver laboratório do tipo que você marcou, nada muda:\n  a lista continua mostrando todas as aulas do laboratório."
 }
