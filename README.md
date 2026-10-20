@@ -29,7 +29,7 @@ resumo de tudo que vai para a SED, e só manda depois que você clicar em
 
 ## Veja funcionando
 
-![Vídeo de divulgação: o programa lê a agenda do NTE, preenche o registro da SED sozinho e só envia quando você clica em Enviar](docs/video-promocional.gif)
+![Vídeo de divulgação: o programa lê a agenda do NTE, a IA escreve o conteúdo da aula, o registro da SED é preenchido sozinho e só é enviado quando você clica em Enviar](docs/video-promocional.gif)
 
 Os nomes de professores, turmas e escola que aparecem no vídeo são
 fictícios — nenhum dado real de ninguém.
